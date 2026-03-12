@@ -15,6 +15,7 @@ from contextlib import redirect_stdout
 import numpy as np
 import pyvista as pv
 import tetgen
+from numba import njit, prange
 
 from irregular_object_packing.cat.tetra_cell import TetraCell
 from irregular_object_packing.cat.utils import (
@@ -56,6 +57,74 @@ def compute_cdt(meshes: list[pv.PolyData], tetgen_kwargs=None) -> pv.Unstructure
 
     return mesh.grid
 
+
+@njit(cache=True)
+def _vectorized_n_related_objects(cumsum_npoints, cells):
+    """Vectorized version of n_related_objects for all cells at once.
+
+    Parameters:
+    cumsum_npoints (ndarray): Cumulative sum of points per object.
+    cells (ndarray): (n_cells, 4) array of point indices.
+
+    Returns:
+    object_ids (ndarray): (n_cells, 4) array of object IDs for each point.
+    n_unique (ndarray): (n_cells,) array of number of unique objects per cell.
+    """
+    n_cells = cells.shape[0]
+    object_ids = np.empty((n_cells, 4), dtype=np.int64)
+    n_unique = np.empty(n_cells, dtype=np.int64)
+
+    for i in prange(n_cells):
+        for j in range(4):
+            # searchsorted equivalent: find which object this point belongs to
+            obj = 0
+            for k in range(len(cumsum_npoints)):
+                if cells[i, j] < cumsum_npoints[k]:
+                    obj = k
+                    break
+            object_ids[i, j] = obj
+
+        # count unique objects
+        seen = np.zeros(len(cumsum_npoints), dtype=np.int64)
+        count = 0
+        for j in range(4):
+            if seen[object_ids[i, j]] == 0:
+                seen[object_ids[i, j]] = 1
+                count += 1
+        n_unique[i] = count
+
+    return object_ids, n_unique
+
+
+def filter_relevant_cells(cells, objects_npoints):
+    """Filter out cells that only belong to a single object.
+
+    Vectorized version: computes object assignments for all cells at once
+    using numba, then filters.
+
+    parameters:
+    cells (ndarray): an array of shape (n_cells, 4) with the indices of the points in the cell.
+    objects_npoints (List[int]): A list of the number of points for each object.
+    """
+    cells_arr = np.asarray(cells, dtype=np.int64)
+    npoints_arr = np.array(objects_npoints, dtype=np.int64)
+    cumsum = np.cumsum(npoints_arr)
+
+    object_ids, n_unique = _vectorized_n_related_objects(cumsum, cells_arr)
+
+    relevant_cells = []
+    skipped_cells = []
+
+    for i in range(len(cells_arr)):
+        cell = TetraCell(cells_arr[i].tolist(), object_ids[i].tolist(), i)
+        if n_unique[i] == 1:
+            skipped_cells.append(cell)
+        else:
+            relevant_cells.append(cell)
+
+    return relevant_cells, skipped_cells
+
+
 def split_and_process(cell: TetraCell, tetmesh_points: np.ndarray, normals: list[list[np.ndarray]], cat_cells: list[list[np.ndarray]], normals_per_points):
     """Splits the cell into faces and processes them."""
     # 0. split the cell into faces
@@ -80,41 +149,11 @@ def split_and_process(cell: TetraCell, tetmesh_points: np.ndarray, normals: list
             added_objs.append(obj_id)
 
 
-def filter_relevant_cells(cells: list[int], objects_npoints: list[int]):
-    """Filter out cells that only belong to a single object.
-
-    parameters:
-    cells (ndarray): an array of shape (n_cells, 4) with the indices of the points in the cell. shape: [id0, id1, id2, id3]
-    objects_npoints (List[int]): A list of the number of points for each object.
-    """
-    relevant_cells: list[TetraCell] = []
-    skipped_cells = []
-
-    for i, cell in enumerate(cells):
-        rel_objs = n_related_objects(objects_npoints, cell=cell)
-        cell = TetraCell(cell, rel_objs, i)
-        if cell.nobjs == 1:
-            skipped_cells.append(cell)
-        else:
-            relevant_cells.append(cell)
-
-    return relevant_cells, skipped_cells
-
-
 def process_cells_to_normals(tetmesh_points: np.ndarray, rel_cells: list[TetraCell], n_objs: int) -> tuple[list[np.ndarray], list[np.ndarray]]:
     # initialize face normals list
-    face_normals = []
-    for _i in range(n_objs):
-        face_normals.append([])
-
-    face_normals_pp = []
-    for _i in range(len(tetmesh_points)):
-        face_normals_pp.append([])
-
-    # initialize cat cells list
-    cat_cells = []
-    for _i in range(n_objs):
-        cat_cells.append([])
+    face_normals = [[] for _ in range(n_objs)]
+    face_normals_pp = [[] for _ in range(len(tetmesh_points))]
+    cat_cells = [[] for _ in range(n_objs)]
 
     for cell in rel_cells:
         # mutates face_normals and cat_cells

@@ -89,7 +89,7 @@ class Optimizer(OptimizerData):
     # ----------------------------------------------------------------------------------------------
     def setup(self):
         # init current state
-        self.curr_sample_rate = self.shape0.n_faces
+        self.curr_sample_rate = self.shape0.n_cells
 
         n_expected_objs = round(self.config.r * self.container0.volume/ self.shape0.volume)
         if n_expected_objs == 1:
@@ -133,7 +133,7 @@ class Optimizer(OptimizerData):
         self.add(self.tf_arrays, self.normals, self.cat_cells, iterdata)
 
     def sample_rate_mesh(self, scale_factor):
-        return int(mesh_simplification_condition(scale_factor, self.config.alpha, self.config.beta) * self.shape0.n_faces)
+        return int(mesh_simplification_condition(scale_factor, self.config.alpha, self.config.beta) * self.shape0.n_cells)
 
     def resample_meshes(self, scale_factor=None):
         self.log.info("resampling meshes")
@@ -145,8 +145,8 @@ class Optimizer(OptimizerData):
             self.shape = resample_pyvista_mesh(self.shape0, self.curr_sample_rate)
             self.container = resample_mesh_by_triangle_area(self.shape, self.container0, factor=4)
 
-        self.log.info(f"container: n_faces: {self.container.n_faces}[sampled]/{self.container0.n_faces}[original]")
-        self.log.info(f"mesh: n_faces: {self.curr_sample_rate}[sampled]/{self.shape0.n_faces}[original]")
+        self.log.info(f"container: n_faces: {self.container.n_cells}[sampled]/{self.container0.n_cells}[original]")
+        self.log.info(f"mesh: n_faces: {self.curr_sample_rate}[sampled]/{self.shape0.n_cells}[original]")
 
     def run(self, start_idx=None, end_idx=None, Ni=-1):
         self.check_setup()

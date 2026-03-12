@@ -152,7 +152,7 @@ def reorder_split_input(point_ids, SPLIT_INPUT=SPLIT_INPUT):
     """convenience func to resort points so that sorted_points[point_ids]
     returns the same input as SPLIT_INPUT[1, 2, 3, 4]"""
     # Adds a NaN row to the input data to cover for index 0
-    nan_row = [[np.NaN, np.NaN, np.NaN]]
+    nan_row = [[np.nan, np.nan, np.nan]]
     sorted_points = [[]] * 4
 
     for i, pid in enumerate(point_ids):
@@ -167,7 +167,7 @@ RESORT_TEST_INPUT = [[0.0,0.0,0.0], [1.0,1.0,1.0], [2.0,2.0,2.0], [3.0,3.0,3.0]]
 
 class TestResortPoints(unittest.TestCase):
     def setUp(self):
-        self.nan_row = [[np.NaN, np.NaN, np.NaN]]
+        self.nan_row = [[np.nan, np.nan, np.nan]]
         self.expected_result = lambda lst: float_array(self.nan_row + lst)
 
     def test_resort_points_ordered(self):
