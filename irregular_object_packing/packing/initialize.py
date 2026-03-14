@@ -140,7 +140,7 @@ def coord_is_correct(
         distance_to_container = trimesh.proximity.signed_distance(container, [coord])[0]  # type: ignore
         distance_arr.append(distance_to_container > min_distance_between_meshes / 2)
 
-        if np.alltrue(distance_arr):
+        if np.all(distance_arr):
             return True
     return False
 
@@ -167,7 +167,7 @@ def filter_coords(
             np.linalg.norm(coord - i) > min_distance for i in objects_coords
         ]
 
-        if np.alltrue(distance_arr):
+        if np.all(distance_arr):
             point = container.find_closest_point(coord)
             distance_to_container = np.linalg.norm(coord - point)
             if distance_to_container > min_distance / 2:

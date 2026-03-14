@@ -1,44 +1,20 @@
 import numpy as np
 import pyvista as pv
+import trimesh
 
-# from sklearn.cluster import KMeans
-
-
-# def resample_pyvista_mesh_kmeans(mesh: pv.PolyData, target_vertices: int):
-#     # Convert PyVista mesh to NumPy points|
-#     points = mesh.points
-
-#     # Cluster points using KMeans to get the target number of vertices
-#     kmeans = KMeans(n_clusters=target_vertices)
-#     kmeans.fit(points)
-#     new_points = kmeans.cluster_centers_
-
-#     # Create a new mesh from the reduced points
-#     cloud = pv.PolyData(new_points)
-
-#     # Regenerate the surface mesh using Delaunay triangulation
-#     new_mesh = cloud.reconstruct_surface()
-
-#     # Extract the surface of the 3D triangulation
-#     new_mesh = new_mesh.extract_surface()
-
-#     # Smooth the mesh
-#     new_mesh = new_mesh.smooth(n_iter=10)
-
-#     return new_mesh
+from irregular_object_packing.mesh.utils import pyvista_to_trimesh, trimesh_to_pyvista
 
 
 def resample_pyvista_mesh(mesh: pv.PolyData, target_faces):
     """Resample a PyVista mesh to a target number of faces.
 
-    If the number of faces
-    of the mesh is less than the target number of faces, we use subdivision,
-    If the number of faces of the mesh is greater than the target number of faces,
-    decimation is used."""
-    # Compute the decimation factor based on the target number of faces
-    if mesh.n_faces > target_faces:
+    Uses trimesh's quadric decimation for downsampling (preserves geometric features
+    like concave notches better than uniform decimation) and pyvista Loop subdivision
+    for upsampling.
+    """
+    if mesh.n_cells > target_faces:
         new_mesh = downsample_pv_mesh(mesh, target_faces)
-    elif mesh.n_faces < target_faces:
+    elif mesh.n_cells < target_faces:
         new_mesh = upsample_pv_mesh(mesh, target_faces)
     else:
         return mesh
@@ -56,7 +32,7 @@ def upsample_pv_mesh(input_mesh: pv.PolyData, target_faces: int):
     :param target_faces: The target number of faces in the upsampled mesh
     :return: A PyVista PolyData object representing the upsampled mesh
     """
-    num_input_faces = input_mesh.n_faces
+    num_input_faces = input_mesh.n_cells
     if target_faces <= num_input_faces:
         raise ValueError(
             "Target number of faces should be greater than the input mesh's \
@@ -72,14 +48,27 @@ def upsample_pv_mesh(input_mesh: pv.PolyData, target_faces: int):
 
 
 def downsample_pv_mesh(mesh: pv.PolyData, target_faces: int):
-    num_faces = mesh.n_faces
+    """Downsample a mesh using trimesh's quadric decimation.
+
+    Quadric decimation preserves geometric features (like the RBC concave notch)
+    much better than uniform decimation at low face counts.
+    """
+    num_faces = mesh.n_cells
     if num_faces < target_faces:
         raise ValueError("Target number of faces must be less than the number of faces \
             in the mesh.")
-    decimation_factor = 1 - target_faces / num_faces
-    # Decimate the mesh using the decimation factor
-    new_mesh = mesh.decimate(decimation_factor, inplace=False)
-    return new_mesh
+
+    # Use trimesh quadric decimation for better feature preservation
+    tri_mesh = pyvista_to_trimesh(mesh)
+    try:
+        simplified = tri_mesh.simplify_quadric_decimation(target_faces)
+        if simplified.is_empty or len(simplified.faces) == 0:
+            raise ValueError("Quadric decimation produced empty mesh")
+        return trimesh_to_pyvista(simplified)
+    except Exception:
+        # Fallback to pyvista decimation if trimesh fails
+        decimation_factor = 1 - target_faces / num_faces
+        return mesh.decimate(decimation_factor, inplace=False)
 
 
 def mesh_simplification_condition(scale_factor: float, alpha: float = 0.05, beta: float = 0.1) -> float:
@@ -110,7 +99,7 @@ def resample_mesh_by_triangle_area(example_mesh: pv.PolyData, target_mesh: pv.Po
     target_avg_area = compute_average_triangle_area(target_mesh)
 
     # Calculate the desired number of triangles in the target mesh
-    target_num_triangles =  factor * int(target_mesh.n_faces * (target_avg_area / example_avg_area))
+    target_num_triangles =  factor * int(target_mesh.n_cells * (target_avg_area / example_avg_area))
 
     # Use the decimation algorithm to reduce the number of triangles in the target mesh
     resampled_mesh = resample_pyvista_mesh(target_mesh, target_faces=target_num_triangles)
@@ -120,4 +109,4 @@ def resample_mesh_by_triangle_area(example_mesh: pv.PolyData, target_mesh: pv.Po
 
 def compute_average_triangle_area(mesh: pv.PolyData):
     """Compute the average triangle area of a mesh."""
-    return mesh.area / mesh.n_faces
+    return mesh.area / mesh.n_cells

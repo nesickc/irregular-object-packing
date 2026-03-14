@@ -5,7 +5,7 @@ from pyvista import PolyData
 
 
 def compute_collision(mesh: PolyData, with_mesh: PolyData, set_contacts) -> int:
-    contact_mesh, n_contacts = mesh.collision(with_mesh, 0, cell_tolerance=1e-6)
+    contact_mesh, n_contacts = mesh.collision(with_mesh, contact_mode=0, cell_tolerance=1e-6)
     if n_contacts > 0:
 
         if set_contacts:

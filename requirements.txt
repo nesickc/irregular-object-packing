@@ -9,6 +9,7 @@ pandas
 pyvista==0.38.4
 imageio==2.26.1
 scipy
+cyipopt
 setuptools
 tabulate
 tetgen

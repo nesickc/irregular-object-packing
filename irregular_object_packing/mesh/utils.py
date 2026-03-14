@@ -14,10 +14,16 @@ def print_mesh_info(mesh: pv.PolyData, description="", suppress_scientific=True)
         )
 
 def pyvista_to_trimesh(mesh: pv.PolyData):
-    tri_container = mesh.extract_surface().triangulate() # type: ignore
-    faces_as_array = tri_container.faces.reshape((tri_container.n_faces, 4))[:, 1:] # type: ignore
+    tri_container = mesh.extract_surface(algorithm=None).triangulate() # type: ignore
+    faces_as_array = tri_container.faces.reshape((tri_container.n_cells, 4))[:, 1:] # type: ignore
     tri_container = Trimesh(tri_container.points, faces_as_array) # type: ignore
     return tri_container
+
+
+def trimesh_to_pyvista(mesh: Trimesh) -> pv.PolyData:
+    """Convert a trimesh.Trimesh to a pyvista.PolyData mesh."""
+    faces = np.hstack([np.full((len(mesh.faces), 1), 3, dtype=np.int64), mesh.faces])
+    return pv.PolyData(mesh.vertices, faces.flatten())
 
 
 def convert_faces_to_polydata_input(faces: np.ndarray):
