@@ -36,7 +36,9 @@ You can also install the in-development version with:
 
 ## Documentation
 
-Currently there is no documentation. However you can read through my [thesis report](/static/Thesis-Maurits_Bos-MSc_Computational_Science-Final-19June2023-1-fix.pdf) which explains the algorithm and the implementation in detail. Also, the notebooks show a lot of the functionallity.
+The [thesis report](/static/Thesis-Maurits_Bos-MSc_Computational_Science-Final-19June2023-1-fix.pdf) explains the algorithm and the Python implementation in detail. The notebooks also demonstrate much of the current functionality.
+
+Planning and maintenance documentation for the Windows C++ port starts with [docs/PROJECT.md](/docs/PROJECT.md). Agents and maintainers should follow the reading order in [AGENTS.md](/AGENTS.md).
 
 ## Known Issues
 

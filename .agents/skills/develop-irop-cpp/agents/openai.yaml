@@ -1,0 +1,4 @@
+interface:
+  display_name: "Develop IROP C++"
+  short_description: "Implement and review the IROP C++ port"
+  default_prompt: "Use $develop-irop-cpp to implement and verify the next C++ task in this repository."
