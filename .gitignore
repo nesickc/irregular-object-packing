@@ -10,6 +10,7 @@ __pycache__/
 .Python
 env/
 build/
+vcpkg_installed/
 develop-eggs/
 dist/
 downloads/
@@ -29,6 +30,7 @@ venv/
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
+!app/irop/irop.manifest
 *.spec
 
 # Installer logs
@@ -77,6 +79,9 @@ target/
 
 #VSCode
 .vscode/
+
+# Local CMake preset overrides
+CMakeUserPresets.json
 
 #Ipython Notebook
 .ipynb_checkpoints

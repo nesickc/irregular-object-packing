@@ -1,0 +1,23 @@
+---
+Checks: >
+  -*,
+  bugprone-exception-escape,
+  bugprone-integer-division,
+  bugprone-narrowing-conversions,
+  bugprone-sizeof-expression,
+  bugprone-suspicious-enum-usage,
+  bugprone-use-after-move,
+  clang-analyzer-core.*,
+  clang-analyzer-cplusplus.NewDelete,
+  clang-analyzer-cplusplus.NewDeleteLeaks,
+  clang-analyzer-deadcode.DeadStores,
+  clang-analyzer-security.*,
+  performance-for-range-copy,
+  performance-inefficient-string-concatenation,
+  performance-unnecessary-copy-initialization,
+  portability-simd-intrinsics
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*[\\/](app|include|src|tests)[\\/]'
+SystemHeaders: false
+FormatStyle: file
+...

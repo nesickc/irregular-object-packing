@@ -1,0 +1,21 @@
+include_guard(GLOBAL)
+
+function(irop_enable_project_warnings target_name)
+    if(NOT TARGET "${target_name}")
+        message(FATAL_ERROR "irop_enable_project_warnings called for unknown target: ${target_name}")
+    endif()
+
+    if(MSVC)
+        set(irop_warning_options /W4 /permissive- /Zc:__cplusplus /utf-8)
+        if(IROP_WARNINGS_AS_ERRORS)
+            list(APPEND irop_warning_options /WX)
+        endif()
+    else()
+        set(irop_warning_options -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion)
+        if(IROP_WARNINGS_AS_ERRORS)
+            list(APPEND irop_warning_options -Werror)
+        endif()
+    endif()
+
+    target_compile_options("${target_name}" PRIVATE ${irop_warning_options})
+endfunction()

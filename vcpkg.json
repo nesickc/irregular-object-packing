@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "irregular-object-packing",
+  "version-string": "0.0.0",
+  "builtin-baseline": "271a5b8850aa50f9a40269cbf3cf414b36e333d6",
+  "dependencies": [
+    "catch2",
+    "cli11",
+    "nlohmann-json",
+    "spdlog",
+    {
+      "name": "vtk",
+      "default-features": false,
+      "features": [
+        "utf8"
+      ]
+    }
+  ]
+}

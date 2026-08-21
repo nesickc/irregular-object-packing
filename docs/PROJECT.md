@@ -1,6 +1,6 @@
 # C++ Project Definition
 
-Status: Approved baseline; implementation has not started.
+Status: Approved baseline; Milestone 1 implementation is verified.
 
 ## Purpose
 

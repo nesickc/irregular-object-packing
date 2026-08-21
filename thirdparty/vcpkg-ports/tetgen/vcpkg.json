@@ -1,0 +1,7 @@
+{
+  "name": "tetgen",
+  "version-string": "0-disabled",
+  "description": "Disabled guard for the license-gated future TetGen overlay port",
+  "license": "AGPL-3.0-only",
+  "supports": "windows & !windows"
+}

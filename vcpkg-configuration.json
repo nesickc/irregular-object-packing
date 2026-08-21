@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg-configuration.schema.json",
+  "overlay-ports": [
+    "thirdparty/vcpkg-ports"
+  ],
+  "registries": [
+    {
+      "kind": "git",
+      "repository": "https://github.com/microsoft/vcpkg",
+      "baseline": "62159a45e18f3a9ac0548628dcaf74fcb60c6ff9",
+      "packages": [
+        "gl2ps"
+      ]
+    }
+  ]
+}

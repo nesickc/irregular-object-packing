@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nesickc/irregular-object-packing/blob/main/docs/schemas/inspection-summary-v1.schema.json",
+  "title": "IROP inspection summary version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "command",
+    "outcome",
+    "input",
+    "output",
+    "limits",
+    "mesh",
+    "versions",
+    "warnings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "command": {
+      "const": "inspect"
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category"],
+      "properties": {
+        "category": {
+          "const": "success"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resolved_path", "stl_encoding", "size_bytes"],
+      "properties": {
+        "resolved_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stl_encoding": {
+          "enum": ["ascii", "binary"]
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["normalized_stl"],
+      "properties": {
+        "normalized_stl": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_input_bytes", "max_vertices", "max_triangles"],
+      "properties": {
+        "max_input_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_vertices": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_triangles": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "mesh": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vertex_count", "triangle_count", "bounds"],
+      "properties": {
+        "vertex_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "triangle_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "bounds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["minimum", "maximum"],
+          "properties": {
+            "minimum": {
+              "$ref": "#/$defs/point"
+            },
+            "maximum": {
+              "$ref": "#/$defs/point"
+            }
+          }
+        }
+      }
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["irop", "vtk"],
+      "properties": {
+        "irop": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vtk": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "string",
+        "maxLength": 512
+      }
+    }
+  },
+  "$defs": {
+    "point": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number"
+      }
+    }
+  }
+}
