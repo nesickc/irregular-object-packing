@@ -23,7 +23,8 @@ Use this reference for new C++ behavior and refactors.
 
 ## Style
 
-- Follow Google C++ Style through the checked-in formatter.
+- Use the root `.clang-format` as the formatting authority. It is the maintainer's Google-based profile with intentional overrides; do not replace it with the stock Google preset.
+- Run clang-format on changed project-owned C++ files and review brace insertion or other non-whitespace edits. Avoid unrelated whole-tree formatting churn.
 - Use descriptive names that expose scale semantics, units, ownership, and coordinate space.
 - Keep headers narrow; include what they use and forward-declare only when safe.
 - Use comments for rationale, invariants, numerical conventions, and compatibility constraints.

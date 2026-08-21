@@ -21,7 +21,7 @@ Use the repository skill `$develop-irop-cpp` for C++ implementation, refactoring
 - Keep the CLI thin and the packing implementation in reusable library modules.
 - Keep VTK, TetGen, Ipopt, and other dependency-specific types behind adapters. Do not expose them from the project-owned domain API.
 - Prefer simple composition and explicit data flow. Do not introduce speculative hierarchies, service boundaries, or template frameworks.
-- Follow Google C++ Style through the repository formatting configuration once present.
+- Treat the checked-in `.clang-format` as the authoritative C++ style. It is Google-based with project-specific overrides; do not substitute the unmodified Google preset.
 - Treat mesh and configuration inputs as untrusted. Validate resource sizes, arithmetic, indices, finite values, and termination conditions at trust boundaries.
 - Add dependencies only when they replace specialized, security-sensitive, or substantial code. Prefer the standard library for small utilities.
 - Optimize measured hot paths. Preserve a simple correct implementation when performance is not material.

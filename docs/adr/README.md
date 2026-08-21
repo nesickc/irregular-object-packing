@@ -21,6 +21,8 @@ Accepted ADRs are immutable apart from typo fixes and explicit amendment notes. 
 | [0003](0003-windows-cmake-vcpkg-toolchain.md) | Accepted | Target Windows 11, MSVC, C++20, CMake, and vcpkg |
 | [0004](0004-agent-documentation-and-skill.md) | Accepted | Use layered project memory and a repository-scoped skill |
 | [0005](0005-stl-first-output-contract.md) | Accepted | Make STL primary and JSON the canonical run record |
+| [0006](0006-bsd-source-license-and-third-party-boundary.md) | Accepted | Retain BSD-3-Clause for project source and track third-party terms separately |
+| [0007](0007-authoritative-clang-format-profile.md) | Accepted | Use the checked-in clang-format profile as the C++ style authority |
 
 Use [0000-template.md](0000-template.md) for new records.
 

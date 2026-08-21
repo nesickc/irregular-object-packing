@@ -35,6 +35,7 @@ Goal: prove that the Windows toolchain, dependency model, CLI, mesh representati
 Work:
 
 - Add CMake targets, CMake presets, the vcpkg manifest, and the TetGen overlay-port skeleton.
+- Record the source, version, license, and notice requirements for the initial dependency set; keep TetGen out of linked targets until its integration review is complete.
 - Configure C++20, MSVC warnings, formatting, focused static analysis, and CTest.
 - Add the `TriangleMesh`, basic result/error types, and VTK mesh conversion boundary.
 - Implement secure STL loading and writing with preflight resource checks and post-load validation.
@@ -48,6 +49,7 @@ Acceptance criteria:
 - A sample STL can be read, validated, and written back as an inspectable STL.
 - Malformed/truncated fixtures fail safely.
 - `run-summary.json` or an inspection summary records resolved inputs and mesh statistics.
+- The dependency baseline has a reviewable license inventory, and the TetGen overlay skeleton cannot be enabled accidentally.
 
 ## Milestone 2: Transforms, Sampling, and Initialization
 
@@ -74,6 +76,7 @@ Goal: reproduce the constrained tetrahedralization and chordal axis transform da
 
 Work:
 
+- Review the pinned TetGen version and integration model, and record the license path before linking it into a project target.
 - Complete the TetGen overlay port and adapter.
 - Convert project meshes to and from the TetGen boundary without exposing TetGen types.
 - Port relevant-cell filtering, tetrahedron classification, split cases, face generation, and normal construction.
@@ -86,6 +89,7 @@ Acceptance criteria:
 - Simple object/container fixtures produce valid tetrahedralization output.
 - CAT faces and normals satisfy orientation and containment invariants.
 - Failures are translated into project-owned status values with useful diagnostics.
+- The selected TetGen license path and obligations are documented for source publication and any future combined distribution.
 
 ## Milestone 4: Local Nonlinear Optimization
 
@@ -136,6 +140,7 @@ Work:
 - Compare initialization, CAT constraints, transforms, final feasibility, and packing metrics within tolerances.
 - Exercise malformed STL, extreme numeric values, allocation boundaries, and solver termination.
 - Add Windows CI for configure, build, tests, formatting checks, and focused static analysis.
+- Verify third-party notices and license obligations against the exact resolved dependency versions.
 - Document installation, CLI usage, configuration fields, and troubleshooting.
 
 Acceptance criteria:
@@ -144,6 +149,7 @@ Acceptance criteria:
 - Security-boundary tests cover the highest-risk parser and allocation paths.
 - CI validates the supported Windows preset.
 - A clean checkout has a reproducible setup and smoke-run procedure.
+- Every published source or binary artifact includes the licenses and notices required by its contents.
 - Documentation accurately distinguishes implemented, verified, experimental, and deferred behavior.
 
 ## Milestone 7: Measured Scalability Improvements

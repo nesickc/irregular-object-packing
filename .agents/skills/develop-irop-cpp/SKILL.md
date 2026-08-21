@@ -50,7 +50,7 @@ Load multiple references only when the task genuinely spans those activities.
 1. State the milestone outcome and acceptance evidence affected by the task.
 2. Inspect current code, Python reference behavior, tests, compatibility items, and ADR constraints.
 3. Design the smallest cohesive change that preserves module boundaries.
-4. Implement using Google C++ Style and repository tools.
+4. Implement using the root `.clang-format` and repository tools. The checked-in profile is authoritative over generic Google-style defaults.
 5. Run focused verification, then the broader affected checks.
 6. Review the diff for behavior drift, unsafe input handling, ownership, and dependency leakage.
 7. Update `docs/STATUS.md`; update compatibility, plan, ADRs, and this skill when their governed facts change.

@@ -234,6 +234,19 @@ Deferred dependencies:
 
 Do not add a dependency for a small, safe utility that can be implemented and tested clearly with the standard library. Do not implement specialized file parsers, nonlinear solvers, computational geometry kernels, or JSON parsers casually.
 
+## Licensing and Third-Party Notices
+
+Repository-owned source, including the C++ port, remains available under the BSD 3-Clause License in the root [LICENSE](../LICENSE) file. Retain the existing Maurits Bos copyright notice, license conditions, and disclaimer. Publishing the repository on GitHub is treated as source redistribution for compliance purposes, even though no binary distribution is currently planned.
+
+Dependencies and copied third-party material retain their own licenses; the repository BSD license does not replace those terms. When adding or updating a dependency:
+
+- Record its exact version, source, and license in the dependency manifest or accompanying third-party documentation.
+- Preserve notices and source offers required by that dependency.
+- Keep copied dependency code isolated under `thirdparty/` or an overlay port instead of presenting it as project-owned BSD source.
+- Review the combined-work and binary-distribution obligations before publishing an executable or hosted service.
+
+TetGen is the most restrictive planned dependency: the current 1.6 release is offered under AGPL-3.0 or a commercial license. Its selected version and integration model require an explicit license review before the dependency is enabled or any combined build is distributed. See [ADR-0006](adr/0006-bsd-source-license-and-third-party-boundary.md).
+
 ## Error Handling
 
 - Use exceptions for unrecoverable setup, parsing, filesystem, and dependency-adapter failures at application boundaries.
@@ -303,7 +316,7 @@ Project warnings are errors in CI once the baseline is stable. Third-party warni
 
 ## Coding Principles
 
-- Follow Google C++ Style and repository formatting tools.
+- Treat the root `.clang-format` as authoritative. It starts from Google style and intentionally overrides it; format changed C++ files with that exact profile.
 - Prefer C++20 standard-library facilities.
 - Keep functions and modules cohesive and data flow visible.
 - Apply DRY to stable knowledge, not to coincidental repetition.
@@ -323,5 +336,6 @@ Project warnings are errors in CI once the baseline is stable. Third-party warni
 - `docs/COMPATIBILITY.md` records preserved quirks and deviations.
 - `docs/adr/` records durable decisions and their rationale.
 - `.agents/skills/develop-irop-cpp/` defines the preferred agent workflow for C++ work.
+- `.clang-format` is the maintainer's reusable C++ formatting baseline for this and future C++ repositories.
 
 When project-wide coding practice changes, update the skill and the relevant project documentation together. Record a significant or difficult-to-reverse policy change as an ADR.

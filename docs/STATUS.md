@@ -1,10 +1,10 @@
 # C++ Implementation Status
 
-Last updated: 2026-08-18
+Last updated: 2026-08-21
 
 ## Current Summary
 
-The C++ implementation has not started. The project baseline, milestone plan, compatibility process, ADR process, agent onboarding guide, and project-scoped development skill are defined.
+The C++ implementation has not started. The project baseline, milestone plan, compatibility process, ADR process, agent onboarding guide, project-scoped development skill, BSD licensing policy, and authoritative C++ formatting profile are defined.
 
 Current milestone: Milestone 1 — Build Foundation and STL Vertical Slice.
 
@@ -23,7 +23,7 @@ Next outcome: configure and build a C++20 CLI on Windows 11 with Visual Studio 2
 
 | Milestone | Status | Evidence | Next gate |
 | --- | --- | --- | --- |
-| 0. Baseline and agent onboarding | Verified | `AGENTS.md`, project documents, ADRs, and validated `develop-irop-cpp` skill | Begin build foundation |
+| 0. Baseline and agent onboarding | Verified | `AGENTS.md`, project documents, ADRs, validated `develop-irop-cpp` skill, and clang-format 22.1.3 profile validation | Begin build foundation |
 | 1. Build foundation and STL vertical slice | Not started | None | Configure, build, inspect, and re-emit STL |
 | 2. Transforms, sampling, and initialization | Not started | None | Emit a valid initialized placement scene |
 | 3. Tetrahedralization and CAT constraints | Not started | None | Verify tetrahedral and CAT invariants |
@@ -37,8 +37,9 @@ Next outcome: configure and build a C++20 CLI on Windows 11 with Visual Studio 2
 
 | Area | Status | Notes |
 | --- | --- | --- |
-| Project documentation | Verified | Baseline documents and ADR process established |
-| Agent development skill | Verified | Repository-scoped skill created and structurally validated |
+| Project documentation | Verified | Baseline documents, BSD policy, formatting policy, and ADR process established |
+| Agent development skill | Verified | Repository-scoped skill created, structurally validated, and synchronized with the formatter policy |
+| C++ formatting profile | Verified | Root `.clang-format` accepted by Visual Studio 2026 bundled clang-format 22.1.3 |
 | CMake and presets | Not started | No C++ build files exist |
 | vcpkg manifest and overlay ports | Not started | Dependency baseline is documented only |
 | CLI | Not started | Intended command and artifacts are documented only |
@@ -64,8 +65,8 @@ The initial catalog is in `docs/COMPATIBILITY.md`. No compatibility item has bee
 ## Immediate Next Work
 
 1. Add target-based root CMake configuration and Visual Studio 2026 presets.
-2. Add a pinned vcpkg manifest for the Milestone 1 dependency subset.
-3. Establish formatting, warnings, CTest, and focused static-analysis configuration.
+2. Add a pinned vcpkg manifest and license inventory for the Milestone 1 dependency subset.
+3. Integrate the checked-in formatting profile with build checks, then establish warnings, CTest, and focused static-analysis configuration.
 4. Add the project-owned `TriangleMesh` and basic result/error types.
 5. Implement a resource-limited STL inspection vertical slice and emit normalized STL plus JSON.
 6. Update this file with exact build and test evidence.
@@ -87,4 +88,5 @@ When updating status:
 
 | Date | Change | Verification |
 | --- | --- | --- |
+| 2026-08-21 | Retained BSD-3-Clause and its existing notice; added the authoritative reusable C++ formatting profile and synchronized agent guidance | Existing `LICENSE` reviewed; attached profile accepted by Visual Studio 2026 bundled clang-format 22.1.3 |
 | 2026-08-18 | Established the C++ project baseline and agent workflow | Documentation cross-check and skill structural validation |

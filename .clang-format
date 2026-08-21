@@ -1,0 +1,19 @@
+---
+BasedOnStyle: Google
+AccessModifierOffset: -4
+AlignArrayOfStructures: Left
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: Empty
+AllowShortLoopsOnASingleLine: false
+BreakBeforeBraces: Stroustrup
+BreakConstructorInitializers: AfterColon
+ColumnLimit: 120
+Cpp11BracedListStyle: false
+IndentCaseLabels: false
+IndentWidth: 4
+InsertBraces: true
+LambdaBodyIndentation: OuterScope
+PackConstructorInitializers: CurrentLine
+ReflowComments: Never
+SpaceBeforeCpp11BracedList: true
+TabWidth: 4
