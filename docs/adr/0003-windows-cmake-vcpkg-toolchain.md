@@ -130,3 +130,14 @@ No GL2PS overlay or modified port participated in the restore.
 Fresh Visual Studio Debug and Release builds against that resolution each
 passed 30/30 tests. A separate fresh Ninja build invoked clang-tidy 22.1.3 and
 passed the same 30/30 tests; the checked-in clang-format gate also passed.
+
+## Amendments
+
+### 2026-08-22 — TetGen guard replaced after approval
+
+ADR-0009 completed the source, integration, and license review required by this
+decision. The historical non-activatable guard was replaced with a patchless
+overlay for official TetGen v1.6.0, and the root manifest now consumes its
+static `TetGen::TetGen` target privately through the project-owned adapter. The
+AGPL-3.0-or-later combined-distribution and hosted-service gates in ADR-0009
+remain active.

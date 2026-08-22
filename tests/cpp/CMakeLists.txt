@@ -3,6 +3,8 @@ find_package(nlohmann_json CONFIG REQUIRED)
 
 add_executable(
     irop_tests
+    cat_tests.cpp
+    diagnostic_geometry_tests.cpp
     initialization_scene_tests.cpp
     initialization_tests.cpp
     inspection_tests.cpp
@@ -10,6 +12,7 @@ add_executable(
     mesh_validation_tests.cpp
     sampling_policy_tests.cpp
     stl_io_tests.cpp
+    tetrahedralization_tests.cpp
     transform_tests.cpp
 )
 target_compile_features(irop_tests PRIVATE cxx_std_20)
@@ -26,6 +29,7 @@ target_link_libraries(
         Catch2::Catch2WithMain
         irop_core
         nlohmann_json::nlohmann_json
+        VTK::IOXML
 )
 
 if(COMMAND irop_enable_project_warnings)

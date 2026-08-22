@@ -74,6 +74,15 @@ Acceptance criteria:
 
 Goal: reproduce the constrained tetrahedralization and chordal axis transform data needed by optimization.
 
+Compatibility clarification (2026-08-22): the live Python CAT path supplies the
+explicit TetGen switch string `O0/0Q`. The historical wrapper treats that string
+as authoritative and bypasses the accompanying `cdt=True`, `steinerleft=0`, and
+other keyword arguments, so successful reference runs use point-union Delaunay
+tetrahedralization rather than the PLC/CDT behavior suggested by the function
+name. Milestone 3 reproduces that observable behavior under
+`IROP-COMPAT-0005`; enabling the intended constrained path is a deliberate
+post-parity behavior change, not part of this milestone.
+
 Work:
 
 - Review the pinned TetGen version and integration model, and record the license path before linking it into a project target.

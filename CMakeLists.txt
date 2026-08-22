@@ -24,6 +24,7 @@ find_package(CLI11 CONFIG REQUIRED)
 find_package(Eigen3 3.4.1 EXACT CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
+find_package(TetGen 1.6.0 EXACT CONFIG REQUIRED)
 find_package(
     VTK 9.3
     CONFIG
@@ -33,32 +34,39 @@ find_package(
         CommonDataModel
         CommonMisc
         IOGeometry
+        IOXML
 )
 
 set(
     IROP_CORE_SOURCES
     src/error.cpp
+    src/cat/cat.cpp
     src/geometry/mesh_geometry.cpp
     src/geometry/sampling_policy.cpp
     src/geometry/transform.cpp
     src/initialization/initialize_scene.cpp
     src/inspection/inspect_stl.cpp
     src/io/stl_io.cpp
+    src/io/diagnostic_geometry.cpp
     src/model/mesh_validation.cpp
     src/packing/initialization.cpp
+    src/tetrahedralization/tetgen_adapter.cpp
 )
 set(
     IROP_PUBLIC_HEADERS
     include/irop/error.hpp
+    include/irop/cat/cat.hpp
     include/irop/geometry/mesh_geometry.hpp
     include/irop/geometry/sampling_policy.hpp
     include/irop/geometry/transform.hpp
     include/irop/initialization/initialize_scene.hpp
     include/irop/inspection/inspect_stl.hpp
     include/irop/io/stl_io.hpp
+    include/irop/io/diagnostic_geometry.hpp
     include/irop/model/mesh_validation.hpp
     include/irop/model/triangle_mesh.hpp
     include/irop/packing/initialization.hpp
+    include/irop/tetrahedralization/tetrahedralization.hpp
 )
 set(
     IROP_VTK_TARGETS
@@ -66,6 +74,7 @@ set(
     VTK::CommonDataModel
     VTK::CommonMisc
     VTK::IOGeometry
+    VTK::IOXML
 )
 
 # Static is intentional until the project defines an installed ABI and symbol
@@ -85,6 +94,7 @@ target_link_libraries(
     PRIVATE
         Eigen3::Eigen
         nlohmann_json::nlohmann_json
+        TetGen::TetGen
         ${IROP_VTK_TARGETS}
 )
 irop_enable_project_warnings(irop_core)

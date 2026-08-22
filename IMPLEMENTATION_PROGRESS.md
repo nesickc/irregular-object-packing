@@ -8,15 +8,16 @@ detailed implementation trail requested for the migration.
 
 ## Current Position
 
-- Active milestone: Milestone 3 — Tetrahedralization and CAT Constraints.
-- State: Milestones 1 and 2 are Verified; Milestone 3 has not started.
-- Current outcome: `irop_core` and the thin CLI now inspect STL meshes and emit a
-  deterministic, bounded, atomically published initialized placement scene with
-  combined/optional individual STL, canonical placements, and a successful run
-  summary. The scoped official GL2PS `1.4.2#5` graph passes Debug, Release, and
+- Active milestone: Milestone 4 — Local Nonlinear Optimization.
+- State: Milestones 1 through 3 are Verified; Milestone 4 has not started.
+- Current outcome: `irop_core` now provides hardened STL inspection, deterministic
+  bounded initialization, a private TetGen 1.6.0 tetrahedralization boundary, and
+  project-owned participant-contiguous CAT polygons and plane constraints. Optional
+  no-overwrite VTU/VTP diagnostics expose the intermediate geometry without leaking
+  VTK or TetGen types. The full dependency graph passes Debug, Release, format, and
   clang-tidy analysis gates.
-- Blocking ambiguities: none for the completed work. Milestone 3 begins with the
-  explicit TetGen license/source-model decision already required by ADR-0006.
+- Blocking ambiguities: none. ADR-0009 records the approved TetGen AGPL source and
+  integration path; `IROP-COMPAT-0005` records the live Python switch-string quirk.
 
 ## Decisions Applied
 
@@ -35,8 +36,21 @@ detailed implementation trail requested for the migration.
 - Preserve coincident-point merging used by the Python/PyVista read path. Rejecting
   malformed and unsafe inputs is new trust-boundary behavior, not a compatibility
   deviation from a demonstrated successful Python case.
-- Keep the TetGen overlay disabled and unlinked until the Milestone 3 license and
-  integration review.
+- Pin official TetGen v1.6.0 commit
+  `535f9c41f44abc832a7bbf2c9c7af003d1c18f3c` through a patchless local vcpkg
+  overlay, build it statically with `TETLIBRARY`, and keep its types behind a private
+  adapter. Project-owned source remains BSD-3-Clause; future conveyed combined builds
+  and hosted services retain the ADR-0009 AGPL review gate.
+- Preserve the Python reference's literal `O0/0Q` TetGen string. Its historical
+  wrapper bypasses the accompanying `cdt=True` and `steinerleft=0` keywords, so the
+  compatibility path tetrahedralizes the participant point union rather than silently
+  enabling the intended PLC/CDT configuration.
+- Serialize calls into TetGen because its exact predicates use mutable process-global
+  state. Validate closed participant surfaces and all translated output, enforce
+  project-controlled input/accepted-output limits, and document that backend peak
+  memory/time cannot be hard-capped through the library API.
+- Keep CAT outputs contiguous by participant with explicit polygon/constraint ranges,
+  bounded work counters, and optional no-overwrite VTU/VTP diagnostic writers.
 - Keep the reviewed default vcpkg baseline and route only GL2PS to the pinned newer
   Microsoft registry that contains `1.4.2#5`; do not introduce a local GL2PS port.
 - Permit a vcpkg download-cache fallback only when the acquired GL2PS archive matches
@@ -94,6 +108,29 @@ detailed implementation trail requested for the migration.
 - [x] Add ADR-0008, direct Eigen license inventory, and compatibility entries through
   `IROP-DEV-0012`.
 - [x] Pass scoped-registry Debug, Release, format, clang-tidy, and full CTest gates.
+
+## Milestone 3 Checklist
+
+- [x] Approve and document the exact TetGen 1.6.0 AGPL source/integration path.
+- [x] Replace the guard port with a patchless vcpkg overlay that exports
+  `TetGen::TetGen` and installs the complete upstream license.
+- [x] Add a dependency-private adapter with project-owned points, owners,
+  tetrahedra, limits, work counters, statuses, and diagnostics.
+- [x] Preserve the effective Python `O0/0Q` point-union behavior and regression-test
+  mixed-participant tetrahedra across separated surfaces.
+- [x] Validate closed single-component participant surfaces, translated point order,
+  ownership, indices, finite values, nondegeneracy, and accepted output counts.
+- [x] Serialize TetGen calls and make every nested TetGen input allocation cleanup-safe
+  under exceptions.
+- [x] Port relevant-cell filtering, stable ownership classification, all four CAT
+  split cases, per-owner polygon reuse, constraints, and contiguous ranges.
+- [x] Match complete Python split goldens and verify finite unit inward normals and
+  polygon coplanarity across every ownership partition.
+- [x] Bound tetrahedralization and CAT work with focused exhaustion regressions and
+  project-owned failure translation.
+- [x] Add validated, no-overwrite VTU tetrahedral and VTP CAT diagnostic writers.
+- [x] Pass isolated vcpkg port checks, Visual Studio Debug/Release, format,
+  clang-tidy, focused review, and full CTest gates.
 
 ## Activity Log
 
@@ -236,6 +273,63 @@ detailed implementation trail requested for the migration.
 - The checked-in clang-format 22.1.3 compliance target passed. Milestone 2 is
   Verified and Milestone 3 is next.
 
+### 2026-08-22 — TetGen AGPL path and patchless overlay approved
+
+- Recorded the maintainer's selection of official TetGen v1.6.0 under
+  AGPL-3.0-or-later in ADR-0009. Static versus dynamic linkage is treated as an
+  engineering choice rather than a license workaround; project-owned source remains
+  under its BSD-3-Clause notice, and no binary distribution is currently planned.
+- Replaced the non-activatable guard with a patchless vcpkg port pinned to commit
+  `535f9c41f44abc832a7bbf2c9c7af003d1c18f3c` and full-commit archive SHA-512
+  `62e5fc640f72e594ad7d7286075f85cb590d4a71b979e0b035d545543e4d80807db26c2f56775032e4a94abbdaf411473273bd304ad77bf1a451c9db435dcfcf`.
+- The port-owned CMake wrapper compiles unmodified `tetgen.cxx` and `predicates.cxx`,
+  exports a static `TetGen::TetGen` target with `TETLIBRARY`, and installs
+  `tetgen.h` plus the complete upstream license. An isolated x64-windows
+  Debug/Release install passed vcpkg `--enforce-port-checks`.
+
+### 2026-08-22 — Tetrahedralization and Python parity implemented
+
+- Added the dependency-private adapter and project-owned tetrahedral mesh, ownership,
+  limits, work, result, and status contracts. Public headers remain free of TetGen,
+  VTK, and Eigen types.
+- Historical PyVista TetGen v0.6.0 source confirms that a nonempty `switches` value
+  takes the literal API branch and bypasses keyword behavior. The adapter therefore
+  preserves the Python reference's `O0/0Q` point-union cell complex under
+  `IROP-COMPAT-0005` instead of silently adding PLC/CDT/zero-index/no-Steiner flags.
+- Added closed-surface validation, checked count/index conversions, exact output point
+  order/ownership verification, finite/nondegenerate cell checks, accepted-output
+  limits, and project-owned dependency-failure diagnostics.
+- Serialized the complete TetGen call around its mutable global predicate state.
+  Review also hardened nested facet allocation ordering and value-initialized every
+  facet before any throwing nested allocation.
+
+### 2026-08-22 — CAT constraints and diagnostics implemented
+
+- Ported relevant-cell filtering, stable descending ownership classification, all
+  four split partitions, Python-compatible polygon geometry, per-owner polygon reuse,
+  one constraint per source vertex/face pair, and participant-contiguous ranges.
+- Added complete Python goldens for 1+1+1+1, 2+1+1, 3+1, and 2+2 splits plus
+  split-wide finite unit inward-normal, coplanarity, ownership, range, malformed mesh,
+  and every configured work/output-limit regression.
+- Added optional VTU tetrahedralization and VTP CAT writers using private VTK XML
+  adapters. They validate project geometry and cross-references, reserve a previously
+  absent output leaf, remove incomplete files on failure, and never overwrite.
+- Independent integration and design review closed findings in exception cleanup,
+  process-global concurrency, literal-switch parity, diagnostic cross-references,
+  backend-failure translation, and invariant-test breadth.
+
+### 2026-08-22 — Milestone 3 verified
+
+- Visual Studio Debug and Release builds completed with warnings as errors and passed
+  all 102 CTest cases in each configuration. The focused tetrahedralization, CAT, and
+  diagnostic subset passed 22/22.
+- The Ninja analysis build ran clang-tidy 22.1.3 over all affected project targets and
+  passed all 102 tests. Explicit non-empty/count invariants made TetGen raw-array
+  marshalling analyzable without suppressing the security checks.
+- The checked-in clang-format 22.1.3 compliance target passed. Compatibility entries
+  `IROP-COMPAT-0005`, `IROP-DEV-0013`, and `IROP-DEV-0014` are verified. Milestone 4
+  is next.
+
 ## Verification Evidence
 
 - Toolchain: CMake 4.2.3; Visual Studio Community 2026 18.8.3; MSVC 19.51.36252;
@@ -243,21 +337,25 @@ detailed implementation trail requested for the migration.
   `271a5b8850aa50f9a40269cbf3cf414b36e333d6`; GL2PS-only registry baseline
   `62159a45e18f3a9ac0548628dcaf74fcb60c6ff9`; clang-format/clang-tidy 22.1.3.
 - Configure: `cmake --preset windows-vs2026 -B
-  build/windows-vs2026-scoped-gl2ps` succeeded from a fresh tree, selected GL2PS
-  `1.4.2#5`, and used no temporary GL2PS overlay.
+  build/windows-vs2026-scoped-gl2ps` succeeded, selected GL2PS `1.4.2#5`, restored
+  the patchless TetGen `1.6.0` overlay, and used no temporary dependency overlay.
 - Debug: `cmake --build build/windows-vs2026-scoped-gl2ps --config Debug`
   succeeded; `ctest --test-dir build/windows-vs2026-scoped-gl2ps -C Debug
-  --output-on-failure` passed 80/80 tests.
+  --output-on-failure` passed 102/102 tests.
 - Release: `cmake --build build/windows-vs2026-scoped-gl2ps --config Release`
   succeeded; `ctest --test-dir build/windows-vs2026-scoped-gl2ps -C Release
-  --output-on-failure` passed 80/80 tests.
+  --output-on-failure` passed 102/102 tests.
 - Formatting: `cmake --build build/windows-vs2026-scoped-gl2ps --config Debug
   --target irop-format-check` passed with the checked-in profile.
-- Analysis: a fresh `windows-ninja-analysis` configuration at
+- Analysis: the `windows-ninja-analysis` configuration at
   `build/windows-ninja-analysis-scoped-gl2ps-vcpkg-root` generated build rules
-  invoking clang-tidy 22.1.3, built successfully, and passed 80/80 tests.
+  invoking clang-tidy 22.1.3, built successfully in the Visual Studio developer
+  environment, and passed 102/102 tests.
+- Focused Milestone 3: `ctest --test-dir build/windows-vs2026-scoped-gl2ps -C
+  Debug -R "TetGen|tetrahedral|CAT|diagnostic writers" --output-on-failure`
+  passed 22/22 tests.
 - The Release executable embeds `activeCodePage=UTF-8` and `longPathAware=true`; the
-  Unicode-path CLI smoke test passed in all three fresh test configurations.
+  Unicode-path CLI smoke test passed in all three verified test configurations.
 
 ## Risks and Follow-up
 
@@ -283,5 +381,16 @@ detailed implementation trail requested for the migration.
   packing-result coordinator.
 - Each initialization output path is a new atomic artifact-set identity and cannot be
   an existing reusable directory.
-- Next implementation work is Milestone 3. TetGen remains license-gated until its
-  source/publication model is explicitly approved under ADR-0006.
+- TetGen 1.6.0 makes any conveyed combined build and any hosted-service release subject
+  to the ADR-0009 AGPL-specific source, build-material, and notice review. Private or
+  static linkage does not remove that gate.
+- The Python-compatible `O0/0Q` switch string tetrahedralizes the participant point
+  union rather than enabling PLC/CDT mode. Changing this after parity may materially
+  change CAT constraints and requires comparative packing evidence.
+- Project limits bound TetGen inputs and accepted outputs but cannot strictly cap the
+  backend's peak memory or time. Calls are serialized because TetGen's exact-predicate
+  implementation uses mutable process-global state.
+- Tetrahedralization accepts one connected closed component per participant; nested
+  cavities or multi-solid participant semantics remain undefined.
+- Next implementation work is Milestone 4: the private Ipopt boundary and local
+  seven-variable nonlinear solve.

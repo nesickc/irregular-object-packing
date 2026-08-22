@@ -24,6 +24,7 @@ Accepted ADRs are immutable apart from typo fixes and explicit amendment notes. 
 | [0006](0006-bsd-source-license-and-third-party-boundary.md) | Accepted | Retain BSD-3-Clause for project source and track third-party terms separately |
 | [0007](0007-authoritative-clang-format-profile.md) | Accepted | Use the checked-in clang-format profile as the C++ style authority |
 | [0008](0008-milestone-2-initialization-contract.md) | Accepted | Fix deterministic initialization state, bounded geometry work, and atomic artifact publication |
+| [0009](0009-tetgen-1-6-agpl-overlay-and-adapter.md) | Accepted | Pin TetGen 1.6.0 under AGPL and isolate it behind a private vcpkg adapter |
 
 Use [0000-template.md](0000-template.md) for new records.
 

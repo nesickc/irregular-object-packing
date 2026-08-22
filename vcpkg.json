@@ -9,6 +9,7 @@
     "eigen3",
     "nlohmann-json",
     "spdlog",
+    "tetgen",
     {
       "name": "vtk",
       "default-features": false,

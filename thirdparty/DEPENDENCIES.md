@@ -4,13 +4,14 @@ The default C++ dependency graph is resolved from vcpkg builtin-registry commit
 `271a5b8850aa50f9a40269cbf3cf414b36e333d6` using the `x64-windows` triplet.
 Only `gl2ps` is routed to the official Microsoft vcpkg Git registry pinned at
 `62159a45e18f3a9ac0548628dcaf74fcb60c6ff9`. The table records direct
-dependencies through Milestone 2. Port revisions are part of the resolved vcpkg version
-even when the upstream version is unchanged.
+dependencies through Milestone 3. Port revisions are part of the resolved vcpkg
+version even when the upstream version is unchanged.
 
 | Dependency | Resolved version | Role | Upstream source | License and required notice |
 | --- | --- | --- | --- | --- |
-| VTK | `9.3.0-pv5.12.1#12` | STL I/O, the private mesh-adapter boundary, and the private triangle-surface intersection primitive | [Kitware/VTK at `09a76bc`](https://github.com/Kitware/VTK/tree/09a76bc55b37caad94d0d8ebe865caaed1b438af) | BSD-3-Clause at the project level, with module-specific copyright/license files. Preserve the resolved `share/vtk/copyright` material. The vcpkg port's license metadata is currently `null`, so review the installed notices rather than relying on manifest metadata alone. |
+| VTK | `9.3.0-pv5.12.1#12` | STL I/O, private mesh/geometry adapters, triangle-surface intersection, and optional VTU/VTP diagnostics | [Kitware/VTK at `09a76bc`](https://github.com/Kitware/VTK/tree/09a76bc55b37caad94d0d8ebe865caaed1b438af) | BSD-3-Clause at the project level, with module-specific copyright/license files. Preserve the resolved `share/vtk/copyright` material. The vcpkg port's license metadata is currently `null`, so review the installed notices rather than relying on manifest metadata alone. |
 | Eigen3 | `3.4.1#1` | Private fixed-size transform mathematics and Eigen version reporting | [libeigen/eigen `3.4.1`](https://gitlab.com/libeigen/eigen/-/tree/3.4.1) | MPL-2.0 for the used Eigen headers. Preserve `share/eigen3/copyright`; the installed notice bundle also carries Apache-2.0, BSD, and MINPACK texts for other portions of the distribution. |
+| TetGen | `1.6.0` | Private tetrahedralization backend for the Python-compatible CAT cell complex | [TetGen/TetGen at `535f9c41`](https://github.com/TetGen/TetGen/tree/535f9c41f44abc832a7bbf2c9c7af003d1c18f3c) | AGPL-3.0-or-later under the selected open-source path. Preserve the complete upstream `LICENSE`, installed as `share/tetgen/copyright`. Any conveyed combined executable/build and any hosted-service release require an AGPL-specific source, build-material, and notice review under ADR-0009. |
 | CLI11 | `2.5.0` | Command-line parsing | [CLIUtils/CLI11 `v2.5.0`](https://github.com/CLIUtils/CLI11/tree/v2.5.0) | BSD-3-Clause; retain the upstream `LICENSE` notice. |
 | nlohmann-json | `3.12.0#1` | Inspection, placement, and run-summary JSON serialization | [nlohmann/json `v3.12.0`](https://github.com/nlohmann/json/tree/v3.12.0) | MIT; retain `LICENSE.MIT`. |
 | spdlog | `1.16.0` | CLI diagnostics | [gabime/spdlog `v1.16.0`](https://github.com/gabime/spdlog/tree/v1.16.0) | MIT; retain the upstream `LICENSE` notice. |
@@ -25,6 +26,38 @@ needed by the vertical slice.
 remain Eigen-free, and the private `EIGEN_MPL2_ONLY` definition rejects accidental
 use of Eigen's optional non-MPL2 headers. Promoting Eigen from a VTK-transitive
 package to a direct dependency adds no runtime deployment component.
+
+## Repository-owned TetGen overlay
+
+The checked-in `thirdparty/vcpkg-ports/tetgen/` port pins official v1.6.0 commit
+`535f9c41f44abc832a7bbf2c9c7af003d1c18f3c`. `vcpkg_from_github` verifies the
+full-commit archive SHA-512
+`62e5fc640f72e594ad7d7286075f85cb590d4a71b979e0b035d545543e4d80807db26c2f56775032e4a94abbdaf411473273bd304ad77bf1a451c9db435dcfcf`.
+This differs from the tag-named archive hash because GitHub serves those archive
+identities separately.
+
+Upstream v1.6.0 has no installable CMake package. A port-owned wrapper compiles
+the unmodified `tetgen.cxx` and `predicates.cxx` sources as a static library,
+exports `TetGen::TetGen`, propagates the required `TETLIBRARY` definition,
+installs `tetgen.h`, and installs the complete upstream license. No project
+patch is applied to TetGen source. The overlay passed a fresh isolated
+`x64-windows` Debug/Release install with vcpkg `--enforce-port-checks` on
+2026-08-22.
+
+`irop_core` links TetGen privately and exposes only project-owned points,
+tetrahedra, limits, work counters, statuses, and diagnostics. This private
+static boundary prevents TetGen types from becoming a public API contract; it
+does not avoid or weaken TetGen's AGPL-3.0-or-later conditions. Project-owned
+source retains BSD-3-Clause notices, while any future conveyed combined build
+or hosted service must complete the release-specific review in ADR-0009. No
+binary distribution is currently planned.
+
+The adapter passes the literal `O0/0Q` switch string used by the historical
+Python wrapper. Because that nonempty string bypasses the reference's separate
+`cdt=True` and `steinerleft=0` keyword arguments, the effective compatibility
+path tetrahedralizes the participant point union rather than enabling TetGen's
+PLC/CDT mode. This is recorded as `IROP-COMPAT-0005`; it is independent of the
+dependency acquisition and license decision.
 
 ## Repository-owned VTK overlay
 
@@ -93,7 +126,3 @@ a binary, inventory every resolved transitive package and preserve the copyright
 files installed under `vcpkg_installed/<triplet>/share/`.
 
 - `coin-or-ipopt` is deferred until Milestone 4.
-- TetGen is deferred until Milestone 3 and remains license-gated by
-  [ADR-0006](../docs/adr/0006-bsd-source-license-and-third-party-boundary.md).
-  Its checked-in port is a deliberately unsupported guard; TetGen is not a
-  dependency of any target or the root manifest.

@@ -1,6 +1,6 @@
 # C++ Project Definition
 
-Status: Approved baseline; Milestones 1 and 2 are verified.
+Status: Approved baseline; Milestones 1 through 3 are verified; Milestone 4 is next.
 
 ## Purpose
 
@@ -54,6 +54,10 @@ A successful run should produce:
 STL contains geometry but not a reliable scene graph, unit declaration, or instance metadata. JSON is therefore the canonical run record, while STL is the primary interoperable visual result. Input coordinates use arbitrary but consistent units; the application performs no implicit unit conversion.
 
 Additional formats such as OBJ, PLY, and VTK-family files may be added behind the mesh I/O boundary when useful. They are not required for the first parity release.
+
+Milestone 3 provides optional VTU tetrahedral-grid and VTP CAT-face diagnostic
+writers behind that same boundary. These are developer inspection artifacts,
+not canonical packing results.
 
 Milestone 2 also exposes the initialization phase independently:
 
@@ -238,7 +242,7 @@ A later visualization application will link to `irop_core` and consume `PackingR
 | VTK | STL I/O, mesh processing, geometry queries, later visualization path | vcpkg |
 | Eigen3 | Linear algebra and fixed-size transforms | vcpkg |
 | Ipopt | Primary nonlinear optimization backend | vcpkg |
-| TetGen | Constrained tetrahedralization | Local vcpkg overlay port |
+| TetGen | Python-compatible CAT tetrahedralization; live `O0/0Q` point-union behavior | Patchless local vcpkg overlay; static private backend |
 | CLI11 | Command-line parsing and help | vcpkg |
 | nlohmann-json | Configuration and run-result serialization | vcpkg |
 | spdlog | Structured diagnostics | vcpkg |
@@ -263,7 +267,14 @@ Dependencies and copied third-party material retain their own licenses; the repo
 - Keep copied dependency code isolated under `thirdparty/` or an overlay port instead of presenting it as project-owned BSD source.
 - Review the combined-work and binary-distribution obligations before publishing an executable or hosted service.
 
-TetGen is the most restrictive planned dependency: the current 1.6 release is offered under AGPL-3.0 or a commercial license. Its selected version and integration model require an explicit license review before the dependency is enabled or any combined build is distributed. See [ADR-0006](adr/0006-bsd-source-license-and-third-party-boundary.md).
+TetGen is the most restrictive active dependency. ADR-0009 selects official
+v1.6.0 commit `535f9c41f44abc832a7bbf2c9c7af003d1c18f3c` under
+AGPL-3.0-or-later and integrates it through a patchless local vcpkg overlay plus
+a static, private project adapter. Private linkage isolates the public API; it
+is not a licensing exemption. Project-owned files remain BSD-3-Clause, while
+any future conveyed combined build or hosted service requires a release-specific
+AGPL source, build-material, and notice review. No binary distribution is
+currently planned. See [ADR-0009](adr/0009-tetgen-1-6-agpl-overlay-and-adapter.md).
 
 ## Error Handling
 

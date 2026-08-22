@@ -47,3 +47,14 @@ Rejected because BSD-3-Clause already matches the desired permissive source publ
 - The root `LICENSE` remains unchanged and contains the BSD 3-Clause text and original notice.
 - Project documentation distinguishes repository-owned source from dependency licenses.
 - Dependency and release milestones include a license review before a combined build is distributed.
+
+## Amendments
+
+### 2026-08-22 — TetGen gate resolved
+
+ADR-0009 records the maintainer's informed selection of TetGen 1.6.0 under
+AGPL-3.0-or-later, the exact official source and archive hash, the private linked
+adapter boundary, and the combined-build distribution restrictions. The root
+BSD license continues to cover project-owned source only. This exact
+`AGPL-3.0-or-later` selection clarifies the original decision's shorter
+`AGPL-3.0` shorthand without rewriting its historical context.

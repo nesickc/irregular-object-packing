@@ -1,8 +1,8 @@
 # Local vcpkg overlay ports
 
 This directory is the checked-in, repository-owned overlay root selected by
-`vcpkg-configuration.json`. It contains one active compatibility overlay and one
-deliberately disabled guard port.
+`vcpkg-configuration.json`. It contains the active VTK compatibility overlay and
+the active patchless TetGen source/build overlay.
 
 ## VTK
 
@@ -25,13 +25,18 @@ port for unrelated convenience changes.
 
 ## TetGen
 
-`tetgen/` remains a hard-disabled guard. Its contradictory platform support
-expression rejects every target, and its portfile fails explicitly as a second
-line of defense. No project target or root-manifest dependency can link TetGen.
+`tetgen/` pins official TetGen v1.6.0 commit
+`535f9c41f44abc832a7bbf2c9c7af003d1c18f3c` with full-commit archive SHA-512
+`62e5fc640f72e594ad7d7286075f85cb590d4a71b979e0b035d545543e4d80807db26c2f56775032e4a94abbdaf411473273bd304ad77bf1a451c9db435dcfcf`.
+The port-owned CMake wrapper compiles upstream `tetgen.cxx` and `predicates.cxx`
+unchanged as a static library, exports `TetGen::TetGen` with `TETLIBRARY`,
+installs `tetgen.h`, and installs the upstream AGPL-3.0-or-later license through
+vcpkg's standard copyright path.
 
-Completing the TetGen port requires the Milestone 3 integration and license
-review. Replace the guard only after recording the selected source revision,
-hash, patches, license path, and verification evidence.
+The root manifest links this target privately through the project-owned
+tetrahedralization adapter. `PRIVATE` is an API/type-isolation boundary, not a
+license boundary. ADR-0009 records the selected AGPL path and the review gate
+for any future combined binary distribution or hosted service.
 
 ## Scoped official GL2PS registry
 
