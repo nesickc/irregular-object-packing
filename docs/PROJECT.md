@@ -1,6 +1,6 @@
 # C++ Project Definition
 
-Status: Approved baseline; Milestones 1 through 3 are verified; Milestone 4 is next.
+Status: Approved baseline; Milestones 1 through 4 are verified; Milestone 5 is next.
 
 ## Purpose
 
@@ -241,7 +241,7 @@ A later visualization application will link to `irop_core` and consume `PackingR
 | --- | --- | --- |
 | VTK | STL I/O, mesh processing, geometry queries, later visualization path | vcpkg |
 | Eigen3 | Linear algebra and fixed-size transforms | vcpkg |
-| Ipopt | Primary nonlinear optimization backend | vcpkg |
+| Ipopt | Primary nonlinear optimization backend | Official 3.14.19 Windows archives through a local vcpkg overlay; private C adapter |
 | TetGen | Python-compatible CAT tetrahedralization; live `O0/0Q` point-union behavior | Patchless local vcpkg overlay; static private backend |
 | CLI11 | Command-line parsing and help | vcpkg |
 | nlohmann-json | Configuration and run-result serialization | vcpkg |
@@ -275,6 +275,16 @@ is not a licensing exemption. Project-owned files remain BSD-3-Clause, while
 any future conveyed combined build or hosted service requires a release-specific
 AGPL source, build-material, and notice review. No binary distribution is
 currently planned. See [ADR-0009](adr/0009-tetgen-1-6-agpl-overlay-and-adapter.md).
+
+Milestone 4 packages the official Ipopt 3.14.19 Windows DLL archive through a
+hash-pinned local vcpkg overlay and consumes it only through a private C adapter.
+That archive also contains MUMPS, METIS, embedded oneMKL code, and Intel runtime
+DLLs under their own terms. ADR-0010 permits the reproducible local-development
+path but gates public distribution of this exact binary combination until a
+release-specific license, notice, source-availability, and TetGen-AGPL
+compatibility review. A source-built Ipopt/MUMPS/OpenBLAS configuration is the
+preferred distribution fallback. See
+[ADR-0010](adr/0010-ipopt-3-14-19-official-windows-binary-adapter.md).
 
 ## Error Handling
 

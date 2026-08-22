@@ -1,8 +1,29 @@
 # Local vcpkg overlay ports
 
 This directory is the checked-in, repository-owned overlay root selected by
-`vcpkg-configuration.json`. It contains the active VTK compatibility overlay and
-the active patchless TetGen source/build overlay.
+`vcpkg-configuration.json`. It contains the active VTK compatibility overlay,
+the patchless TetGen source/build overlay, and the Ipopt official-Windows-binary
+packaging overlay.
+
+## Ipopt
+
+`coin-or-ipopt/` packages the source-unmodified official COIN-OR Ipopt 3.14.19
+Windows x64 MSVC 2022 MD and MDD archives. Both complete archives are pinned by
+SHA-512 in the portfile. The port forces dynamic libraries and the dynamic CRT,
+exports `Ipopt::Ipopt`, and installs only the header/import-library surface and
+recursive DLL closure needed by the project's private C adapter.
+
+The adapter explicitly selects the bundled MUMPS 5.8.0 backend. AMPL, Java, and
+sIpopt artifacts are deliberately omitted. Release needs six DLLs; Debug needs
+seven because it imports both `libmmd.dll` and `libmmdd.dll`. Keep the runtime
+lists synchronized with import-table inspection whenever the archive changes.
+Do not infer the closure only from CMake's direct imported target.
+
+The overlay applies no source patch, but it is not a source build and its
+archive contains components under several licenses. ADR-0010 and
+`thirdparty/DEPENDENCIES.md` define the provenance record and prohibit public
+binary distribution until a release-specific review clears the exact payload.
+The Debug/MDD archive and MSVC Debug CRT are development-only.
 
 ## VTK
 

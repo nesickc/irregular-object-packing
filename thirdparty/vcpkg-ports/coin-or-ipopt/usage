@@ -1,0 +1,8 @@
+coin-or-ipopt provides the source-unmodified official Ipopt Windows DLL build.
+
+The package exports a CMake config target:
+
+    find_package(Ipopt 3.14.19 EXACT CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE Ipopt::Ipopt)
+
+The package supports only Windows x64 with dynamic libraries and the dynamic CRT.

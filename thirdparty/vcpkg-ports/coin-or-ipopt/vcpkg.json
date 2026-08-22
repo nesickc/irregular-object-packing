@@ -1,0 +1,8 @@
+{
+  "name": "coin-or-ipopt",
+  "version": "3.14.19",
+  "description": "Ipopt nonlinear optimizer packaged from the official Windows DLL release",
+  "homepage": "https://github.com/coin-or/Ipopt",
+  "license": null,
+  "supports": "windows & x64 & !uwp & !xbox & !mingw & !staticcrt"
+}

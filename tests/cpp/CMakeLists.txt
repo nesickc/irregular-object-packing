@@ -8,6 +8,7 @@ add_executable(
     initialization_scene_tests.cpp
     initialization_tests.cpp
     inspection_tests.cpp
+    local_solver_tests.cpp
     mesh_geometry_tests.cpp
     mesh_validation_tests.cpp
     sampling_policy_tests.cpp

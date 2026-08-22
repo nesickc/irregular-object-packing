@@ -8,16 +8,19 @@ detailed implementation trail requested for the migration.
 
 ## Current Position
 
-- Active milestone: Milestone 4 — Local Nonlinear Optimization.
-- State: Milestones 1 through 3 are Verified; Milestone 4 has not started.
+- Active milestone: Milestone 5 — End-to-End Packing CLI.
+- State: Milestones 1 through 4 are Verified; Milestone 5 has not started.
 - Current outcome: `irop_core` now provides hardened STL inspection, deterministic
   bounded initialization, a private TetGen 1.6.0 tetrahedralization boundary, and
-  project-owned participant-contiguous CAT polygons and plane constraints. Optional
-  no-overwrite VTU/VTP diagnostics expose the intermediate geometry without leaking
-  VTK or TetGen types. The full dependency graph passes Debug, Release, format, and
-  clang-tidy analysis gates.
+  project-owned participant-contiguous CAT polygons and plane constraints. A private
+  Ipopt 3.14.19 C adapter now solves the bounded seven-variable local problem with
+  exact derivatives, structured outcomes, and independent applied-geometry
+  acceptance checks. Public headers expose only project-owned types. The full
+  dependency graph passes Debug, Release, format, and clang-tidy analysis gates.
 - Blocking ambiguities: none. ADR-0009 records the approved TetGen AGPL source and
-  integration path; `IROP-COMPAT-0005` records the live Python switch-string quirk.
+  integration path; ADR-0010 records the exact Ipopt binary path and public-binary
+  review gate; the compatibility catalog is synchronized through
+  `IROP-COMPAT-0006` and `IROP-DEV-0016`.
 
 ## Decisions Applied
 
@@ -51,6 +54,23 @@ detailed implementation trail requested for the migration.
   memory/time cannot be hard-capped through the library API.
 - Keep CAT outputs contiguous by participant with explicit polygon/constraint ranges,
   bounded work counters, and optional no-overwrite VTU/VTP diagnostic writers.
+- Package the source-unmodified official Ipopt 3.14.19 MD/MDD Windows archives
+  through a hash-pinned x64-windows vcpkg overlay. Consume only the C ABI inside a
+  private adapter, require the exact loaded version, select MUMPS explicitly, and
+  disable ambient `ipopt.opt` loading.
+- Keep random initialization outside the local-solver contract. Use an explicit
+  seven-variable initial guess, exact objective gradient and dense constraint
+  Jacobian, and a reusable workspace owned by the caller.
+- Accept only successful, acceptable, or feasible Ipopt candidates that satisfy
+  variable bounds and independent constraint checks in both solver space and the
+  geometry produced by the actually stored transform. Preserve solve-then-clamp and
+  componentwise Euler addition only behind compatibility markers.
+- Bound constraint rows, dense Jacobian entries, callback work, iterations, and
+  elapsed time. Time checks are cooperative around callback chunks; an active MUMPS
+  factorization and its peak allocation cannot be hard-preempted through this API.
+- Do not publicly distribute the exact Intel-linked Ipopt archive closure until the
+  ADR-0010 release-specific notice, source-availability, binary-term, and TetGen AGPL
+  review is complete.
 - Keep the reviewed default vcpkg baseline and route only GL2PS to the pinned newer
   Microsoft registry that contains `1.4.2#5`; do not introduce a local GL2PS port.
 - Permit a vcpkg download-cache fallback only when the acquired GL2PS archive matches
@@ -131,6 +151,34 @@ detailed implementation trail requested for the migration.
 - [x] Add validated, no-overwrite VTU tetrahedral and VTP CAT diagnostic writers.
 - [x] Pass isolated vcpkg port checks, Visual Studio Debug/Release, format,
   clang-tidy, focused review, and full CTest gates.
+
+## Milestone 4 Checklist
+
+- [x] Audit the live Python objective, constraints, bounds, transform application,
+  derivative strategy, initialization boundary, and ignored solver outcomes.
+- [x] Approve and document the exact official Ipopt 3.14.19 Windows archive path,
+  recursive runtime closure, component licenses, provenance, and public-binary gate.
+- [x] Add a hash-pinned x64-windows vcpkg overlay for the source-unmodified MD/MDD
+  archives and validate it cache-bypassed with `--enforce-port-checks`.
+- [x] Add project-owned local-step, constraint, request, bound, limit, work, status,
+  result, and reusable-workspace contracts with no public Ipopt or Eigen types.
+- [x] Implement the Python-compatible seven-variable objective and CAT plane
+  constraints with exact objective and constraint derivatives.
+- [x] Isolate Ipopt's C ABI in a private adapter, require runtime 3.14.19, select
+  MUMPS, disable ambient option files, and translate every backend outcome.
+- [x] Validate participant ownership/ranges, finite points/normals/bounds/initial
+  guesses, positive scale, problem size, and dense-Jacobian arithmetic before Ipopt.
+- [x] Enforce preparation, constraint-row, Jacobian-entry, callback, iteration, and
+  cooperative elapsed-time limits with structured failure results.
+- [x] Preserve solve-then-clamp and componentwise Euler addition, while rejecting a
+  candidate unless solver-space and actually applied geometry both pass postchecks.
+- [x] Add Python numerical goldens, central-difference derivative checks, box,
+  asymmetric, genuine seven-variable, fixed/infeasible, hostile-option-file,
+  malformed-input, resource-limit, clamping, and workspace-reuse tests.
+- [x] Benchmark exact analytic derivatives against Python-compatible forward
+  differences on 2,048 constraints.
+- [x] Pass the isolated overlay audit, Visual Studio Debug/Release, format,
+  clang-tidy, independent review, and full CTest gates.
 
 ## Activity Log
 
@@ -330,6 +378,58 @@ detailed implementation trail requested for the migration.
   `IROP-COMPAT-0005`, `IROP-DEV-0013`, and `IROP-DEV-0014` are verified. Milestone 4
   is next.
 
+### 2026-08-22 — Ipopt binary path and private boundary approved
+
+- Confirmed that both the pinned and current official source ports lack a runnable
+  sparse linear solver in this Windows configuration. Selected the source-unmodified
+  official Ipopt 3.14.19 MSVC MD/MDD archives with MUMPS through a repository-owned
+  vcpkg overlay instead of changing the reviewed global baseline or patching upstream
+  source.
+- Pinned complete Release and Debug archive SHA-512 values, pruned unused AMPL/Java/
+  sIpopt material, installed the exact recursive DLL closure, and exported
+  `Ipopt::Ipopt`. A cache-bypassed isolated install passed vcpkg
+  `--enforce-port-checks`.
+- Recorded the C-ABI, provenance, component-license, Debug nonredistribution, and
+  public-binary review decisions in ADR-0010. Local development and source
+  publication can proceed; the exact Intel-linked bundle is not release-approved.
+
+### 2026-08-22 — Local nonlinear solve implemented
+
+- Added dependency-free public local-solver contracts and a caller-owned reusable
+  workspace. Random draws remain the packing coordinator's responsibility, and each
+  solve receives an explicit seven-variable initial guess.
+- Ported the Python objective, `cbrt` volume scaling, `Ry * Rz * Rx` incremental
+  rotation, translation, and CAT plane constraints. Added exact objective and dense
+  constraint derivatives, including analytic rotation derivatives.
+- Added a private Ipopt C adapter that checks runtime 3.14.19 and MUMPS availability,
+  disables ambient `ipopt.opt`, applies bounded options, uses limited-memory Hessian
+  approximation, and translates every C status into project-owned outcomes.
+- Hardened the boundary with checked sized spans, ownership/range/finite/unit-normal
+  validation, fixed-problem handling, exhaustive work accounting, cooperative time
+  checks, and atomic accepted-transform publication.
+- Preserved solve-then-clamp and componentwise Euler addition under
+  `IROP-COMPAT-0001` and `IROP-COMPAT-0006`, but independently re-evaluated both
+  the solver candidate and the geometry produced by the stored transform. Failed or
+  infeasible iterates are no longer applied under `IROP-DEV-0015`; unsafe or
+  unbounded problem assumptions are corrected under `IROP-DEV-0016`.
+
+### 2026-08-22 — Milestone 4 verified
+
+- Added 12 focused local-solver Catch2 cases, bringing the suite to 112 focused tests
+  plus two CLI smoke tests. Coverage includes Python numerical goldens, analytic
+  derivatives, representative Ipopt solves with all seven variables available,
+  hostile ambient options, invalid inputs, fixed infeasibility, resource exhaustion,
+  clamp-induced infeasibility, and workspace reuse.
+- Visual Studio Debug and Release builds completed with warnings as errors and passed
+  all 114 tests. The Ninja analysis build ran clang-tidy 22.1.3 over the affected
+  targets and passed all 114 tests after its buffer-capacity and no-throw cleanup
+  findings were resolved without suppressions.
+- The checked-in clang-format gate passed. The hidden 2,048-constraint benchmark
+  measured 150.222 microseconds for the exact analytic Jacobian versus 1.32158
+  milliseconds for forward differences, about an 8.8x speedup.
+- Independent production/API review found no remaining Milestone 4 blocker.
+  Milestone 5 is next.
+
 ## Verification Evidence
 
 - Toolchain: CMake 4.2.3; Visual Studio Community 2026 18.8.3; MSVC 19.51.36252;
@@ -338,22 +438,33 @@ detailed implementation trail requested for the migration.
   `62159a45e18f3a9ac0548628dcaf74fcb60c6ff9`; clang-format/clang-tidy 22.1.3.
 - Configure: `cmake --preset windows-vs2026 -B
   build/windows-vs2026-scoped-gl2ps` succeeded, selected GL2PS `1.4.2#5`, restored
-  the patchless TetGen `1.6.0` overlay, and used no temporary dependency overlay.
+  the patchless TetGen `1.6.0` overlay, installed exact Ipopt `3.14.19`, and used
+  no temporary dependency overlay.
+- Ipopt overlay: a cache-bypassed isolated `vcpkg install
+  coin-or-ipopt:x64-windows --classic --enforce-port-checks --no-binarycaching`
+  using only the repository overlay passed with ABI
+  `37966ff18a9022a7b0575a2e77f52041276a4744a2c9485390900469a893ea07`.
 - Debug: `cmake --build build/windows-vs2026-scoped-gl2ps --config Debug`
   succeeded; `ctest --test-dir build/windows-vs2026-scoped-gl2ps -C Debug
-  --output-on-failure` passed 102/102 tests.
+  --output-on-failure` passed 114/114 tests.
 - Release: `cmake --build build/windows-vs2026-scoped-gl2ps --config Release`
   succeeded; `ctest --test-dir build/windows-vs2026-scoped-gl2ps -C Release
-  --output-on-failure` passed 102/102 tests.
+  --output-on-failure` passed 114/114 tests.
 - Formatting: `cmake --build build/windows-vs2026-scoped-gl2ps --config Debug
   --target irop-format-check` passed with the checked-in profile.
 - Analysis: the `windows-ninja-analysis` configuration at
   `build/windows-ninja-analysis-scoped-gl2ps-vcpkg-root` generated build rules
   invoking clang-tidy 22.1.3, built successfully in the Visual Studio developer
-  environment, and passed 102/102 tests.
+  environment, and passed 114/114 tests.
 - Focused Milestone 3: `ctest --test-dir build/windows-vs2026-scoped-gl2ps -C
   Debug -R "TetGen|tetrahedral|CAT|diagnostic writers" --output-on-failure`
   passed 22/22 tests.
+- Milestone 4 derivative benchmark:
+  `irop_tests.exe "[.m4-derivative-benchmark]"` in Release measured 150.222
+  microseconds analytic versus 1.32158 milliseconds forward difference for 2,048
+  constraints across 100 samples.
+- Application-local deployment contains the validated six-DLL Release and seven-DLL
+  Debug Ipopt/MUMPS recursive runtime closures documented in ADR-0010.
 - The Release executable embeds `activeCodePage=UTF-8` and `longPathAware=true`; the
   Unicode-path CLI smoke test passed in all three verified test configurations.
 
@@ -392,5 +503,16 @@ detailed implementation trail requested for the migration.
   implementation uses mutable process-global state.
 - Tetrahedralization accepts one connected closed component per participant; nested
   cavities or multi-solid participant semantics remain undefined.
-- Next implementation work is Milestone 4: the private Ipopt boundary and local
-  seven-variable nonlinear solve.
+- The exact official Ipopt archive includes Intel-linked components and is approved
+  for local development, not public binary distribution. Clear ADR-0010's
+  release-specific component notice, source-availability, binary-term, and TetGen
+  AGPL review before publishing a combined executable, installer, container, or
+  binary archive; prefer a source-built MUMPS/OpenBLAS configuration for that path.
+- Project-controlled elapsed checks run before, between, and after callback chunks,
+  but cannot hard-preempt an active MUMPS factorization or strictly cap its peak
+  internal allocation. Future parallel local solves also require a measured
+  concurrency audit because the selected MUMPS-backed build may serialize internally;
+  each concurrent call must use a distinct `LocalSolveWorkspace`.
+- Next implementation work is Milestone 5: compose the verified stages into a
+  bounded packing loop, add collision correction and convergence/recovery behavior,
+  and publish complete `irop pack` results.

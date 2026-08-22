@@ -4,13 +4,14 @@ The default C++ dependency graph is resolved from vcpkg builtin-registry commit
 `271a5b8850aa50f9a40269cbf3cf414b36e333d6` using the `x64-windows` triplet.
 Only `gl2ps` is routed to the official Microsoft vcpkg Git registry pinned at
 `62159a45e18f3a9ac0548628dcaf74fcb60c6ff9`. The table records direct
-dependencies through Milestone 3. Port revisions are part of the resolved vcpkg
+dependencies through Milestone 4. Port revisions are part of the resolved vcpkg
 version even when the upstream version is unchanged.
 
 | Dependency | Resolved version | Role | Upstream source | License and required notice |
 | --- | --- | --- | --- | --- |
 | VTK | `9.3.0-pv5.12.1#12` | STL I/O, private mesh/geometry adapters, triangle-surface intersection, and optional VTU/VTP diagnostics | [Kitware/VTK at `09a76bc`](https://github.com/Kitware/VTK/tree/09a76bc55b37caad94d0d8ebe865caaed1b438af) | BSD-3-Clause at the project level, with module-specific copyright/license files. Preserve the resolved `share/vtk/copyright` material. The vcpkg port's license metadata is currently `null`, so review the installed notices rather than relying on manifest metadata alone. |
 | Eigen3 | `3.4.1#1` | Private fixed-size transform mathematics and Eigen version reporting | [libeigen/eigen `3.4.1`](https://gitlab.com/libeigen/eigen/-/tree/3.4.1) | MPL-2.0 for the used Eigen headers. Preserve `share/eigen3/copyright`; the installed notice bundle also carries Apache-2.0, BSD, and MINPACK texts for other portions of the distribution. |
+| Ipopt | `3.14.19` | Private nonlinear-solver backend through the C interface, using MUMPS | [COIN-OR Ipopt release 3.14.19](https://github.com/coin-or/Ipopt/releases/tag/releases%2F3.14.19) | Ipopt is EPL-2.0. The official Windows archive also contains MUMPS 5.8.0 (CeCILL-C), METIS 5.2.1 (Apache-2.0), an embedded oneMKL 2024.1 Pardiso implementation, and Intel compiler runtimes. The archive does not supply a complete release-ready third-party notice/source bundle. Preserve installed Ipopt notices and do not distribute this binary combination until the ADR-0010 review gate is cleared. |
 | TetGen | `1.6.0` | Private tetrahedralization backend for the Python-compatible CAT cell complex | [TetGen/TetGen at `535f9c41`](https://github.com/TetGen/TetGen/tree/535f9c41f44abc832a7bbf2c9c7af003d1c18f3c) | AGPL-3.0-or-later under the selected open-source path. Preserve the complete upstream `LICENSE`, installed as `share/tetgen/copyright`. Any conveyed combined executable/build and any hosted-service release require an AGPL-specific source, build-material, and notice review under ADR-0009. |
 | CLI11 | `2.5.0` | Command-line parsing | [CLIUtils/CLI11 `v2.5.0`](https://github.com/CLIUtils/CLI11/tree/v2.5.0) | BSD-3-Clause; retain the upstream `LICENSE` notice. |
 | nlohmann-json | `3.12.0#1` | Inspection, placement, and run-summary JSON serialization | [nlohmann/json `v3.12.0`](https://github.com/nlohmann/json/tree/v3.12.0) | MIT; retain `LICENSE.MIT`. |
@@ -26,6 +27,52 @@ needed by the vertical slice.
 remain Eigen-free, and the private `EIGEN_MPL2_ONLY` definition rejects accidental
 use of Eigen's optional non-MPL2 headers. Promoting Eigen from a VTK-transitive
 package to a direct dependency adds no runtime deployment component.
+
+## Repository-owned Ipopt binary overlay
+
+The checked-in `thirdparty/vcpkg-ports/coin-or-ipopt/` recipe packages the
+source-unmodified official COIN-OR Ipopt 3.14.19 Windows x64 MSVC archives. It
+downloads binaries during vcpkg installation; no third-party DLL is checked into
+this repository. The dynamic-CRT archives are pinned as follows:
+
+- Release `Ipopt-3.14.19-win64-msvs2022-md.zip`: SHA-512
+  `15312d94293ccc2e89f11d2355d619116a550ed65a083c9299cc60db379ef6da85984a6fedfd8336f442fb30dff5f507dbc5d4b25d324768d2e18b439eee0e54`.
+- Debug `Ipopt-3.14.19-win64-msvs2022-mdd.zip`: SHA-512
+  `441c6e13ac95da577f94f975e986c958979c15b7134a9530778baae72b2311967b1200d35967931a2883befe81201f6482a98aef961ab2ff2a6ed80d0a42f1d6`.
+
+The port supports Windows x64 and forces dynamic libraries plus the dynamic CRT.
+It exports `Ipopt::Ipopt`, installs the identical official header tree and Ipopt
+import library, and prunes interfaces the project does not consume. The Release
+runtime closure is `ipopt-3.dll`, `coinmumps-3.dll`, `libifcoremd.dll`,
+`libiomp5md.dll`, `libmmd.dll`, and `svml_dispmd.dll`. Debug uses
+`libifcoremdd.dll` and additionally needs both `libmmd.dll` and `libmmdd.dll`.
+The MDD build is development-only and must not be redistributed with the MSVC
+Debug CRT. AMPL, Java, sIpopt, and their binaries are omitted.
+
+The private adapter uses only Ipopt's C ABI, requires runtime version 3.14.19,
+selects the archive's MUMPS 5.8.0 backend, and disables ambient `ipopt.opt`
+loading. Project headers remain Ipopt-free. The six-DLL Release closure is about
+122 MiB; application-local deployment must recursively scan DLL imports rather
+than copy only `ipopt-3.dll`.
+
+The Intel runtime DLLs in the inspected archives carry valid Intel
+Authenticode signatures. `ipopt-3.dll` and `coinmumps-3.dll` are unsigned, so
+their provenance rests on the official COIN-OR release location and the pinned
+whole-archive hashes. The upstream build description says Intel Classic 2021.8,
+while the bundled oneMKL and inspected runtime versions are from the 2024.1 era;
+release notices must inventory the actual payload instead of labelling every
+Intel component as 2021.8.
+
+Ipopt itself is EPL-2.0, but the official archive also incorporates MUMPS under
+CeCILL-C, METIS under Apache-2.0, oneMKL, and Intel compiler runtimes. Intel
+permits oneMKL redistribution under the Intel Simplified Software License, which
+also carries notice and no-reverse-engineering conditions. The archive's
+installed `share/coin-or-ipopt` documentation is not a complete binary-release
+notice or dependency-source bundle. Under ADR-0010, do not publish an executable,
+installer, container, or binary archive containing this exact bundle until a
+release-specific review confirms those terms and their interaction with the
+TetGen AGPL path. For a distributable build, prefer rebuilding Ipopt from source
+with MUMPS and OpenBLAS, then repeat the review and verification.
 
 ## Repository-owned TetGen overlay
 
@@ -125,4 +172,6 @@ This direct inventory is not a binary-release notice bundle. Before distributing
 a binary, inventory every resolved transitive package and preserve the copyright
 files installed under `vcpkg_installed/<triplet>/share/`.
 
-- `coin-or-ipopt` is deferred until Milestone 4.
+- Ipopt's prebuilt MUMPS, METIS, Intel, and oneMKL components are inventoried
+  above but are not separate vcpkg packages. A binary release must produce a
+  complete component-level notice and source-availability record.

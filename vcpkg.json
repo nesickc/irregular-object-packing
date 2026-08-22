@@ -6,6 +6,7 @@
   "dependencies": [
     "catch2",
     "cli11",
+    "coin-or-ipopt",
     "eigen3",
     "nlohmann-json",
     "spdlog",
