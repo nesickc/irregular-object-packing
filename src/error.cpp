@@ -7,6 +7,8 @@ namespace irop {
 const char* to_string(const ErrorCategory category) noexcept
 {
     switch (category) {
+    case ErrorCategory::invalid_configuration:
+        return "invalid_configuration";
     case ErrorCategory::input_io:
         return "input_io";
     case ErrorCategory::resource_limit:

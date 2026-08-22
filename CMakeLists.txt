@@ -21,6 +21,7 @@ option(IROP_ENABLE_CLANG_TIDY "Run the focused clang-tidy profile while compilin
 irop_configure_clang_tidy()
 
 find_package(CLI11 CONFIG REQUIRED)
+find_package(Eigen3 3.4.1 EXACT CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(
@@ -37,17 +38,27 @@ find_package(
 set(
     IROP_CORE_SOURCES
     src/error.cpp
+    src/geometry/mesh_geometry.cpp
+    src/geometry/sampling_policy.cpp
+    src/geometry/transform.cpp
+    src/initialization/initialize_scene.cpp
     src/inspection/inspect_stl.cpp
     src/io/stl_io.cpp
     src/model/mesh_validation.cpp
+    src/packing/initialization.cpp
 )
 set(
     IROP_PUBLIC_HEADERS
     include/irop/error.hpp
+    include/irop/geometry/mesh_geometry.hpp
+    include/irop/geometry/sampling_policy.hpp
+    include/irop/geometry/transform.hpp
+    include/irop/initialization/initialize_scene.hpp
     include/irop/inspection/inspect_stl.hpp
     include/irop/io/stl_io.hpp
     include/irop/model/mesh_validation.hpp
     include/irop/model/triangle_mesh.hpp
+    include/irop/packing/initialization.hpp
 )
 set(
     IROP_VTK_TARGETS
@@ -63,7 +74,7 @@ add_library(irop_core STATIC ${IROP_CORE_SOURCES} ${IROP_PUBLIC_HEADERS})
 add_library(irop::core ALIAS irop_core)
 target_compile_features(irop_core PUBLIC cxx_std_20)
 set_target_properties(irop_core PROPERTIES CXX_EXTENSIONS OFF)
-target_compile_definitions(irop_core PRIVATE IROP_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(irop_core PRIVATE EIGEN_MPL2_ONLY IROP_VERSION="${PROJECT_VERSION}")
 target_include_directories(
     irop_core
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -72,6 +83,7 @@ target_include_directories(
 target_link_libraries(
     irop_core
     PRIVATE
+        Eigen3::Eigen
         nlohmann_json::nlohmann_json
         ${IROP_VTK_TARGETS}
 )

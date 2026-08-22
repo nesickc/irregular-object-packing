@@ -8,6 +8,7 @@
 #include <string>
 
 #include "irop/error.hpp"
+#include "irop/initialization/initialize_scene.hpp"
 #include "irop/inspection/inspect_stl.hpp"
 #include "irop/model/triangle_mesh.hpp"
 
@@ -29,6 +30,8 @@ enum class ExitCode : int {
 [[nodiscard]] ExitCode exit_code_for(const irop::ErrorCategory category) noexcept
 {
     switch (category) {
+    case irop::ErrorCategory::invalid_configuration:
+        return ExitCode::input;
     case irop::ErrorCategory::input_io:
     case irop::ErrorCategory::invalid_mesh:
         return ExitCode::input;
@@ -66,19 +69,83 @@ void log_error_noexcept(const char* category, const char* message) noexcept
     application.require_subcommand(1);
 
     std::filesystem::path input_path;
-    std::filesystem::path output_directory;
-    irop::MeshLimits limits;
+    std::filesystem::path inspection_output_directory;
+    irop::MeshLimits inspection_limits;
 
     CLI::App* inspect_command = application.add_subcommand("inspect", "Validate and normalize an STL mesh");
     inspect_command->add_option("input", input_path, "Input STL path")->required();
     inspect_command
-        ->add_option("-o,--output,--output-dir", output_directory, "New artifact paths under this output directory")
+        ->add_option("-o,--output,--output-dir", inspection_output_directory,
+                     "New artifact paths under this output directory")
         ->required();
-    inspect_command->add_option("--max-input-bytes", limits.max_input_bytes, "Maximum accepted input file size")
+    inspect_command
+        ->add_option("--max-input-bytes", inspection_limits.max_input_bytes, "Maximum accepted input file size")
         ->check(CLI::PositiveNumber);
-    inspect_command->add_option("--max-vertices", limits.max_vertices, "Maximum accepted vertex count")
+    inspect_command->add_option("--max-vertices", inspection_limits.max_vertices, "Maximum accepted vertex count")
         ->check(CLI::PositiveNumber);
-    inspect_command->add_option("--max-triangles", limits.max_triangles, "Maximum accepted triangle count")
+    inspect_command->add_option("--max-triangles", inspection_limits.max_triangles, "Maximum accepted triangle count")
+        ->check(CLI::PositiveNumber);
+
+    std::filesystem::path object_path;
+    std::filesystem::path container_path;
+    std::filesystem::path initialization_output_directory;
+    irop::InitializationOptions initialization_options;
+    CLI::App* initialize_command =
+        application.add_subcommand("initialize", "Create a deterministic initial placement scene");
+    initialize_command->add_option("--object", object_path, "Full-size object-template STL path")->required();
+    initialize_command->add_option("--container", container_path, "Closed container STL path")->required();
+    initialize_command
+        ->add_option("-o,--output,--output-dir", initialization_output_directory,
+                     "New artifact paths under this output directory")
+        ->required();
+    initialize_command->add_option("--count", initialization_options.packing.object_count, "Number of object copies")
+        ->required()
+        ->check(CLI::PositiveNumber);
+    initialize_command
+        ->add_option("--initial-volume-scale", initialization_options.packing.initial_volume_scale,
+                     "Initial object volume scale in (0, 1]")
+        ->check(CLI::Range(0.0, 1.0));
+    initialize_command->add_option("--seed", initialization_options.packing.seed, "Deterministic random seed");
+    initialize_command
+        ->add_option("--max-sampling-attempts", initialization_options.packing.max_sampling_attempts,
+                     "Maximum candidate centers sampled across the run")
+        ->check(CLI::PositiveNumber);
+    initialize_command
+        ->add_option("--max-geometry-query-triangle-visits",
+                     initialization_options.packing.max_geometry_query_triangle_visits,
+                     "Maximum container-triangle visits across initialization queries")
+        ->check(CLI::PositiveNumber);
+    initialize_command
+        ->add_option("--max-pairwise-distance-checks", initialization_options.packing.max_pairwise_distance_checks,
+                     "Maximum center-to-center distance checks across initialization")
+        ->check(CLI::PositiveNumber);
+    initialize_command
+        ->add_option("--max-surface-intersection-triangle-pairs",
+                     initialization_options.packing.max_surface_intersection_triangle_pairs,
+                     "Maximum triangle-pair tests for exact surface containment")
+        ->check(CLI::PositiveNumber);
+    initialize_command->add_flag("--individual-stls,--write-individual-stls",
+                                 initialization_options.write_individual_objects,
+                                 "Also write one STL per initialized object");
+    initialize_command
+        ->add_option("--max-input-bytes", initialization_options.input_limits.max_input_bytes,
+                     "Maximum accepted size of each input STL")
+        ->check(CLI::PositiveNumber);
+    initialize_command
+        ->add_option("--max-input-vertices", initialization_options.input_limits.max_vertices,
+                     "Maximum accepted vertex count per input mesh")
+        ->check(CLI::PositiveNumber);
+    initialize_command
+        ->add_option("--max-input-triangles", initialization_options.input_limits.max_triangles,
+                     "Maximum accepted triangle count per input mesh")
+        ->check(CLI::PositiveNumber);
+    initialize_command
+        ->add_option("--max-output-vertices", initialization_options.packing.output_mesh_limits.max_vertices,
+                     "Maximum combined initialized-object vertex count")
+        ->check(CLI::PositiveNumber);
+    initialize_command
+        ->add_option("--max-output-triangles", initialization_options.packing.output_mesh_limits.max_triangles,
+                     "Maximum combined initialized-object triangle count")
         ->check(CLI::PositiveNumber);
 
     try {
@@ -91,9 +158,16 @@ void log_error_noexcept(const char* category, const char* message) noexcept
     }
 
     if (*inspect_command) {
-        const irop::InspectionResult result = irop::inspect_stl(input_path, output_directory, limits);
+        const irop::InspectionResult result =
+            irop::inspect_stl(input_path, inspection_output_directory, inspection_limits);
         spdlog::info("validated {} vertices and {} triangles; wrote {}", result.mesh.vertex_count,
                      result.mesh.triangle_count, path_as_utf8(result.normalized_stl_path));
+    }
+    else if (*initialize_command) {
+        const irop::InitializationResult result = irop::initialize_scene(
+            object_path, container_path, initialization_output_directory, initialization_options);
+        spdlog::info("initialized {} objects with seed {}; wrote {}", result.state.transforms.size(),
+                     result.state.random_state.seed(), path_as_utf8(result.initialized_objects_path));
     }
     return static_cast<int>(ExitCode::success);
 }

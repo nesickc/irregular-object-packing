@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nesickc/irregular-object-packing/blob/main/docs/schemas/initialization-run-summary-v1.schema.json",
+  "title": "IROP initialization run summary version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "command",
+    "outcome",
+    "inputs",
+    "config",
+    "sampling",
+    "timings",
+    "outputs",
+    "versions",
+    "warnings"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "const": "initialize" },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category"],
+      "properties": {
+        "category": { "const": "success" }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object", "container"],
+      "properties": {
+        "object": { "$ref": "#/$defs/object_input" },
+        "container": { "$ref": "#/$defs/container_input" }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "object_count",
+        "initial_volume_scale",
+        "seed",
+        "max_sampling_attempts",
+        "max_geometry_query_triangle_visits",
+        "max_pairwise_distance_checks",
+        "max_surface_intersection_triangle_pairs",
+        "input_limits",
+        "output_limits"
+      ],
+      "properties": {
+        "object_count": { "type": "integer", "minimum": 1 },
+        "initial_volume_scale": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "max_sampling_attempts": { "type": "integer", "minimum": 1 },
+        "max_geometry_query_triangle_visits": { "type": "integer", "minimum": 1 },
+        "max_pairwise_distance_checks": { "type": "integer", "minimum": 1 },
+        "max_surface_intersection_triangle_pairs": { "type": "integer", "minimum": 1 },
+        "input_limits": { "$ref": "#/$defs/input_limits" },
+        "output_limits": { "$ref": "#/$defs/count_limits" }
+      }
+    },
+    "sampling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "initial_linear_scale",
+        "minimum_boundary_clearance",
+        "minimum_center_distance",
+        "rejected_candidate_count",
+        "random_draw_count",
+        "random_generator",
+        "geometry_query_triangle_visits",
+        "pairwise_distance_checks",
+        "surface_intersection_triangle_pairs"
+      ],
+      "properties": {
+        "policy": { "const": "uniform-aabb-rejection-bounding-sphere" },
+        "initial_linear_scale": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "minimum_boundary_clearance": { "type": "number", "exclusiveMinimum": 0 },
+        "minimum_center_distance": { "type": "number", "exclusiveMinimum": 0 },
+        "rejected_candidate_count": { "type": "integer", "minimum": 0 },
+        "random_draw_count": { "type": "integer", "minimum": 0 },
+        "random_generator": { "const": "numpy-legacy-mt19937-compatible" },
+        "geometry_query_triangle_visits": { "type": "integer", "minimum": 0 },
+        "pairwise_distance_checks": { "type": "integer", "minimum": 0 },
+        "surface_intersection_triangle_pairs": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "timings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["initialization_seconds", "artifact_preparation_seconds"],
+      "properties": {
+        "initialization_seconds": { "type": "number", "minimum": 0 },
+        "artifact_preparation_seconds": { "type": "number", "minimum": 0 }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "initialized_objects_stl",
+        "container_stl",
+        "placements_json",
+        "run_summary_json",
+        "individual_object_stls"
+      ],
+      "properties": {
+        "initialized_objects_stl": { "$ref": "#/$defs/path" },
+        "container_stl": { "$ref": "#/$defs/path" },
+        "placements_json": { "$ref": "#/$defs/path" },
+        "run_summary_json": { "$ref": "#/$defs/path" },
+        "individual_object_stls": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/path" }
+        }
+      }
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["irop", "vtk", "eigen"],
+      "properties": {
+        "irop": { "type": "string", "minLength": 1 },
+        "vtk": { "type": "string", "minLength": 1 },
+        "eigen": { "type": "string", "minLength": 1 }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 524 }
+    }
+  },
+  "$defs": {
+    "path": { "type": "string", "minLength": 1 },
+    "point": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "number" }
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum", "maximum"],
+      "properties": {
+        "minimum": { "$ref": "#/$defs/point" },
+        "maximum": { "$ref": "#/$defs/point" }
+      }
+    },
+    "common_input": {
+      "type": "object",
+      "required": ["resolved_path", "stl_encoding", "size_bytes", "vertex_count", "triangle_count", "volume"],
+      "properties": {
+        "resolved_path": { "$ref": "#/$defs/path" },
+        "stl_encoding": { "enum": ["ascii", "binary"] },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "vertex_count": { "type": "integer", "minimum": 1 },
+        "triangle_count": { "type": "integer", "minimum": 1 },
+        "volume": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "object_input": {
+      "allOf": [
+        { "$ref": "#/$defs/common_input" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "resolved_path",
+            "stl_encoding",
+            "size_bytes",
+            "vertex_count",
+            "triangle_count",
+            "source_vertex_centroid",
+            "volume",
+            "maximum_radius"
+          ],
+          "properties": {
+            "resolved_path": true,
+            "stl_encoding": true,
+            "size_bytes": true,
+            "vertex_count": true,
+            "triangle_count": true,
+            "volume": true,
+            "source_vertex_centroid": { "$ref": "#/$defs/point" },
+            "maximum_radius": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      ]
+    },
+    "container_input": {
+      "allOf": [
+        { "$ref": "#/$defs/common_input" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["resolved_path", "stl_encoding", "size_bytes", "vertex_count", "triangle_count", "volume", "bounds"],
+          "properties": {
+            "resolved_path": true,
+            "stl_encoding": true,
+            "size_bytes": true,
+            "vertex_count": true,
+            "triangle_count": true,
+            "volume": true,
+            "bounds": { "$ref": "#/$defs/bounds" }
+          }
+        }
+      ]
+    },
+    "input_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_input_bytes", "max_vertices", "max_triangles"],
+      "properties": {
+        "max_input_bytes": { "type": "integer", "minimum": 1 },
+        "max_vertices": { "type": "integer", "minimum": 1 },
+        "max_triangles": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "count_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_vertices", "max_triangles"],
+      "properties": {
+        "max_vertices": { "type": "integer", "minimum": 1 },
+        "max_triangles": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

@@ -6,6 +6,7 @@
 namespace irop {
 
 enum class ErrorCategory {
+    invalid_configuration,
     input_io,
     resource_limit,
     invalid_mesh,

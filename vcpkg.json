@@ -6,6 +6,7 @@
   "dependencies": [
     "catch2",
     "cli11",
+    "eigen3",
     "nlohmann-json",
     "spdlog",
     {

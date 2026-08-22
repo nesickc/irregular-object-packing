@@ -8,21 +8,21 @@ detailed implementation trail requested for the migration.
 
 ## Current Position
 
-- Active milestone: Milestone 2 — Transforms, Sampling, and Initialization.
-- State: Milestone 1 is Verified; Milestone 2 implementation is next.
-- Current outcome: the Windows C++20 build, `irop_core`, thin `irop inspect` CLI,
-  hardened STL adapter, normalized STL artifact, and versioned inspection summary are
-  implemented and pass fresh Debug, Release, and clang-tidy analysis builds with
-  official GL2PS `1.4.2#5` resolution.
-- Blocking ambiguities: none. The approved project definition, milestone plan,
-  compatibility catalog, and ADRs define the required boundaries and acceptance
-  criteria.
+- Active milestone: Milestone 3 — Tetrahedralization and CAT Constraints.
+- State: Milestones 1 and 2 are Verified; Milestone 3 has not started.
+- Current outcome: `irop_core` and the thin CLI now inspect STL meshes and emit a
+  deterministic, bounded, atomically published initialized placement scene with
+  combined/optional individual STL, canonical placements, and a successful run
+  summary. The scoped official GL2PS `1.4.2#5` graph passes Debug, Release, and
+  clang-tidy analysis gates.
+- Blocking ambiguities: none for the completed work. Milestone 3 begins with the
+  explicit TetGen license/source-model decision already required by ADR-0006.
 
 ## Decisions Applied
 
 - Preserve the Python implementation as the behavioral reference through parity.
 - Keep the command-line application thin and dependency-specific VTK types inside the
-  mesh I/O adapter.
+  mesh I/O and geometry adapters.
 - Represent meshes and results with project-owned types at core boundaries.
 - Treat input meshes and output paths as untrusted and enforce preflight plus post-load
   resource and geometry validation.
@@ -42,6 +42,19 @@ detailed implementation trail requested for the migration.
 - Permit a vcpkg download-cache fallback only when the acquired GL2PS archive matches
   the official port's complete SHA-512.
 - Use the checked-in `.clang-format` file as the sole formatting authority.
+- Store a volume scale and derive linear scale with `cbrt`; apply column-vector
+  transforms in `Ry * Rz * Rx` order before translation.
+- Center source meshes at the Python-compatible unweighted vertex centroid and persist
+  the original-input-to-world matrix separately from centered-template placement
+  fields.
+- Give each packing run its own NumPy-legacy-MT19937-compatible stream and preserve
+  Python's coordinate/rejection/rotation draw order.
+- Bound candidate attempts, geometry triangle visits, center-distance checks, and
+  exact object/container surface triangle-pair tests.
+- Publish every initialization artifact together by renaming a private staging
+  directory to a previously absent final path after `run-summary.json` is complete.
+- Implement only the adaptive sampling ratio/target-count policy in Milestone 2;
+  actual iteration-time remeshing remains packing-loop work.
 
 ## Milestone 1 Checklist
 
@@ -56,6 +69,31 @@ detailed implementation trail requested for the migration.
 - [x] Add focused model, adapter, malformed-input, and CLI smoke tests.
 - [x] Configure, build, test, format-check, analyze, and review the completed slice.
 - [x] Synchronize `docs/STATUS.md` and record exact verification evidence here.
+
+## Milestone 2 Checklist
+
+- [x] Add project-owned volume-scale transforms and Eigen-private matrix composition.
+- [x] Port vertex-centroid centering, closed-surface volume/bounds/containment,
+  maximum radius, mesh instantiation, and checked mesh combination.
+- [x] Port adaptive surface target-count policy with Python binary64 truncation and a
+  safe closed-surface minimum.
+- [x] Add `PackingConfig`, `PackingState`, and independent deterministic random-state
+  ownership.
+- [x] Match NumPy legacy MT19937 uniform mapping and complete coordinate rejection then
+  rotation draw order against a Python golden.
+- [x] Preserve the valid one-object origin shortcut and add an exact bounded surface
+  containment fallback when its conservative sphere does not fit.
+- [x] Add configurable candidate, geometry-query, pairwise, and surface-intersection
+  work limits with focused exhaustion tests and CLI exit 4 coverage.
+- [x] Add `irop initialize`, combined and optional individual STL artifacts,
+  canonical placements, timings/work metrics, and checked-in version-one schemas.
+- [x] Publish initialization outputs atomically as a new directory and verify failure
+  paths publish no success set.
+- [x] Normalize winding in query-owned snapshots and reject ambiguous multiple closed
+  components pending explicit cavity semantics.
+- [x] Add ADR-0008, direct Eigen license inventory, and compatibility entries through
+  `IROP-DEV-0012`.
+- [x] Pass scoped-registry Debug, Release, format, clang-tidy, and full CTest gates.
 
 ## Activity Log
 
@@ -144,6 +182,60 @@ detailed implementation trail requested for the migration.
   the formatting gate, and a fresh Ninja build with clang-tidy plus 30/30 tests.
   Milestone 1 is now Verified.
 
+### 2026-08-22 — Milestone 2 reference and contract implemented
+
+- Audited the live Python transform, centering, adaptive count, initialization,
+  one-object shortcut, collision-validation, and random draw order rather than porting
+  dead grid code.
+- Added dependency-free public transform, geometry, sampling, configuration, state,
+  initialization-service, and result contracts. Eigen3 is direct but private, with
+  `EIGEN_MPL2_ONLY`; VTK remains behind STL and geometry adapters.
+- Matched volume scale, `Ry * Rz * Rx`, vertex-centroid centering, uniform AABB
+  candidate generation, strict radius clearance/spacing, coordinates-before-rotations
+  draw order, and NumPy legacy MT19937's 53-bit uniform mapping.
+- Added a full Python golden for seed 12345/count 8: six rejected candidates, 66
+  logical random draws, and exact first/last translations and rotations.
+- Ported the adaptive sampling ratio and binary64-truncated target-count policy. The
+  safe four-triangle minimum is intentional; actual remeshing is deferred until the
+  packing loop consumes the policy.
+
+### 2026-08-22 — Milestone 2 safety and artifact review completed
+
+- Added positive limits for candidate attempts, container-triangle visits,
+  center-distance checks, and exact surface triangle-pair tests; every limit has a
+  focused resource-exhaustion regression and geometry-query exhaustion maps to CLI
+  exit 4 without publishing output.
+- Preserved a valid one-object origin transform even when its bounding sphere is too
+  conservative by combining strict transformed-vertex containment with VTK's bounded
+  triangle-surface intersection primitive. Invalid origins use the bounded sampler.
+- Made closed queries own immutable mesh snapshots, normalize local winding without
+  mutating callers, reject open/non-manifold input, and reject multiple connected
+  shells until cavity semantics are explicit.
+- Strengthened initial-state validation for finite transforms, strict thresholds, and
+  wholly outside nonintersecting objects.
+- Added `irop initialize` with input/output/work controls, combined and optional
+  individual STL, original-input-to-world matrices, separate versioned placements and
+  success-summary schemas, timings, work metrics, warnings, and dependency versions.
+- Replaced sequential final-path writes with private sibling staging plus one atomic
+  directory rename. The requested final directory must be absent; failures leave no
+  published success artifact set.
+- Recorded ADR-0008 and synchronized compatibility markers through
+  `IROP-DEV-0012`, dependency notices, project definition, status, and this report.
+
+### 2026-08-22 — Milestone 2 verified
+
+- The scoped official registry continued to select GL2PS `1.4.2#5` and direct Eigen3
+  `3.4.1#1`; no GL2PS or Eigen source overlay was added.
+- Visual Studio Debug and Release builds completed with warnings as errors and passed
+  all 80 CTest cases in each configuration.
+- The Ninja analysis build ran clang-tidy 22.1.3 over the affected targets and passed
+  all 80 tests after a clean reconfiguration in the Visual Studio developer shell.
+- Final API audit coverage rejects non-finite coordinates created by homogeneous
+  division and avoids out-of-range integer conversion at the maximum sampling-count
+  endpoint.
+- The checked-in clang-format 22.1.3 compliance target passed. Milestone 2 is
+  Verified and Milestone 3 is next.
+
 ## Verification Evidence
 
 - Toolchain: CMake 4.2.3; Visual Studio Community 2026 18.8.3; MSVC 19.51.36252;
@@ -155,15 +247,15 @@ detailed implementation trail requested for the migration.
   `1.4.2#5`, and used no temporary GL2PS overlay.
 - Debug: `cmake --build build/windows-vs2026-scoped-gl2ps --config Debug`
   succeeded; `ctest --test-dir build/windows-vs2026-scoped-gl2ps -C Debug
-  --output-on-failure` passed 30/30 tests.
+  --output-on-failure` passed 80/80 tests.
 - Release: `cmake --build build/windows-vs2026-scoped-gl2ps --config Release`
   succeeded; `ctest --test-dir build/windows-vs2026-scoped-gl2ps -C Release
-  --output-on-failure` passed 30/30 tests.
+  --output-on-failure` passed 80/80 tests.
 - Formatting: `cmake --build build/windows-vs2026-scoped-gl2ps --config Debug
   --target irop-format-check` passed with the checked-in profile.
 - Analysis: a fresh `windows-ninja-analysis` configuration at
   `build/windows-ninja-analysis-scoped-gl2ps-vcpkg-root` generated build rules
-  invoking clang-tidy 22.1.3, built successfully, and passed 30/30 tests.
+  invoking clang-tidy 22.1.3, built successfully, and passed 80/80 tests.
 - The Release executable embeds `activeCodePage=UTF-8` and `longPathAware=true`; the
   Unicode-path CLI smoke test passed in all three fresh test configurations.
 
@@ -179,6 +271,17 @@ detailed implementation trail requested for the migration.
 - VTK's compile-tools package emits a cross-compilation support warning under this
   native MSVC configuration. Both configurations link and all runtime tests pass, but
   the warning should be re-evaluated with the next VTK baseline update.
-- TetGen remains license-gated and must not be linked during this milestone.
-- Next implementation work is Milestone 2: unit-explicit transforms, deterministic
-  sampling, bounded initialization, and an initialized placement-scene artifact.
+- Current containment/distance queries are linear in container triangle count and the
+  exact compatibility fallback is quadratic in object/container surface triangles.
+  Explicit work limits bound them; replace them with measured acceleration only after
+  profiling representative inputs.
+- Initialization accepts exactly one connected closed surface component. Supporting
+  nested cavity shells or disjoint solids requires an explicit domain contract rather
+  than summing component magnitudes.
+- Initialization resource failures use stable diagnostics/exit categories and publish
+  no success set; a persisted structured unsuccessful result is deferred to the later
+  packing-result coordinator.
+- Each initialization output path is a new atomic artifact-set identity and cannot be
+  an existing reusable directory.
+- Next implementation work is Milestone 3. TetGen remains license-gated until its
+  source/publication model is explicitly approved under ADR-0006.

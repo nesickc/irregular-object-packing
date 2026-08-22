@@ -1,6 +1,6 @@
 # C++ Project Definition
 
-Status: Approved baseline; Milestone 1 implementation is verified.
+Status: Approved baseline; Milestones 1 and 2 are verified.
 
 ## Purpose
 
@@ -54,6 +54,24 @@ A successful run should produce:
 STL contains geometry but not a reliable scene graph, unit declaration, or instance metadata. JSON is therefore the canonical run record, while STL is the primary interoperable visual result. Input coordinates use arbitrary but consistent units; the application performs no implicit unit conversion.
 
 Additional formats such as OBJ, PLY, and VTK-family files may be added behind the mesh I/O boundary when useful. They are not required for the first parity release.
+
+Milestone 2 also exposes the initialization phase independently:
+
+```powershell
+irop initialize `
+  --container container.stl `
+  --object object.stl `
+  --count 10 `
+  --output out-initial
+```
+
+The output path must not already exist. A successful command atomically publishes
+`initialized-objects.stl`, `container.stl`, canonical `placements.json`, a successful
+`run-summary.json`, and optional per-object STLs. The initialization schemas under
+`docs/schemas/` define the version-one JSON contracts. Initialization currently
+requires each object and container to be one connected, orientable, closed triangular
+surface; multi-component cavity and disjoint-solid semantics remain outside the
+accepted input domain.
 
 ## Behavioral Reference
 

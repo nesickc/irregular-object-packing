@@ -89,6 +89,38 @@ private:
     };
 }
 
+[[nodiscard]] inline TriangleMesh cube_mesh(const double half_extent = 1.0)
+{
+    const double low = -half_extent;
+    const double high = half_extent;
+    return {
+        .vertices = {
+            { low, low, low },
+            { high, low, low },
+            { high, high, low },
+            { low, high, low },
+            { low, low, high },
+            { high, low, high },
+            { high, high, high },
+            { low, high, high },
+        },
+        .triangles = {
+            { 0, 2, 1 },
+            { 0, 3, 2 },
+            { 4, 5, 6 },
+            { 4, 6, 7 },
+            { 0, 1, 5 },
+            { 0, 5, 4 },
+            { 3, 7, 6 },
+            { 3, 6, 2 },
+            { 0, 4, 7 },
+            { 0, 7, 3 },
+            { 1, 2, 6 },
+            { 1, 6, 5 },
+        },
+    };
+}
+
 [[nodiscard]] inline std::string ascii_tetrahedron()
 {
     return R"stl(solid tetrahedron

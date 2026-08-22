@@ -139,6 +139,7 @@ TEST_CASE("mesh validation rejects zero-area and numerically unsafe triangles")
 
 TEST_CASE("error category names are stable machine-readable values")
 {
+    CHECK(std::string_view(irop::to_string(irop::ErrorCategory::invalid_configuration)) == "invalid_configuration");
     CHECK(std::string_view(irop::to_string(irop::ErrorCategory::input_io)) == "input_io");
     CHECK(std::string_view(irop::to_string(irop::ErrorCategory::resource_limit)) == "resource_limit");
     CHECK(std::string_view(irop::to_string(irop::ErrorCategory::invalid_mesh)) == "invalid_mesh");

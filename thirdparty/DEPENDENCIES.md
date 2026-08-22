@@ -4,14 +4,15 @@ The default C++ dependency graph is resolved from vcpkg builtin-registry commit
 `271a5b8850aa50f9a40269cbf3cf414b36e333d6` using the `x64-windows` triplet.
 Only `gl2ps` is routed to the official Microsoft vcpkg Git registry pinned at
 `62159a45e18f3a9ac0548628dcaf74fcb60c6ff9`. The table records direct
-Milestone 1 dependencies. Port revisions are part of the resolved vcpkg version
+dependencies through Milestone 2. Port revisions are part of the resolved vcpkg version
 even when the upstream version is unchanged.
 
 | Dependency | Resolved version | Role | Upstream source | License and required notice |
 | --- | --- | --- | --- | --- |
-| VTK | `9.3.0-pv5.12.1#12` | STL I/O and the private mesh-adapter boundary | [Kitware/VTK at `09a76bc`](https://github.com/Kitware/VTK/tree/09a76bc55b37caad94d0d8ebe865caaed1b438af) | BSD-3-Clause at the project level, with module-specific copyright/license files. Preserve the resolved `share/vtk/copyright` material. The vcpkg port's license metadata is currently `null`, so review the installed notices rather than relying on manifest metadata alone. |
+| VTK | `9.3.0-pv5.12.1#12` | STL I/O, the private mesh-adapter boundary, and the private triangle-surface intersection primitive | [Kitware/VTK at `09a76bc`](https://github.com/Kitware/VTK/tree/09a76bc55b37caad94d0d8ebe865caaed1b438af) | BSD-3-Clause at the project level, with module-specific copyright/license files. Preserve the resolved `share/vtk/copyright` material. The vcpkg port's license metadata is currently `null`, so review the installed notices rather than relying on manifest metadata alone. |
+| Eigen3 | `3.4.1#1` | Private fixed-size transform mathematics and Eigen version reporting | [libeigen/eigen `3.4.1`](https://gitlab.com/libeigen/eigen/-/tree/3.4.1) | MPL-2.0 for the used Eigen headers. Preserve `share/eigen3/copyright`; the installed notice bundle also carries Apache-2.0, BSD, and MINPACK texts for other portions of the distribution. |
 | CLI11 | `2.5.0` | Command-line parsing | [CLIUtils/CLI11 `v2.5.0`](https://github.com/CLIUtils/CLI11/tree/v2.5.0) | BSD-3-Clause; retain the upstream `LICENSE` notice. |
-| nlohmann-json | `3.12.0#1` | JSON inspection summary | [nlohmann/json `v3.12.0`](https://github.com/nlohmann/json/tree/v3.12.0) | MIT; retain `LICENSE.MIT`. |
+| nlohmann-json | `3.12.0#1` | Inspection, placement, and run-summary JSON serialization | [nlohmann/json `v3.12.0`](https://github.com/nlohmann/json/tree/v3.12.0) | MIT; retain `LICENSE.MIT`. |
 | spdlog | `1.16.0` | CLI diagnostics | [gabime/spdlog `v1.16.0`](https://github.com/gabime/spdlog/tree/v1.16.0) | MIT; retain the upstream `LICENSE` notice. |
 | Catch2 | `3.11.0` | C++ test support | [catchorg/Catch2 `v3.11.0`](https://github.com/catchorg/Catch2/tree/v3.11.0) | BSL-1.0; retain `LICENSE.txt`. Test-only use does not remove source-redistribution notice obligations. |
 
@@ -19,6 +20,11 @@ even when the upstream version is unchanged.
 This avoids unrelated VTK features such as CGNS, PDF, Theora, NetCDF, PROJ,
 SEACAS, and SQL while keeping the STL modules and UTF-8 Windows path handling
 needed by the vertical slice.
+
+`irop_core` links the header-only `Eigen3::Eigen` target privately. Public headers
+remain Eigen-free, and the private `EIGEN_MPL2_ONLY` definition rejects accidental
+use of Eigen's optional non-MPL2 headers. Promoting Eigen from a VTK-transitive
+package to a direct dependency adds no runtime deployment component.
 
 ## Repository-owned VTK overlay
 
@@ -86,8 +92,6 @@ This direct inventory is not a binary-release notice bundle. Before distributing
 a binary, inventory every resolved transitive package and preserve the copyright
 files installed under `vcpkg_installed/<triplet>/share/`.
 
-- Eigen3 is currently pulled transitively by VTK. Make it a direct dependency
-  when project-owned transform code first includes Eigen headers.
 - `coin-or-ipopt` is deferred until Milestone 4.
 - TetGen is deferred until Milestone 3 and remains license-gated by
   [ADR-0006](../docs/adr/0006-bsd-source-license-and-third-party-boundary.md).
