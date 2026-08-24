@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <random>
 #include <vector>
 
@@ -63,12 +64,17 @@ struct PackingState {
     std::uint64_t surface_intersection_triangle_pairs = 0;
 };
 
+// Validates the project-owned initialization configuration without inspecting
+// mesh data. Application services can use this before performing input I/O.
+void validate_packing_config(const PackingConfig& config);
+
 // `centered_object` is the full-size object template centered at the origin.
 [[nodiscard]] PackingState initialize_packing(const TriangleMesh& centered_object, const TriangleMesh& container,
-                                              const PackingConfig& config);
+                                              const PackingConfig& config,
+                                              const std::function<bool()>& cancellation_requested = {});
 
 void validate_initial_state(const TriangleMesh& centered_object, const TriangleMesh& container,
-                            const PackingState& state);
+                            const PackingState& state, const std::function<bool()>& cancellation_requested = {});
 
 [[nodiscard]] std::vector<TriangleMesh> instantiate_objects(const TriangleMesh& centered_object,
                                                             const PackingState& state);

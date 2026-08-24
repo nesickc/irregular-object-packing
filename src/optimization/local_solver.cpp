@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <numbers>
 #include <span>
 
 #include "irop/error.hpp"
@@ -15,6 +16,7 @@ namespace irop {
 namespace {
 
 constexpr double unit_normal_squared_tolerance = 1.0e-10;
+constexpr double rotation_singularity_tolerance = 64.0 * std::numeric_limits<double>::epsilon();
 
 struct RotationEvaluation {
     Eigen::Matrix3d rotation;
@@ -127,6 +129,38 @@ void validate_constraint_inputs(const Point3& object_center, const LocalPlaneCon
 {
     result = first + second;
     return std::isfinite(result);
+}
+
+[[nodiscard]] bool compose_rotation(const EulerRotationRadians& current, const EulerRotationRadians& delta,
+                                    EulerRotationRadians& result) noexcept
+{
+    RotationEvaluation current_evaluation;
+    RotationEvaluation delta_evaluation;
+    if (!make_rotation_evaluation(current, current_evaluation) || !make_rotation_evaluation(delta, delta_evaluation)) {
+        return false;
+    }
+
+    // The local constraint model rotates already-transformed geometry, so the
+    // incremental rotation is applied after the current orientation.
+    const Eigen::Matrix3d composed = delta_evaluation.rotation * current_evaluation.rotation;
+    if (!composed.allFinite()) {
+        return false;
+    }
+
+    const double cosine_z = std::hypot(composed(0, 0), composed(2, 0));
+    result.z = std::atan2(composed(1, 0), cosine_z);
+    if (cosine_z > rotation_singularity_tolerance) {
+        result.x = std::atan2(-composed(1, 2), composed(1, 1));
+        result.y = std::atan2(-composed(2, 0), composed(0, 0));
+    }
+    else {
+        // At gimbal lock only one combination of x and y is observable. Fix x
+        // to zero and retain an equivalent orientation through y.
+        result.x = 0.0;
+        result.y = std::atan2(composed(0, 2), composed(2, 2));
+        result.z = std::copysign(std::numbers::pi_v<double> / 2.0, composed(1, 0));
+    }
+    return is_finite(result);
 }
 
 }  // namespace
@@ -309,8 +343,8 @@ std::array<double, local_solve_variable_count> evaluate_local_constraint_gradien
     return gradient;
 }
 
-Transform apply_reference_local_step(const Transform& current, const LocalTransformStep& step,
-                                     const double maximum_result_volume_scale)
+Transform apply_local_step(const Transform& current, const LocalTransformStep& step,
+                           const double maximum_result_volume_scale)
 {
     if (!std::isfinite(current.volume_scale) || current.volume_scale <= 0.0 || !is_finite(current.rotation) ||
         !is_finite(current.translation) || !is_finite(step) || step.volume_scale_multiplier <= 0.0 ||
@@ -318,16 +352,20 @@ Transform apply_reference_local_step(const Transform& current, const LocalTransf
         throw Error(ErrorCategory::invalid_configuration, "local transform update inputs must be finite and positive");
     }
 
-    Transform result;
-    // COMPATIBILITY(IROP-COMPAT-0001): The local NLP does not receive the
-    // stage barrier; multiply the returned volume factor and clamp afterward.
-    result.volume_scale = std::min(maximum_result_volume_scale, current.volume_scale * step.volume_scale_multiplier);
+    const double unconstrained_volume_scale = current.volume_scale * step.volume_scale_multiplier;
+    if (!std::isfinite(unconstrained_volume_scale) || unconstrained_volume_scale <= 0.0) {
+        throw Error(ErrorCategory::invalid_configuration, "local transform scale update overflowed");
+    }
 
-    // COMPATIBILITY(IROP-COMPAT-0006): Preserve componentwise Euler addition
-    // even though it is not general rotation-matrix composition.
-    if (!add_is_finite(current.rotation.x, step.rotation_delta.x, result.rotation.x) ||
-        !add_is_finite(current.rotation.y, step.rotation_delta.y, result.rotation.y) ||
-        !add_is_finite(current.rotation.z, step.rotation_delta.z, result.rotation.z) ||
+    Transform result;
+    // DEVIATION(IROP-DEV-0023): The packing coordinator supplies a finite
+    // barrier-derived multiplier bound. Keep this clamp only as a numerical
+    // publication guard for direct callers and solver tolerance.
+    result.volume_scale = std::min(maximum_result_volume_scale, unconstrained_volume_scale);
+
+    // DEVIATION(IROP-DEV-0022): Persist the same left-composed rotation that
+    // the local constraint model evaluated instead of adding Euler components.
+    if (!compose_rotation(current.rotation, step.rotation_delta, result.rotation) ||
         !add_is_finite(current.translation.x, step.translation_delta.x, result.translation.x) ||
         !add_is_finite(current.translation.y, step.translation_delta.y, result.translation.y) ||
         !add_is_finite(current.translation.z, step.translation_delta.z, result.translation.z) ||

@@ -34,6 +34,8 @@ find_package(
         CommonCore
         CommonDataModel
         CommonMisc
+        FiltersCore
+        FiltersModeling
         IOGeometry
         IOXML
 )
@@ -42,8 +44,10 @@ set(
     IROP_CORE_SOURCES
     src/error.cpp
     src/cat/cat.cpp
+    src/geometry/collision.cpp
     src/geometry/mesh_geometry.cpp
     src/geometry/sampling_policy.cpp
+    src/geometry/surface_resampling.cpp
     src/geometry/transform.cpp
     src/initialization/initialize_scene.cpp
     src/inspection/inspect_stl.cpp
@@ -53,14 +57,18 @@ set(
     src/optimization/ipopt_adapter.cpp
     src/optimization/local_solver.cpp
     src/packing/initialization.cpp
+    src/packing/pack_scene.cpp
+    src/packing/packing.cpp
     src/tetrahedralization/tetgen_adapter.cpp
 )
 set(
     IROP_PUBLIC_HEADERS
     include/irop/error.hpp
     include/irop/cat/cat.hpp
+    include/irop/geometry/collision.hpp
     include/irop/geometry/mesh_geometry.hpp
     include/irop/geometry/sampling_policy.hpp
+    include/irop/geometry/surface_resampling.hpp
     include/irop/geometry/transform.hpp
     include/irop/initialization/initialize_scene.hpp
     include/irop/inspection/inspect_stl.hpp
@@ -70,6 +78,8 @@ set(
     include/irop/model/triangle_mesh.hpp
     include/irop/optimization/local_solver.hpp
     include/irop/packing/initialization.hpp
+    include/irop/packing/pack_scene.hpp
+    include/irop/packing/packing.hpp
     include/irop/tetrahedralization/tetrahedralization.hpp
 )
 set(
@@ -77,6 +87,8 @@ set(
     VTK::CommonCore
     VTK::CommonDataModel
     VTK::CommonMisc
+    VTK::FiltersCore
+    VTK::FiltersModeling
     VTK::IOGeometry
     VTK::IOXML
 )

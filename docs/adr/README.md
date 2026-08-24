@@ -26,6 +26,8 @@ Accepted ADRs are immutable apart from typo fixes and explicit amendment notes. 
 | [0008](0008-milestone-2-initialization-contract.md) | Accepted | Fix deterministic initialization state, bounded geometry work, and atomic artifact publication |
 | [0009](0009-tetgen-1-6-agpl-overlay-and-adapter.md) | Accepted | Pin TetGen 1.6.0 under AGPL and isolate it behind a private vcpkg adapter |
 | [0010](0010-ipopt-3-14-19-official-windows-binary-adapter.md) | Accepted | Package official Ipopt 3.14.19 Windows binaries behind a private C adapter and binary-release gate |
+| [0011](0011-milestone-5-packing-outcome-and-artifact-contract.md) | Accepted | Bound the end-to-end packing loop and atomically distinguish successful artifacts from structured unsuccessful summaries |
+| [0012](0012-transform-consistent-barrier-bounded-local-solves.md) | Accepted | Compose local rotations exactly and bound scale optimization near the active barrier |
 
 Use [0000-template.md](0000-template.md) for new records.
 

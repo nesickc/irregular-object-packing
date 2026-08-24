@@ -145,6 +145,7 @@ TEST_CASE("error category names are stable machine-readable values")
     CHECK(std::string_view(irop::to_string(irop::ErrorCategory::invalid_mesh)) == "invalid_mesh");
     CHECK(std::string_view(irop::to_string(irop::ErrorCategory::output_io)) == "output_io");
     CHECK(std::string_view(irop::to_string(irop::ErrorCategory::dependency_failure)) == "dependency_failure");
+    CHECK(std::string_view(irop::to_string(irop::ErrorCategory::cancelled)) == "cancelled");
     CHECK(std::string_view(irop::to_string(irop::ErrorCategory::internal)) == "internal");
 }
 

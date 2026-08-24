@@ -1,6 +1,8 @@
 #include <spdlog/spdlog.h>
 
 #include <CLI/CLI.hpp>
+#include <chrono>
+#include <csignal>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
@@ -11,6 +13,7 @@
 #include "irop/initialization/initialize_scene.hpp"
 #include "irop/inspection/inspect_stl.hpp"
 #include "irop/model/triangle_mesh.hpp"
+#include "irop/packing/pack_scene.hpp"
 
 #ifndef IROP_VERSION
 #define IROP_VERSION "development"
@@ -24,8 +27,14 @@ enum class ExitCode : int {
     input = 3,
     resource_limit = 4,
     output_io = 5,
+    unsuccessful = 6,
     internal = 70,
+    cancelled = 130,
 };
+
+volatile std::sig_atomic_t interruption_requested = 0;
+
+void handle_interruption(const int) noexcept { interruption_requested = 1; }
 
 [[nodiscard]] ExitCode exit_code_for(const irop::ErrorCategory category) noexcept
 {
@@ -40,8 +49,33 @@ enum class ExitCode : int {
     case irop::ErrorCategory::output_io:
         return ExitCode::output_io;
     case irop::ErrorCategory::dependency_failure:
+        return ExitCode::internal;
+    case irop::ErrorCategory::cancelled:
+        return ExitCode::cancelled;
     case irop::ErrorCategory::internal:
         return ExitCode::internal;
+    }
+    return ExitCode::internal;
+}
+
+[[nodiscard]] ExitCode exit_code_for(const irop::PackingStatus status) noexcept
+{
+    switch (status) {
+    case irop::PackingStatus::success:
+        return ExitCode::success;
+    case irop::PackingStatus::cancelled:
+        return ExitCode::cancelled;
+    case irop::PackingStatus::resource_exhausted:
+    case irop::PackingStatus::time_limit:
+        return ExitCode::resource_limit;
+    case irop::PackingStatus::invalid_input:
+    case irop::PackingStatus::infeasible:
+    case irop::PackingStatus::iteration_limit:
+    case irop::PackingStatus::correction_limit:
+    case irop::PackingStatus::numerical_failure:
+    case irop::PackingStatus::dependency_failure:
+    case irop::PackingStatus::internal_failure:
+        return ExitCode::unsuccessful;
     }
     return ExitCode::internal;
 }
@@ -148,6 +182,143 @@ void log_error_noexcept(const char* category, const char* message) noexcept
                      "Maximum combined initialized-object triangle count")
         ->check(CLI::PositiveNumber);
 
+    std::filesystem::path packing_object_path;
+    std::filesystem::path packing_container_path;
+    std::filesystem::path packing_output_directory;
+    irop::PackOptions pack_options;
+    bool disable_adaptive_sampling = false;
+    std::uint64_t maximum_packing_milliseconds =
+        static_cast<std::uint64_t>(pack_options.limits.max_elapsed_time.count());
+    std::uint64_t maximum_local_solve_milliseconds =
+        static_cast<std::uint64_t>(pack_options.limits.local_solve.max_elapsed_time.count());
+    CLI::App* pack_command = application.add_subcommand("pack", "Run the bounded end-to-end packing loop");
+    pack_command->add_option("--object", packing_object_path, "Full-size object-template STL path")->required();
+    pack_command->add_option("--container", packing_container_path, "Closed container STL path")->required();
+    pack_command
+        ->add_option("-o,--output,--output-dir", packing_output_directory,
+                     "New artifact-set directory (must not already exist)")
+        ->required();
+    pack_command->add_option("--count", pack_options.initialization.object_count, "Number of object copies")
+        ->required()
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--initial-volume-scale", pack_options.initialization.initial_volume_scale,
+                     "Initial object volume scale in (0, 1]")
+        ->check(CLI::Range(0.0, 1.0));
+    pack_command
+        ->add_option("--final-volume-scale", pack_options.algorithm.final_volume_scale,
+                     "Final target object volume scale in (0, 1]")
+        ->check(CLI::Range(0.0, 1.0));
+    pack_command
+        ->add_option("--scale-steps", pack_options.algorithm.scale_step_count,
+                     "Number of scale barriers, including the final target")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-iterations-per-scale-step", pack_options.algorithm.max_iterations_per_scale_step,
+                     "Maximum solve/correction iterations at each scale barrier")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--maximum-rotation-delta-radians", pack_options.algorithm.maximum_rotation_delta_radians,
+                     "Configured symmetric local rotation delta before the reference 0.9 multiplier")
+        ->check(CLI::NonNegativeNumber);
+    pack_command
+        ->add_option("--maximum-translation-per-unit-scale", pack_options.algorithm.maximum_translation_per_unit_scale,
+                     "Base local translation delta; defaults to twice the object equivalent length")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--padding", pack_options.algorithm.padding,
+                     "Nonnegative CAT plane-constraint padding in input coordinate units")
+        ->check(CLI::NonNegativeNumber);
+    pack_command
+        ->add_option("--correction-volume-scale-factor", pack_options.algorithm.correction_volume_scale_factor,
+                     "Volume-scale multiplier for physically colliding objects")
+        ->check(CLI::Range(0.0, 1.0));
+    pack_command
+        ->add_option("--tetra-recovery-volume-scale-factor",
+                     pack_options.algorithm.tetrahedralization_recovery_scale_factor,
+                     "Volume-scale multiplier after a recoverable TetGen failure")
+        ->check(CLI::Range(0.0, 1.0));
+    pack_command
+        ->add_option("--local-solve-tolerance", pack_options.algorithm.local_solve_tolerance,
+                     "Ipopt local-solve tolerance")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--sampling-alpha", pack_options.algorithm.sampling.alpha, "Adaptive surface-sampling alpha")
+        ->check(CLI::Range(0.0, 1.0));
+    pack_command->add_option("--sampling-beta", pack_options.algorithm.sampling.beta, "Adaptive surface-sampling beta")
+        ->check(CLI::Range(0.0, 1.0));
+    pack_command
+        ->add_option("--minimum-sampled-triangles", pack_options.algorithm.sampling.minimum_triangle_count,
+                     "Minimum requested triangles for a closed sampled surface")
+        ->check(CLI::PositiveNumber);
+    pack_command->add_flag("--no-adaptive-sampling", disable_adaptive_sampling,
+                           "Use the full-resolution meshes at every scale barrier");
+    pack_command->add_option("--seed", pack_options.initialization.seed, "Deterministic random seed");
+    pack_command
+        ->add_option("--max-sampling-attempts", pack_options.initialization.max_sampling_attempts,
+                     "Maximum initialization candidate samples")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-geometry-query-triangle-visits",
+                     pack_options.initialization.max_geometry_query_triangle_visits,
+                     "Maximum container-triangle visits across initialization queries")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-pairwise-distance-checks", pack_options.initialization.max_pairwise_distance_checks,
+                     "Maximum center-to-center distance checks across initialization")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-surface-intersection-triangle-pairs",
+                     pack_options.initialization.max_surface_intersection_triangle_pairs,
+                     "Maximum initialization surface-intersection triangle-pair tests")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-correction-passes", pack_options.limits.max_correction_passes_per_iteration,
+                     "Maximum collision scale reductions per packing iteration")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-history-records", pack_options.limits.max_history_records,
+                     "Maximum retained packing iteration records")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-total-local-solves", pack_options.limits.max_total_local_solves,
+                     "Maximum local solves across the run")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-local-solve-iterations", pack_options.limits.local_solve.max_iterations,
+                     "Maximum Ipopt iterations for each object solve")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-local-solve-milliseconds", maximum_local_solve_milliseconds,
+                     "Maximum elapsed time checked inside each local solve")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-elapsed-milliseconds", maximum_packing_milliseconds,
+                     "Maximum wall-clock duration checked between dependency calls")
+        ->check(CLI::PositiveNumber);
+    pack_command->add_flag("--individual-stls,--write-individual-stls", pack_options.write_individual_objects,
+                           "Also write one STL per successfully packed object");
+    pack_command
+        ->add_option("--max-input-bytes", pack_options.input_limits.max_input_bytes,
+                     "Maximum accepted size of each input STL")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-input-vertices", pack_options.input_limits.max_vertices,
+                     "Maximum accepted vertex count per input mesh")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-input-triangles", pack_options.input_limits.max_triangles,
+                     "Maximum accepted triangle count per input mesh")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-output-vertices", pack_options.initialization.output_mesh_limits.max_vertices,
+                     "Maximum combined packed-object vertex count")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-output-triangles", pack_options.initialization.output_mesh_limits.max_triangles,
+                     "Maximum combined packed-object triangle count")
+        ->check(CLI::PositiveNumber);
+
     try {
         application.parse(argc, argv);
     }
@@ -168,6 +339,56 @@ void log_error_noexcept(const char* category, const char* message) noexcept
             object_path, container_path, initialization_output_directory, initialization_options);
         spdlog::info("initialized {} objects with seed {}; wrote {}", result.state.transforms.size(),
                      result.state.random_state.seed(), path_as_utf8(result.initialized_objects_path));
+    }
+    else if (*pack_command) {
+        pack_options.algorithm.adaptive_sampling = !disable_adaptive_sampling;
+        if (maximum_packing_milliseconds > static_cast<std::uint64_t>(std::chrono::milliseconds::max().count())) {
+            throw irop::Error(irop::ErrorCategory::invalid_configuration,
+                              "maximum packing duration is not representable");
+        }
+        pack_options.limits.max_elapsed_time =
+            std::chrono::milliseconds(static_cast<std::chrono::milliseconds::rep>(maximum_packing_milliseconds));
+        if (maximum_local_solve_milliseconds > static_cast<std::uint64_t>(std::chrono::milliseconds::max().count())) {
+            throw irop::Error(irop::ErrorCategory::invalid_configuration,
+                              "maximum local-solve duration is not representable");
+        }
+        pack_options.limits.local_solve.max_elapsed_time =
+            std::chrono::milliseconds(static_cast<std::chrono::milliseconds::rep>(maximum_local_solve_milliseconds));
+        interruption_requested = 0;
+        static_cast<void>(std::signal(SIGINT, handle_interruption));
+        pack_options.callbacks.cancellation_requested = []() noexcept {
+            return interruption_requested != 0;
+        };
+        pack_options.callbacks.progress = [](const irop::PackingProgress& progress) {
+            switch (progress.phase) {
+            case irop::PackingProgressPhase::scale_step_started:
+                spdlog::info("packing scale step {}/{}: target volume scale {}", progress.scale_step + 1,
+                             progress.scale_step_count, progress.target_volume_scale);
+                break;
+            case irop::PackingProgressPhase::tetrahedralization_recovery:
+                spdlog::warn("TetGen recovery at scale step {}, iteration {}", progress.scale_step + 1,
+                             progress.iteration + 1);
+                break;
+            case irop::PackingProgressPhase::iteration_completed:
+                spdlog::debug("packing step {}, iteration {}: {}/{} objects at target", progress.scale_step + 1,
+                              progress.iteration + 1, progress.objects_at_target, progress.object_count);
+                break;
+            case irop::PackingProgressPhase::finished:
+                break;
+            }
+        };
+
+        const irop::PackSceneResult result =
+            irop::pack_scene(packing_object_path, packing_container_path, packing_output_directory, pack_options);
+        if (result.packing.succeeded()) {
+            spdlog::info("packed {} objects; wrote {}", result.packing.state.transforms.size(),
+                         path_as_utf8(*result.packed_objects_path));
+        }
+        else {
+            spdlog::error("packing ended with {}: {}; wrote {}", irop::to_string(result.packing.status),
+                          result.packing.diagnostic, path_as_utf8(result.run_summary_path));
+        }
+        return static_cast<int>(exit_code_for(result.packing.status));
     }
     return static_cast<int>(ExitCode::success);
 }

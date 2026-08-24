@@ -26,6 +26,96 @@ The implementation is based on the paper ["Packing irregular Objects in 3D Space
 * packing up to 10 items.
 * currently limit is probably due to the faulty implementation of the non-linear constraint optimisation. see issues.
 
+## Experimental Windows C++ CLI
+
+The C++20 port can validate an STL, create a deterministic initial scene, and run
+the bounded end-to-end packing loop for repeated copies of one closed object mesh
+inside one closed container mesh. Build it from a Visual Studio 2026 developer
+shell with a configured `VCPKG_ROOT`:
+
+```powershell
+cmake --preset windows-vs2026
+cmake --build --preset windows-vs2026-release
+```
+
+Run a small packing like this:
+
+```powershell
+build/windows-vs2026/Release/irop.exe pack `
+  --object path/to/object.stl `
+  --container path/to/container.stl `
+  --count 1 `
+  --initial-volume-scale 0.1 `
+  --final-volume-scale 0.1001 `
+  --scale-steps 1 `
+  --no-adaptive-sampling `
+  --output-dir artifacts/my-packing
+```
+
+This conservative one-step command is a useful input/build check. For a real
+packing attempt, increase `--count` and `--final-volume-scale`, use several
+`--scale-steps`, and enable adaptive sampling after the full-resolution path
+works for your meshes.
+
+The output directory must not already exist. A successful run atomically writes
+`packed-objects.stl`, `container.stl`, `placements.json`, and
+`run-summary.json`; add `--individual-stls` for one STL per object. Expected
+algorithm failures write only an unsuccessful `run-summary.json`, so an
+intermediate scene cannot be mistaken for a packed result. Press Ctrl+C for a
+clean cancellation. Before an engine result exists—including during input
+preparation or initialization—it exits 130 without creating the output
+directory. Cancellation reported by the engine or observed after engine success
+publishes only a cancelled `run-summary.json`; an already-final unsuccessful
+engine result remains authoritative. Adaptive sampling is enabled by default
+for reference parity, but its container refinement formula can be expensive for
+coarse toy meshes; use `--no-adaptive-sampling` for those inputs and for
+full-resolution diagnostic runs. Run `irop.exe pack --help` for limits and
+tuning flags.
+Configuration is currently supplied through CLI flags; JSON files are result
+formats, not yet configuration inputs.
+
+For automation, `pack` returns 0 on success, 2 for CLI usage, 3 for invalid
+input/configuration, 4 on a resource/time limit, 5 for output I/O, 6 for another
+structured unsuccessful packing outcome, 70 for an internal command failure,
+and 130 after cancellation. Treat a run as usable only when
+`run-summary.json` reports `outcome.category: "success"` and
+`validation.physical_scene_valid: true`.
+
+The related commands are:
+
+```powershell
+irop.exe inspect input.stl --output-dir artifacts/inspection
+irop.exe initialize --object object.stl --container container.stl --count 3 --output-dir artifacts/initial
+```
+
+### Practical C++ packing checks
+
+The practical fixtures are generated directly in C++; no hand-authored STL test
+files are required. After a Release build, run the complete suite or the focused
+geometry and end-to-end groups:
+
+```powershell
+ctest --test-dir build/windows-vs2026 -C Release --output-on-failure
+build/windows-vs2026/tests/cpp/Release/irop_tests.exe "[geometry]"
+build/windows-vs2026/tests/cpp/Release/irop_tests.exe "[practical-packing]"
+```
+
+`[geometry]` checks obvious cube/cylinder fits, separated objects, an oversized
+non-fit, and a rod that fits only at a known rotation. `[practical-packing]`
+runs actual initialization, TetGen, CAT, Ipopt, barrier completion, and physical
+validation for rotation-enabled cylinders, full-scale cylinders/tetrahedra, and
+the rotation-required rod.
+
+The transform and scale-barrier corrections are recorded in [ADR-0012](/docs/adr/0012-transform-consistent-barrier-bounded-local-solves.md).
+
+This C++ path is still parity-oriented and experimental. The Python package and
+its notes below remain the behavioral reference until the compatibility milestone
+is complete. The linked C++ executable is not simply BSD-distributable: TetGen
+is used under AGPL-3.0-or-later, and the currently validated Ipopt/Intel binary
+bundle is approved for local builds rather than public binary redistribution.
+See [ADR-0009](/docs/adr/0009-tetgen-1-6-agpl-overlay-and-adapter.md)
+and [ADR-0010](/docs/adr/0010-ipopt-3-14-19-official-windows-binary-adapter.md).
+
 ## Installation
 
     pip install irregular-object-packing

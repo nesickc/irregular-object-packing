@@ -1,6 +1,6 @@
 # C++ Migration Implementation Progress
 
-Last updated: 2026-08-22
+Last updated: 2026-08-24
 
 This working report tracks execution of `docs/IMPLEMENTATION_PLAN.md`. The concise,
 authoritative project status remains in `docs/STATUS.md`; this file records the more
@@ -8,19 +8,24 @@ detailed implementation trail requested for the migration.
 
 ## Current Position
 
-- Active milestone: Milestone 5 — End-to-End Packing CLI.
-- State: Milestones 1 through 4 are Verified; Milestone 5 has not started.
-- Current outcome: `irop_core` now provides hardened STL inspection, deterministic
-  bounded initialization, a private TetGen 1.6.0 tetrahedralization boundary, and
-  project-owned participant-contiguous CAT polygons and plane constraints. A private
-  Ipopt 3.14.19 C adapter now solves the bounded seven-variable local problem with
-  exact derivatives, structured outcomes, and independent applied-geometry
-  acceptance checks. Public headers expose only project-owned types. The full
-  dependency graph passes Debug, Release, format, and clang-tidy analysis gates.
+- Active milestone: Milestone 6 — Compatibility, Robustness, and Release Readiness.
+- State: Milestones 1 through 5 are Verified; Milestone 6 is In Progress.
+- Current outcome: `irop_core` composes bounded initialization, adaptive
+  resampling, TetGen, CAT, deterministic Ipopt solves, full-resolution collision
+  correction, exact scale barriers, termination, and output-quantized validation.
+  Accepted local rotations are now left-composed in the same order as the
+  constraint model. Packing-local scale objectives use overflow-safe finite
+  near-barrier bounds plus independently postchecked exact-target snapping.
+  The thin `irop pack` command atomically emits versioned success artifacts or a
+  summary-only structured failure. Public headers expose only project-owned types.
+  Visual Studio Debug/Release and the Ninja clang-tidy configuration pass 163/163
+  tests.
 - Blocking ambiguities: none. ADR-0009 records the approved TetGen AGPL source and
   integration path; ADR-0010 records the exact Ipopt binary path and public-binary
-  review gate; the compatibility catalog is synchronized through
-  `IROP-COMPAT-0006` and `IROP-DEV-0016`.
+  review gate; ADR-0011 records the packing outcome/artifact contract; ADR-0012
+  records the transform-consistent barrier-bounded solve correction. The
+  compatibility catalog is synchronized through `IROP-COMPAT-0007` and
+  `IROP-DEV-0023`.
 
 ## Decisions Applied
 
@@ -34,8 +39,9 @@ detailed implementation trail requested for the migration.
 - Fix inspection artifact leaves as `normalized.stl` and
   `inspection-summary.json`, publish without overwrite, and publish the JSON success
   record only after the geometry artifact is complete.
-- Use stable process outcomes 0 (success), 2 (usage), 3 (input), 4 (resource limit),
-  5 (output), and 70 (internal).
+- Use stable process outcomes 0 (success), 2 (usage), 3 (input), 4 (resource/time
+  limit), 5 (output), 6 (other structured packing failure), 70 (internal), and
+  130 (packing cancellation).
 - Preserve coincident-point merging used by the Python/PyVista read path. Rejecting
   malformed and unsafe inputs is new trust-boundary behavior, not a compatibility
   deviation from a demonstrated successful Python case.
@@ -63,8 +69,12 @@ detailed implementation trail requested for the migration.
   Jacobian, and a reusable workspace owned by the caller.
 - Accept only successful, acceptable, or feasible Ipopt candidates that satisfy
   variable bounds and independent constraint checks in both solver space and the
-  geometry produced by the actually stored transform. Preserve solve-then-clamp and
-  componentwise Euler addition only behind compatibility markers.
+  geometry produced by the actually stored transform.
+- Left-compose accepted incremental rotations with the current orientation and encode
+  the result canonically in the existing `Ry * Rz * Rx` Euler representation.
+- Bound packing-local scale objectives near each barrier with fixed representable
+  slack, finite saturation for extreme ratios, exact clamping, and an independently
+  postchecked near-target snap.
 - Bound constraint rows, dense Jacobian entries, callback work, iterations, and
   elapsed time. Time checks are cooperative around callback chunks; an active MUMPS
   factorization and its peak allocation cannot be hard-preempted through this API.
@@ -87,8 +97,26 @@ detailed implementation trail requested for the migration.
   exact object/container surface triangle-pair tests.
 - Publish every initialization artifact together by renaming a private staging
   directory to a previously absent final path after `run-summary.json` is complete.
-- Implement only the adaptive sampling ratio/target-count policy in Milestone 2;
-  actual iteration-time remeshing remains packing-loop work.
+- Run the packing coordinator sequentially in object-ID order, continue the
+  run-owned NumPy-compatible MT19937 stream, preserve exact scale barriers and
+  cataloged Python quirks, and stop with project-owned outcomes rather than
+  silently advancing an unconverged barrier.
+- Use private VTK resampling for the Python target-count policy, while physical
+  correction and final acceptance operate on full-resolution closed surfaces.
+- Bound correction, history, collision work, generated geometry, nested adapter
+  work, local solves, and elapsed time; poll cancellation between input,
+  initialization, coarse engine, and successful artifact-publication boundaries.
+  Preserve an already-final unsuccessful engine outcome if interruption arrives
+  only while its summary is being published.
+- Resolve an omitted translation base to twice the cube root of full-size object
+  volume; retain an explicit positive base and the reference-compatible
+  barrier multiplication.
+- Publish packing results with a private staging directory. Success contains the
+  four fixed artifacts (plus optional individual STLs); expected failure contains
+  only `run-summary.json`; input/output failures publish no run directory.
+- Revalidate the exact float32-coordinate meshes used by the binary STL writer
+  before success and make the version-one schema enforce the success/failure
+  artifact and physical-validation invariant.
 
 ## Milestone 1 Checklist
 
@@ -170,8 +198,9 @@ detailed implementation trail requested for the migration.
   guesses, positive scale, problem size, and dense-Jacobian arithmetic before Ipopt.
 - [x] Enforce preparation, constraint-row, Jacobian-entry, callback, iteration, and
   cooperative elapsed-time limits with structured failure results.
-- [x] Preserve solve-then-clamp and componentwise Euler addition, while rejecting a
-  candidate unless solver-space and actually applied geometry both pass postchecks.
+- [x] Initially preserve solve-then-clamp and componentwise Euler addition with
+  solver/applied postchecks; retire both paths through ADR-0012 in Milestone 6 after
+  practical failures established their downstream harm.
 - [x] Add Python numerical goldens, central-difference derivative checks, box,
   asymmetric, genuine seven-variable, fixed/infeasible, hostile-option-file,
   malformed-input, resource-limit, clamping, and workspace-reuse tests.
@@ -179,6 +208,57 @@ detailed implementation trail requested for the migration.
   differences on 2,048 constraints.
 - [x] Pass the isolated overlay audit, Visual Studio Debug/Release, format,
   clang-tidy, independent review, and full CTest gates.
+
+## Milestone 5 Checklist
+
+- [x] Audit the live Python barrier, resampling, recovery, local-guess,
+  collision-correction, random-draw, and termination behavior.
+- [x] Add project-owned packing configuration, limit, callback, progress,
+  history, work, validation, result, and application-service contracts.
+- [x] Implement exact linear volume-scale barriers, adaptive VTK resampling,
+  TetGen/CAT rebuilding, deterministic per-object Ipopt solves, transactional
+  state updates, and bounded recovery/correction.
+- [x] Add strict full-resolution container and object collision/nesting checks
+  with cumulative work limits and no repeated structural validation per pair.
+- [x] Require final physical validation and repeat it on the exact float32
+  coordinates serialized by the binary STL writer.
+- [x] Add `irop pack` with one-based progress logging, Ctrl+C cancellation,
+  stable exits, input/engine/output controls, and thin CLI orchestration.
+- [x] Atomically publish the four fixed success artifacts plus optional
+  individual STLs, or a summary-only expected unsuccessful result.
+- [x] Add version-one placements/run-summary schemas whose conditional contract
+  rejects misleading success records.
+- [x] Cover genuine growth, adaptive orchestration, collision predicates and
+  budgets, cancellation, resource exhaustion, infeasibility/exit 6, malformed
+  input, no-overwrite output, serialization quantization, and schemas.
+- [x] Record ADR-0011, synchronize compatibility through
+  `IROP-COMPAT-0007`/`IROP-DEV-0021`, and add short README usage/licensing
+  guidance.
+- [x] Pass Visual Studio Debug/Release, 154/154 CTest cases, clang-format,
+  Ninja clang-tidy with 154/154 tests, schema validation, and final review.
+
+## Milestone 6 Checklist
+
+- [x] Reproduce the reported two-object rotation-enabled postcheck failure and
+  full-scale iteration-limit failure on the supplied STL pair.
+- [x] Retire `IROP-COMPAT-0001` and `IROP-COMPAT-0006`; record ADR-0012,
+  `IROP-DEV-0022`, and `IROP-DEV-0023`.
+- [x] Persist accepted rotations through exact `R_delta * R_current` composition
+  with canonical `Ry * Rz * Rx` extraction and gimbal-lock coverage.
+- [x] Bound packing scale objectives near the active barrier, saturate extreme
+  ratios below the solver sentinel, and independently postcheck exact-target snaps.
+- [x] Generate primitive geometry in test code for obvious cube/cylinder fits,
+  separated objects, oversized non-fit, rotation-required rod, full-scale cylinder
+  and tetrahedron, and rotation-enabled two-object growth.
+- [x] Re-run both exact reported commands; require exact target scales and passing
+  full-resolution/output validation.
+- [x] Pass Visual Studio Debug/Release and Ninja clang-tidy builds with 163/163
+  tests in each configuration.
+- [ ] Build the broader representative Python/C++ transform, outcome, collision,
+  and artifact parity corpus.
+- [ ] Expand hostile-input, rare recovery/correction, and process-level SIGINT
+  coverage and profile representative adaptive runs.
+- [ ] Add hosted CI/release checks and close ADR-0009/ADR-0010 distribution gates.
 
 ## Activity Log
 
@@ -430,6 +510,84 @@ detailed implementation trail requested for the migration.
 - Independent production/API review found no remaining Milestone 4 blocker.
   Milestone 5 is next.
 
+### 2026-08-22 — End-to-end packing coordinator implemented
+
+- Audited the Python coordinator and implemented exact barriers, adaptive
+  surface resampling, TetGen/CAT rebuilding, deterministic transaction-local
+  per-object solves, continued run-owned random draws, bounded recovery and
+  collision correction, history/work accounting, and explicit termination.
+- Added strict collision and containment/nesting validation over full-resolution
+  meshes. Scene comparisons now validate each mesh once and reuse an
+  already-validated narrow intersection primitive under cumulative work limits.
+- Preserved CAT-diagnostic exclusion and barrier-scaled translation behind
+  compatibility markers; corrected threaded state races, silent iteration
+  advancement, unsafe surface-only acceptance, unbounded correction, and the
+  effectively unbounded default translation setting through cataloged deviations.
+
+### 2026-08-22 — Packing CLI and artifact contract implemented
+
+- Added `irop pack`, cooperative SIGINT handling, one-based interactive
+  progress, stable packing exits, CLI-configured resource limits, and early
+  project-owned configuration validation.
+- Added atomic success publication of `packed-objects.stl`, `container.stl`,
+  `placements.json`, and `run-summary.json`, plus optional individual STLs.
+  Resource, infeasible, engine-cancelled, and post-success-cancelled outcomes
+  publish summary-only; invalid input/configuration, pre-engine cancellation,
+  and output failures publish no run directory.
+- Added explicit final-validation state and checked-in version-one schemas. The
+  run-summary schema conditionally requires fixed artifacts and passed physical
+  validation for success, and null/empty success outputs for every failure.
+- Factored the binary-STL float quantization into a reusable helper. The
+  application validates and writes the same quantized meshes, preventing a
+  sub-ULP contact introduced by serialization from being published as success.
+
+### 2026-08-22 — Milestone 5 verified
+
+- The genuine-growth CLI smoke traversed STL loading, TetGen, CAT, Ipopt,
+  full-resolution/output-quantized validation, and the four-artifact success
+  transaction. It also verified summary-only resource exhaustion and a
+  deterministic infeasible exit 6.
+- Focused tests cover adaptive orchestration, collision and containment cases,
+  cumulative budgets, run-owned random continuation, cancellation during the
+  initialization and success-to-publication boundaries, pre-input cancellation
+  with no artifacts, malformed input, no-overwrite output, schema invariants,
+  and float quantization.
+- Visual Studio Debug and Release and the Ninja clang-tidy build each passed
+  154/154 tests. The clang-format gate, `git diff --check`, emitted-instance
+  schema validation, and misleading-success schema rejection passed.
+- Independent implementation and acceptance reviews were incorporated.
+  Milestone 6 is next.
+
+### 2026-08-24 - Milestone 6 transform and barrier robustness tranche
+
+- Reproduced the supplied two-object failures and separated their causes. With
+  rotation enabled, additive Euler persistence produced a different orientation
+  from the solver's `R_delta * R_current` constraint geometry and failed the
+  applied-transform postcheck. With rotation disabled at `0.999 -> 1.0`, the
+  unconstrained scale objective spent 533 iterations on the first object and
+  exhausted the 1,000-iteration limit on the second.
+- Replaced additive Euler updates with exact left composition and canonical
+  `Ry * Rz * Rx` extraction. Matrix invariants cover non-commuting rotations and
+  exact/near positive and negative gimbal lock.
+- Added overflow-safe finite scale bounds with fixed representable slack,
+  saturation below the adapter's `1e19` sentinel for extreme ratios, and an
+  independently checked exact-target snap that retains the unsnapped feasible
+  result when exact scale is infeasible.
+- Added generated box, cube, faceted-cylinder, tetrahedron, and rod fixtures.
+  Geometry oracles cover obvious fits, separated copies, an oversized non-fit,
+  and a known rotation-only fit. End-to-end tests cover rotation-enabled
+  two-object growth, full-scale cylinder/tetrahedron barriers, and a
+  rotation-required rod without external STL fixtures.
+- Re-ran the exact supplied meshes. The `0.1 -> 0.1001` rotation-enabled run
+  completed two solves in 78 aggregate Ipopt iterations. The
+  `0.999 -> 1.0` rotation-disabled run completed two solves in 14 iterations
+  after one bounded TetGen recovery. Both wrote exact requested scales and passed
+  physical validation.
+- Recorded ADR-0012, retired COMPAT-0001/0006, synchronized DEV-0022/0023, and
+  added focused practical-test commands to the README.
+- Visual Studio Debug, Visual Studio Release, and the Ninja clang-tidy analysis
+  build each passed 163/163 tests.
+
 ## Verification Evidence
 
 - Toolchain: CMake 4.2.3; Visual Studio Community 2026 18.8.3; MSVC 19.51.36252;
@@ -446,16 +604,34 @@ detailed implementation trail requested for the migration.
   `37966ff18a9022a7b0575a2e77f52041276a4744a2c9485390900469a893ea07`.
 - Debug: `cmake --build build/windows-vs2026-scoped-gl2ps --config Debug`
   succeeded; `ctest --test-dir build/windows-vs2026-scoped-gl2ps -C Debug
-  --output-on-failure` passed 114/114 tests.
+  --output-on-failure` passed 154/154 tests.
 - Release: `cmake --build build/windows-vs2026-scoped-gl2ps --config Release`
   succeeded; `ctest --test-dir build/windows-vs2026-scoped-gl2ps -C Release
-  --output-on-failure` passed 114/114 tests.
+  --output-on-failure` passed 154/154 tests.
 - Formatting: `cmake --build build/windows-vs2026-scoped-gl2ps --config Debug
   --target irop-format-check` passed with the checked-in profile.
 - Analysis: the `windows-ninja-analysis` configuration at
   `build/windows-ninja-analysis-scoped-gl2ps-vcpkg-root` generated build rules
   invoking clang-tidy 22.1.3, built successfully in the Visual Studio developer
-  environment, and passed 114/114 tests.
+  environment, and passed 154/154 tests.
+- Milestone 6 Visual Studio: `cmake --build build/windows-vs2026 --config
+  Debug` and `--config Release` succeeded; both matching CTest runs passed
+  163/163 tests.
+- Milestone 6 analysis: the Ninja clang-tidy configuration rebuilt all changed
+  production and test sources and passed 163/163 tests.
+- Milestone 6 exact inputs: `build/manual-m6-rotation-final-20260824` succeeded
+  with two exact `0.1001` scales, two solves, 78 aggregate Ipopt iterations,
+  and physical validity. `build/manual-m6-fullscale-final-20260824` succeeded
+  with two exact `1.0` scales, one TetGen recovery, two solves, 14 iterations,
+  and physical validity.
+- Focused numeric/geometry coverage includes non-commuting and gimbal-lock
+  composition, near-tight exact snap, default/small/below-ULP tolerance policy,
+  extreme-ratio saturation, obvious primitive fits/non-fits, full-scale
+  cylinder/tetrahedron packing, and rotation-required geometry/packing.
+
+- Milestone 5 JSON contracts: emitted success, resource-failure, and placements
+  documents passed PowerShell `Test-Json` against the checked-in schemas; a
+  mutated success category with null artifacts was rejected.
 - Focused Milestone 3: `ctest --test-dir build/windows-vs2026-scoped-gl2ps -C
   Debug -R "TetGen|tetrahedral|CAT|diagnostic writers" --output-on-failure`
   passed 22/22 tests.
@@ -498,6 +674,10 @@ detailed implementation trail requested for the migration.
 - The Python-compatible `O0/0Q` switch string tetrahedralizes the participant point
   union rather than enabling PLC/CDT mode. Changing this after parity may materially
   change CAT constraints and requires comparative packing evidence.
+- Exact co-spherical/coplanar point sets in very regular generated primitives can
+  make point-union TetGen emit a zero-volume tetrahedron. End-to-end toy fixtures
+  use small deterministic geometric perturbations and production retains bounded
+  recovery; the current recovery warning does not expose the backend root cause.
 - Project limits bound TetGen inputs and accepted outputs but cannot strictly cap the
   backend's peak memory or time. Calls are serialized because TetGen's exact-predicate
   implementation uses mutable process-global state.
@@ -513,6 +693,15 @@ detailed implementation trail requested for the migration.
   internal allocation. Future parallel local solves also require a measured
   concurrency audit because the selected MUMPS-backed build may serialize internally;
   each concurrent call must use a distinct `LocalSolveWorkspace`.
-- Next implementation work is Milestone 5: compose the verified stages into a
-  bounded packing loop, add collision correction and convergence/recovery behavior,
-  and publish complete `irop pack` results.
+- Adaptive sampling intentionally preserves the Python target-count formulas and can
+  refine coarse toy containers aggressively. Use `--no-adaptive-sampling` for
+  full-resolution diagnostic runs; Milestone 7 may optimize only measured workloads.
+- Packing cancellation and elapsed checks are cooperative between input,
+  initialization, engine-stage, and successful artifact boundaries. An
+  already-final unsuccessful engine outcome wins over a later interruption.
+  Active VTK reads and remeshing, TetGen, MUMPS, collision queries, and
+  individual file-write calls are not hard-preemptible.
+- Remaining Milestone 6 work is to build representative Python/C++ parity
+  corpora, expand hostile-input and process-level interruption coverage, add hosted
+  CI/release checks, and resolve the exact public binary licensing path before any
+  distribution.

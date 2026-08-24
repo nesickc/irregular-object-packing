@@ -23,7 +23,7 @@ namespace irop {
 namespace {
 
 constexpr ipindex variable_count = static_cast<ipindex>(local_solve_variable_count);
-constexpr ipnumber ipopt_infinity = 1.0e19;
+constexpr ipnumber ipopt_infinity = maximum_local_solve_bound_magnitude_exclusive;
 constexpr ipnumber constraint_upper_bound = 2.0e19;
 constexpr double unit_normal_squared_tolerance = 1.0e-10;
 constexpr std::size_t elapsed_check_stride = 4'096;
@@ -806,8 +806,7 @@ LocalSolveResult solve_local_transform(const TetrahedralMesh& mesh, const CatCon
 
         Transform applied;
         try {
-            applied =
-                apply_reference_local_step(request.current_transform, candidate, request.maximum_result_volume_scale);
+            applied = apply_local_step(request.current_transform, candidate, request.maximum_result_volume_scale);
         }
         catch (...) {
             result.status = LocalSolveStatus::postcheck_failed;
@@ -832,8 +831,41 @@ LocalSolveResult solve_local_transform(const TetrahedralMesh& mesh, const CatCon
         if (!result.work.minimum_applied_constraint.has_value() ||
             *result.work.minimum_applied_constraint < -feasibility_tolerance) {
             result.status = LocalSolveStatus::postcheck_failed;
-            result.diagnostic = "reference-compatible applied transform is infeasible";
+            result.diagnostic = "applied barrier-clamped transform is infeasible";
             return finish();
+        }
+
+        // DEVIATION(IROP-DEV-0023): A feasible optimum can converge a few
+        // ulps below an exact barrier even when the finite scale bound has
+        // slack. Snap only near-target candidates, independently postcheck the
+        // exact scale, and retain the original feasible candidate if the snap
+        // is not feasible or the optional postcheck budget is unavailable.
+        const double required_target_multiplier =
+            request.maximum_result_volume_scale / request.current_transform.volume_scale;
+        const bool scale_bound_allows_target =
+            std::isfinite(required_target_multiplier) &&
+            (!request.bounds.maximum_volume_scale_multiplier.has_value() ||
+             required_target_multiplier <= *request.bounds.maximum_volume_scale_multiplier);
+        const bool is_near_target = applied.volume_scale < request.maximum_result_volume_scale &&
+                                    request.maximum_result_volume_scale - applied.volume_scale <=
+                                        request.maximum_result_volume_scale * local_solve_barrier_relative_slack;
+        if (scale_bound_allows_target && is_near_target &&
+            add_bounded_work(row_count, limits.max_constraint_rows_evaluated, result.work.constraint_rows_evaluated)) {
+            Transform snapped = applied;
+            snapped.volume_scale = request.maximum_result_volume_scale;
+            if (evaluate_applied_with_deadline(context, request.current_transform, snapped,
+                                               std::span(workspace.second_constraint_buffer_))) {
+                const std::optional<double> snapped_minimum = minimum_finite_value(workspace.second_constraint_buffer_);
+                if (snapped_minimum.has_value() && *snapped_minimum >= -feasibility_tolerance) {
+                    applied = snapped;
+                    result.work.minimum_applied_constraint = snapped_minimum;
+                }
+            }
+            else if (context.stop_reason == CallbackStopReason::time_limit) {
+                result.status = LocalSolveStatus::time_limit;
+                result.diagnostic = "local solve elapsed-time limit exceeded during exact-barrier postcheck";
+                return finish();
+            }
         }
         if (elapsed_limit_reached(context)) {
             result.status = LocalSolveStatus::time_limit;

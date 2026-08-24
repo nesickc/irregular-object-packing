@@ -116,6 +116,62 @@ TEST_CASE("STL writing emits a reloadable normalized binary mesh")
     require_tetrahedron_statistics(reloaded.mesh);
 }
 
+TEST_CASE("binary STL quantization exposes the exact serialized vertex coordinates")
+{
+    irop::TriangleMesh mesh = irop::test::tetrahedron_mesh();
+    mesh.vertices[1].x = std::nextafter(1.0, 2.0);
+    REQUIRE(mesh.vertices[1].x > 1.0);
+
+    const irop::TriangleMesh serialized = irop::quantize_mesh_for_binary_stl(mesh);
+
+    CHECK(serialized.triangles == mesh.triangles);
+    REQUIRE(serialized.vertices.size() == mesh.vertices.size());
+    CHECK(serialized.vertices[1].x == 1.0);
+    CHECK(serialized.vertices[1].x == static_cast<double>(static_cast<float>(mesh.vertices[1].x)));
+    CHECK(mesh.vertices[1].x > serialized.vertices[1].x);
+}
+
+TEST_CASE("STL writing serializes the same coordinates returned by the quantization helper")
+{
+    irop::test::TempDirectory temporary;
+    const std::filesystem::path output = temporary.path() / "quantized.stl";
+    irop::TriangleMesh mesh = irop::test::tetrahedron_mesh();
+    mesh.vertices[1].x = std::nextafter(1.0, 2.0);
+    const irop::TriangleMesh serialized = irop::quantize_mesh_for_binary_stl(mesh);
+
+    irop::write_stl(output, mesh);
+    const irop::LoadedStl reloaded = irop::read_stl(output, {});
+
+    const irop::MeshStatistics serialized_statistics = irop::validate_and_measure_mesh(serialized, {});
+    const irop::MeshStatistics reloaded_statistics = irop::validate_and_measure_mesh(reloaded.mesh, {});
+    CHECK(reloaded_statistics.vertex_count == serialized_statistics.vertex_count);
+    CHECK(reloaded_statistics.triangle_count == serialized_statistics.triangle_count);
+    CHECK(reloaded_statistics.bounds.maximum.x == serialized_statistics.bounds.maximum.x);
+    CHECK(reloaded_statistics.bounds.maximum.y == serialized_statistics.bounds.maximum.y);
+    CHECK(reloaded_statistics.bounds.maximum.z == serialized_statistics.bounds.maximum.z);
+}
+
+TEST_CASE("binary STL quantization can close a sub-ULP gap between valid meshes")
+{
+    const irop::TriangleMesh first = irop::test::cube_mesh();
+    irop::TriangleMesh second = irop::test::cube_mesh();
+    const double translation = std::nextafter(2.0, 3.0);
+    for (irop::Point3& point : second.vertices) {
+        point.x += translation;
+    }
+
+    const irop::MeshStatistics first_before = irop::validate_and_measure_mesh(first, {});
+    const irop::MeshStatistics second_before = irop::validate_and_measure_mesh(second, {});
+    REQUIRE(first_before.bounds.maximum.x < second_before.bounds.minimum.x);
+
+    const irop::TriangleMesh serialized_first = irop::quantize_mesh_for_binary_stl(first);
+    const irop::TriangleMesh serialized_second = irop::quantize_mesh_for_binary_stl(second);
+    const irop::MeshStatistics first_after = irop::validate_and_measure_mesh(serialized_first, {});
+    const irop::MeshStatistics second_after = irop::validate_and_measure_mesh(serialized_second, {});
+
+    CHECK(first_after.bounds.maximum.x == second_after.bounds.minimum.x);
+}
+
 TEST_CASE("STL preflight rejects missing, empty, and truncated inputs safely")
 {
     irop::test::TempDirectory temporary;
@@ -351,6 +407,10 @@ TEST_CASE("STL writing rejects triangles that collapse during binary float quant
         .triangles = { { 0, 1, 2 } },
     };
     static_cast<void>(irop::validate_and_measure_mesh(mesh, {}));
+
+    irop::test::require_error_category([&]() {
+        static_cast<void>(irop::quantize_mesh_for_binary_stl(mesh));
+    }, irop::ErrorCategory::invalid_mesh);
 
     irop::test::require_error_category([&]() {
         irop::write_stl(output, mesh);

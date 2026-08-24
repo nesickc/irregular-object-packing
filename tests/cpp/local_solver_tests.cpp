@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <numbers>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -247,7 +248,7 @@ TEST_CASE("analytic local constraint gradient matches central differences")
     }
 }
 
-TEST_CASE("reference local result application preserves solve-then-clamp and additive Euler behavior")
+TEST_CASE("local result application composes the optimized incremental rotation")
 {
     const irop::Transform current {
         .volume_scale = 0.4,
@@ -260,14 +261,69 @@ TEST_CASE("reference local result application preserves solve-then-clamp and add
         .translation_delta = { -0.5, 0.25, 1.0   },
     };
 
-    const irop::Transform applied = irop::apply_reference_local_step(current, step, 0.7);
+    const irop::Transform applied = irop::apply_local_step(current, step, 0.7);
     CHECK(applied.volume_scale == Approx(0.7));
-    CHECK(applied.rotation.x == Approx(0.25));
-    CHECK(applied.rotation.y == Approx(-0.06));
-    CHECK(applied.rotation.z == Approx(0.28));
     CHECK(applied.translation.x == Approx(0.5));
     CHECK(applied.translation.y == Approx(2.25));
     CHECK(applied.translation.z == Approx(4.0));
+
+    const irop::Matrix4 expected_rotation = irop::compose(irop::matrix_for({ .rotation = step.rotation_delta }),
+                                                          irop::matrix_for({ .rotation = current.rotation }));
+    const irop::Matrix4 applied_rotation = irop::matrix_for({ .rotation = applied.rotation });
+    for (std::size_t row = 0; row < 3; ++row) {
+        for (std::size_t column = 0; column < 3; ++column) {
+            CAPTURE(row, column);
+            CHECK(applied_rotation(row, column) == Approx(expected_rotation(row, column)).margin(2.0e-14));
+        }
+    }
+}
+
+TEST_CASE("local result rotation composition is stable at gimbal lock")
+{
+    constexpr double half_pi = std::numbers::pi_v<double> / 2.0;
+    constexpr std::array<irop::EulerRotationRadians, 3> deltas {
+        irop::EulerRotationRadians { .z = half_pi },
+        irop::EulerRotationRadians { .z = -half_pi },
+        irop::EulerRotationRadians { .z = half_pi - 1.0e-13 },
+    };
+    const irop::Transform current { .rotation = { .x = 0.4 } };
+
+    for (const irop::EulerRotationRadians& delta : deltas) {
+        const irop::LocalTransformStep step { .rotation_delta = delta };
+        const irop::Transform applied = irop::apply_local_step(current, step, 1.0);
+        const irop::Matrix4 expected_rotation =
+            irop::compose(irop::matrix_for({ .rotation = delta }), irop::matrix_for({ .rotation = current.rotation }));
+        const irop::Matrix4 applied_rotation = irop::matrix_for({ .rotation = applied.rotation });
+        for (std::size_t row = 0; row < 3; ++row) {
+            for (std::size_t column = 0; column < 3; ++column) {
+                CAPTURE(delta.z, row, column);
+                CHECK(applied_rotation(row, column) == Approx(expected_rotation(row, column)).margin(2.0e-12));
+            }
+        }
+    }
+}
+
+TEST_CASE("near-target local result snaps to an independently feasible exact barrier")
+{
+    const LocalSolveFixture fixture = make_box_fixture();
+    irop::LocalSolveRequest request = make_scale_only_request();
+    constexpr double geometric_scale_limit = 1.0 / (0.9 * 0.9 * 0.9);
+    const double exact_feasible_barrier = std::nextafter(geometric_scale_limit, 0.0);
+    request.bounds.maximum_volume_scale_multiplier =
+        exact_feasible_barrier * (1.0 + irop::local_solve_barrier_relative_slack);
+    request.maximum_result_volume_scale = exact_feasible_barrier;
+
+    irop::LocalSolveWorkspace workspace;
+    const irop::LocalSolveResult result = irop::solve_local_transform(fixture.mesh, fixture.cat, request, workspace);
+
+    INFO(result.diagnostic);
+    REQUIRE(result.succeeded());
+    REQUIRE(result.candidate_step.has_value());
+    REQUIRE(result.accepted_transform.has_value());
+    CHECK(result.candidate_step->volume_scale_multiplier < exact_feasible_barrier);
+    CHECK(result.accepted_transform->volume_scale == exact_feasible_barrier);
+    REQUIRE(result.work.minimum_applied_constraint.has_value());
+    CHECK(*result.work.minimum_applied_constraint >= 0.0);
 }
 
 TEST_CASE("Ipopt solves the Python box scale fixture")

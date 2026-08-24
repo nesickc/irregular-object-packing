@@ -15,6 +15,8 @@ namespace irop {
 
 inline constexpr std::size_t local_solve_variable_count = 7;
 inline constexpr double maximum_local_solve_tolerance = 1.0e-6;
+inline constexpr double maximum_local_solve_bound_magnitude_exclusive = 1.0e19;
+inline constexpr double local_solve_barrier_relative_slack = 20.0 * maximum_local_solve_tolerance;
 inline constexpr double maximum_local_solve_rotation_delta_radians = 3.14159265358979323846;
 
 struct LocalTransformStep {
@@ -139,10 +141,11 @@ private:
     const Point3& object_center, const LocalPlaneConstraint& constraint, double padding,
     const LocalTransformStep& step);
 
-// Applies the Python reference's incremental result representation. This is
-// intentionally not equivalent to composing two arbitrary transform matrices.
-[[nodiscard]] Transform apply_reference_local_step(const Transform& current, const LocalTransformStep& step,
-                                                   double maximum_result_volume_scale);
+// Applies the local step represented by the nonlinear constraints. Incremental
+// rotation is left-composed with the current orientation and encoded back into
+// the project's Ry * Rz * Rx Euler representation.
+[[nodiscard]] Transform apply_local_step(const Transform& current, const LocalTransformStep& step,
+                                         double maximum_result_volume_scale);
 
 // The caller supplies the initial guess and reusable workspace explicitly. Use
 // a distinct workspace for every concurrent solve. The solver consumes no

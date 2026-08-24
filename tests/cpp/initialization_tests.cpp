@@ -252,6 +252,38 @@ TEST_CASE("initialization stops at the configured placement-attempt limit")
     }, irop::ErrorCategory::resource_limit);
 }
 
+TEST_CASE("initialization observes cooperative cancellation during bounded work")
+{
+    irop::PackingConfig config;
+    config.object_count = 2;
+    std::uint64_t polls = 0;
+    irop::test::require_error_category([&]() {
+        static_cast<void>(
+            irop::initialize_packing(centered_tetrahedron(), irop::test::cube_mesh(5.0), config, [&polls]() {
+            ++polls;
+            return polls > 5;
+        }));
+    }, irop::ErrorCategory::cancelled);
+    CHECK(polls > 5);
+}
+
+TEST_CASE("cancellation takes precedence when the final placement attempt is rejected")
+{
+    irop::PackingConfig config;
+    config.object_count = 2;
+    config.initial_volume_scale = 1.0;
+    config.max_sampling_attempts = 2;
+    std::uint64_t polls = 0;
+    irop::test::require_error_category([&]() {
+        static_cast<void>(
+            irop::initialize_packing(irop::test::cube_mesh(2.0), irop::test::cube_mesh(1.0), config, [&polls]() {
+            ++polls;
+            return polls >= 10;
+        }));
+    }, irop::ErrorCategory::cancelled);
+    CHECK(polls >= 10);
+}
+
 TEST_CASE("initialization stops at the geometry-query work limit")
 {
     irop::PackingConfig config;

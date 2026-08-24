@@ -4,6 +4,7 @@ find_package(nlohmann_json CONFIG REQUIRED)
 add_executable(
     irop_tests
     cat_tests.cpp
+    collision_tests.cpp
     diagnostic_geometry_tests.cpp
     initialization_scene_tests.cpp
     initialization_tests.cpp
@@ -11,7 +12,11 @@ add_executable(
     local_solver_tests.cpp
     mesh_geometry_tests.cpp
     mesh_validation_tests.cpp
+    pack_scene_tests.cpp
+    packing_tests.cpp
+    practical_packing_tests.cpp
     sampling_policy_tests.cpp
+    surface_resampling_tests.cpp
     stl_io_tests.cpp
     tetrahedralization_tests.cpp
     transform_tests.cpp
@@ -64,3 +69,17 @@ add_test(
         "${CMAKE_CURRENT_SOURCE_DIR}/initialization_cli_smoke.cmake"
 )
 set_tests_properties(irop_initialization_cli_smoke PROPERTIES LABELS "cli;initialization;smoke")
+
+add_test(
+    NAME irop_packing_cli_smoke
+    COMMAND
+        "${CMAKE_COMMAND}"
+        "-DIROP_EXECUTABLE=$<TARGET_FILE:irop>"
+        "-DIROP_OBJECT_FIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/../fixtures/tetra_ascii.stl"
+        "-DIROP_CONTAINER_FIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/../fixtures/cube_ascii.stl"
+        "-DIROP_SCHEMA_DIR=${PROJECT_SOURCE_DIR}/docs/schemas"
+        "-DIROP_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/packing-cli-smoke"
+        -P
+        "${CMAKE_CURRENT_SOURCE_DIR}/packing_cli_smoke.cmake"
+)
+set_tests_properties(irop_packing_cli_smoke PROPERTIES LABELS "cli;packing;smoke")

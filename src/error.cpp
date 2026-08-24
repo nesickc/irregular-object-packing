@@ -19,6 +19,8 @@ const char* to_string(const ErrorCategory category) noexcept
         return "output_io";
     case ErrorCategory::dependency_failure:
         return "dependency_failure";
+    case ErrorCategory::cancelled:
+        return "cancelled";
     case ErrorCategory::internal:
         return "internal";
     }

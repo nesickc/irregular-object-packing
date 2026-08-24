@@ -12,6 +12,7 @@ enum class ErrorCategory {
     invalid_mesh,
     output_io,
     dependency_failure,
+    cancelled,
     internal,
 };
 

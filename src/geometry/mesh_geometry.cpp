@@ -18,6 +18,7 @@
 #include "irop/error.hpp"
 #include "irop/geometry/transform.hpp"
 #include "irop/model/mesh_validation.hpp"
+#include "mesh_geometry_internal.hpp"
 
 namespace irop {
 namespace {
@@ -429,11 +430,10 @@ double ClosedMeshQuery::distance_to_surface(const Point3& point) const
     return std::sqrt(minimum_squared);
 }
 
-SurfaceIntersectionResult query_surface_intersection(const TriangleMesh& first, const TriangleMesh& second,
-                                                     const std::uint64_t maximum_triangle_pair_tests)
+SurfaceIntersectionResult detail::query_validated_surface_intersection(const TriangleMesh& first,
+                                                                       const TriangleMesh& second,
+                                                                       const std::uint64_t maximum_triangle_pair_tests)
 {
-    static_cast<void>(validate_and_measure_mesh(first, structural_limits_for(first)));
-    static_cast<void>(validate_and_measure_mesh(second, structural_limits_for(second)));
     if (maximum_triangle_pair_tests == 0) {
         throw Error(ErrorCategory::resource_limit, "surface-intersection triangle-pair limit is exhausted");
     }
@@ -466,6 +466,14 @@ SurfaceIntersectionResult query_surface_intersection(const TriangleMesh& first, 
         }
     }
     return result;
+}
+
+SurfaceIntersectionResult query_surface_intersection(const TriangleMesh& first, const TriangleMesh& second,
+                                                     const std::uint64_t maximum_triangle_pair_tests)
+{
+    static_cast<void>(validate_and_measure_mesh(first, structural_limits_for(first)));
+    static_cast<void>(validate_and_measure_mesh(second, structural_limits_for(second)));
+    return detail::query_validated_surface_intersection(first, second, maximum_triangle_pair_tests);
 }
 
 TriangleMesh combine_meshes(const std::vector<TriangleMesh>& meshes, const MeshLimits& limits)

@@ -1,0 +1,671 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nesickc/irregular-object-packing/blob/main/docs/schemas/packing-run-summary-v1.schema.json",
+  "title": "IROP packing run summary version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "command",
+    "outcome",
+    "inputs",
+    "config",
+    "initialization",
+    "work",
+    "history",
+    "validation",
+    "metrics",
+    "timings",
+    "outputs",
+    "versions",
+    "warnings"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "const": "pack" },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "diagnostic"],
+      "properties": {
+        "category": {
+          "enum": [
+            "success",
+            "cancelled",
+            "invalid_input",
+            "resource_exhausted",
+            "infeasible",
+            "iteration_limit",
+            "correction_limit",
+            "time_limit",
+            "numerical_failure",
+            "dependency_failure",
+            "internal_failure"
+          ]
+        },
+        "diagnostic": { "type": "string", "maxLength": 2048 }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object", "container"],
+      "properties": {
+        "object": { "$ref": "#/$defs/object_input" },
+        "container": { "$ref": "#/$defs/container_input" }
+      }
+    },
+    "config": { "$ref": "#/$defs/config" },
+    "initialization": { "$ref": "#/$defs/initialization" },
+    "work": { "$ref": "#/$defs/packing_work" },
+    "history": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/history_record" }
+    },
+    "validation": { "$ref": "#/$defs/validation" },
+    "metrics": { "$ref": "#/$defs/metrics" },
+    "timings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["initialization_seconds", "packing_seconds", "artifact_preparation_seconds"],
+      "properties": {
+        "initialization_seconds": { "$ref": "#/$defs/nonnegative_number" },
+        "packing_seconds": { "$ref": "#/$defs/nonnegative_number" },
+        "artifact_preparation_seconds": { "$ref": "#/$defs/nonnegative_number" }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packed_objects_stl",
+        "container_stl",
+        "placements_json",
+        "run_summary_json",
+        "individual_object_stls"
+      ],
+      "properties": {
+        "packed_objects_stl": { "$ref": "#/$defs/nullable_path" },
+        "container_stl": { "$ref": "#/$defs/nullable_path" },
+        "placements_json": { "$ref": "#/$defs/nullable_path" },
+        "run_summary_json": { "const": "run-summary.json" },
+        "individual_object_stls": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/path" }
+        }
+      }
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["irop", "vtk", "eigen", "tetgen", "ipopt", "ipopt_linear_solver"],
+      "properties": {
+        "irop": { "$ref": "#/$defs/nonempty_string" },
+        "vtk": { "$ref": "#/$defs/nonempty_string" },
+        "eigen": { "$ref": "#/$defs/nonempty_string" },
+        "tetgen": { "const": "1.6.0" },
+        "ipopt": { "const": "3.14.19" },
+        "ipopt_linear_solver": { "const": "mumps" }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 256,
+      "items": { "type": "string", "maxLength": 1024 }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["outcome"],
+        "properties": {
+          "outcome": {
+            "required": ["category"],
+            "properties": {
+              "category": { "const": "success" }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "outputs": {
+            "properties": {
+              "packed_objects_stl": { "const": "packed-objects.stl" },
+              "container_stl": { "const": "container.stl" },
+              "placements_json": { "const": "placements.json" },
+              "individual_object_stls": {
+                "items": {
+                  "type": "string",
+                  "pattern": "^objects/object-[0-9]{6}\\.stl$"
+                }
+              }
+            }
+          },
+          "validation": {
+            "properties": {
+              "status": { "const": "passed" },
+              "physical_scene_valid": { "const": true }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "outputs": {
+            "properties": {
+              "packed_objects_stl": { "const": null },
+              "container_stl": { "const": null },
+              "placements_json": { "const": null },
+              "individual_object_stls": { "maxItems": 0 }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonnegative_integer": { "type": "integer", "minimum": 0 },
+    "positive_integer": { "type": "integer", "minimum": 1 },
+    "nonnegative_number": { "type": "number", "minimum": 0 },
+    "positive_number": { "type": "number", "exclusiveMinimum": 0 },
+    "nullable_number": { "type": ["number", "null"] },
+    "nonempty_string": { "type": "string", "minLength": 1 },
+    "path": { "type": "string", "minLength": 1 },
+    "nullable_path": { "type": ["string", "null"], "minLength": 1 },
+    "point": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "number" }
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum", "maximum"],
+      "properties": {
+        "minimum": { "$ref": "#/$defs/point" },
+        "maximum": { "$ref": "#/$defs/point" }
+      }
+    },
+    "common_input_properties": {
+      "type": "object",
+      "properties": {
+        "resolved_path": { "$ref": "#/$defs/path" },
+        "stl_encoding": { "enum": ["ascii", "binary"] },
+        "size_bytes": { "$ref": "#/$defs/positive_integer" },
+        "vertex_count": { "$ref": "#/$defs/positive_integer" },
+        "triangle_count": { "$ref": "#/$defs/positive_integer" },
+        "volume": { "$ref": "#/$defs/positive_number" }
+      }
+    },
+    "object_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resolved_path",
+        "stl_encoding",
+        "size_bytes",
+        "vertex_count",
+        "triangle_count",
+        "source_vertex_centroid",
+        "volume",
+        "maximum_radius"
+      ],
+      "properties": {
+        "resolved_path": { "$ref": "#/$defs/path" },
+        "stl_encoding": { "enum": ["ascii", "binary"] },
+        "size_bytes": { "$ref": "#/$defs/positive_integer" },
+        "vertex_count": { "$ref": "#/$defs/positive_integer" },
+        "triangle_count": { "$ref": "#/$defs/positive_integer" },
+        "source_vertex_centroid": { "$ref": "#/$defs/point" },
+        "volume": { "$ref": "#/$defs/positive_number" },
+        "maximum_radius": { "$ref": "#/$defs/positive_number" }
+      }
+    },
+    "container_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resolved_path",
+        "stl_encoding",
+        "size_bytes",
+        "vertex_count",
+        "triangle_count",
+        "volume",
+        "bounds"
+      ],
+      "properties": {
+        "resolved_path": { "$ref": "#/$defs/path" },
+        "stl_encoding": { "enum": ["ascii", "binary"] },
+        "size_bytes": { "$ref": "#/$defs/positive_integer" },
+        "vertex_count": { "$ref": "#/$defs/positive_integer" },
+        "triangle_count": { "$ref": "#/$defs/positive_integer" },
+        "volume": { "$ref": "#/$defs/positive_number" },
+        "bounds": { "$ref": "#/$defs/bounds" }
+      }
+    },
+    "count_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_vertices", "max_triangles"],
+      "properties": {
+        "max_vertices": { "$ref": "#/$defs/positive_integer" },
+        "max_triangles": { "$ref": "#/$defs/positive_integer" }
+      }
+    },
+    "input_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_input_bytes", "max_vertices", "max_triangles"],
+      "properties": {
+        "max_input_bytes": { "$ref": "#/$defs/positive_integer" },
+        "max_vertices": { "$ref": "#/$defs/positive_integer" },
+        "max_triangles": { "$ref": "#/$defs/positive_integer" }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "object_count",
+        "initial_volume_scale",
+        "final_volume_scale",
+        "scale_step_count",
+        "max_iterations_per_scale_step",
+        "maximum_rotation_delta_radians",
+        "maximum_translation_per_unit_scale",
+        "resolved_maximum_translation_per_unit_scale",
+        "padding",
+        "correction_volume_scale_factor",
+        "tetrahedralization_recovery_scale_factor",
+        "local_solve_tolerance",
+        "adaptive_sampling",
+        "sampling",
+        "seed",
+        "initialization_limits",
+        "input_limits",
+        "output_limits",
+        "engine_limits"
+      ],
+      "properties": {
+        "object_count": { "$ref": "#/$defs/positive_integer" },
+        "initial_volume_scale": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "final_volume_scale": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "scale_step_count": { "$ref": "#/$defs/positive_integer" },
+        "max_iterations_per_scale_step": { "$ref": "#/$defs/positive_integer" },
+        "maximum_rotation_delta_radians": { "$ref": "#/$defs/nonnegative_number" },
+        "maximum_translation_per_unit_scale": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "resolved_maximum_translation_per_unit_scale": { "$ref": "#/$defs/positive_number" },
+        "padding": { "$ref": "#/$defs/nonnegative_number" },
+        "correction_volume_scale_factor": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
+        "tetrahedralization_recovery_scale_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "local_solve_tolerance": { "$ref": "#/$defs/positive_number" },
+        "adaptive_sampling": { "type": "boolean" },
+        "sampling": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["alpha", "beta", "minimum_triangle_count"],
+          "properties": {
+            "alpha": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
+            "beta": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "minimum_triangle_count": { "type": "integer", "minimum": 4 }
+          }
+        },
+        "seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "initialization_limits": { "$ref": "#/$defs/initialization_limits" },
+        "input_limits": { "$ref": "#/$defs/input_limits" },
+        "output_limits": { "$ref": "#/$defs/count_limits" },
+        "engine_limits": { "$ref": "#/$defs/engine_limits" }
+      }
+    },
+    "initialization_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_sampling_attempts",
+        "max_geometry_query_triangle_visits",
+        "max_pairwise_distance_checks",
+        "max_surface_intersection_triangle_pairs"
+      ],
+      "properties": {
+        "max_sampling_attempts": { "$ref": "#/$defs/positive_integer" },
+        "max_geometry_query_triangle_visits": { "$ref": "#/$defs/positive_integer" },
+        "max_pairwise_distance_checks": { "$ref": "#/$defs/positive_integer" },
+        "max_surface_intersection_triangle_pairs": { "$ref": "#/$defs/positive_integer" }
+      }
+    },
+    "engine_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_correction_passes_per_iteration",
+        "max_history_records",
+        "max_total_local_solves",
+        "max_elapsed_milliseconds",
+        "intermediate_mesh",
+        "resampling",
+        "tetrahedralization",
+        "cat",
+        "local_solve",
+        "collision"
+      ],
+      "properties": {
+        "max_correction_passes_per_iteration": { "$ref": "#/$defs/positive_integer" },
+        "max_history_records": { "$ref": "#/$defs/positive_integer" },
+        "max_total_local_solves": { "$ref": "#/$defs/positive_integer" },
+        "max_elapsed_milliseconds": { "$ref": "#/$defs/positive_integer" },
+        "intermediate_mesh": { "$ref": "#/$defs/count_limits" },
+        "resampling": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_subdivision_steps", "mesh"],
+          "properties": {
+            "max_subdivision_steps": { "$ref": "#/$defs/positive_integer" },
+            "mesh": { "$ref": "#/$defs/count_limits" }
+          }
+        },
+        "tetrahedralization": { "$ref": "#/$defs/tetrahedralization_limits" },
+        "cat": { "$ref": "#/$defs/cat_limits" },
+        "local_solve": { "$ref": "#/$defs/local_solve_limits" },
+        "collision": { "$ref": "#/$defs/collision_limits" }
+      }
+    },
+    "tetrahedralization_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_participants",
+        "max_input_points",
+        "max_input_triangles",
+        "max_output_points",
+        "max_output_tetrahedra"
+      ],
+      "properties": {
+        "max_participants": { "$ref": "#/$defs/positive_integer" },
+        "max_input_points": { "$ref": "#/$defs/positive_integer" },
+        "max_input_triangles": { "$ref": "#/$defs/positive_integer" },
+        "max_output_points": { "$ref": "#/$defs/positive_integer" },
+        "max_output_tetrahedra": { "$ref": "#/$defs/positive_integer" }
+      }
+    },
+    "cat_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_participants",
+        "max_points",
+        "max_tetrahedra",
+        "max_relevant_tetrahedra",
+        "max_polygons",
+        "max_polygon_vertices",
+        "max_constraints"
+      ],
+      "properties": {
+        "max_participants": { "$ref": "#/$defs/positive_integer" },
+        "max_points": { "$ref": "#/$defs/positive_integer" },
+        "max_tetrahedra": { "$ref": "#/$defs/positive_integer" },
+        "max_relevant_tetrahedra": { "$ref": "#/$defs/positive_integer" },
+        "max_polygons": { "$ref": "#/$defs/positive_integer" },
+        "max_polygon_vertices": { "$ref": "#/$defs/positive_integer" },
+        "max_constraints": { "$ref": "#/$defs/positive_integer" }
+      }
+    },
+    "local_solve_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_constraints",
+        "max_dense_jacobian_entries",
+        "max_constraint_rows_evaluated",
+        "max_jacobian_entries_evaluated",
+        "max_iterations",
+        "max_elapsed_milliseconds"
+      ],
+      "properties": {
+        "max_constraints": { "$ref": "#/$defs/positive_integer" },
+        "max_dense_jacobian_entries": { "$ref": "#/$defs/positive_integer" },
+        "max_constraint_rows_evaluated": { "$ref": "#/$defs/positive_integer" },
+        "max_jacobian_entries_evaluated": { "$ref": "#/$defs/positive_integer" },
+        "max_iterations": { "$ref": "#/$defs/positive_integer" },
+        "max_elapsed_milliseconds": { "$ref": "#/$defs/positive_integer" }
+      }
+    },
+    "collision_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_triangle_pair_tests", "max_containment_triangle_visits", "max_reported_violations"],
+      "properties": {
+        "max_triangle_pair_tests": { "$ref": "#/$defs/positive_integer" },
+        "max_containment_triangle_visits": { "$ref": "#/$defs/positive_integer" },
+        "max_reported_violations": { "$ref": "#/$defs/positive_integer" }
+      }
+    },
+    "initialization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy",
+        "initial_linear_scale",
+        "minimum_boundary_clearance",
+        "minimum_center_distance",
+        "rejected_candidate_count",
+        "random_draw_count",
+        "random_generator",
+        "geometry_query_triangle_visits",
+        "pairwise_distance_checks",
+        "surface_intersection_triangle_pairs"
+      ],
+      "properties": {
+        "policy": { "const": "uniform-aabb-rejection-bounding-sphere" },
+        "initial_linear_scale": { "$ref": "#/$defs/positive_number" },
+        "minimum_boundary_clearance": { "$ref": "#/$defs/positive_number" },
+        "minimum_center_distance": { "$ref": "#/$defs/positive_number" },
+        "rejected_candidate_count": { "$ref": "#/$defs/nonnegative_integer" },
+        "random_draw_count": { "$ref": "#/$defs/nonnegative_integer" },
+        "random_generator": { "const": "numpy-legacy-mt19937-compatible" },
+        "geometry_query_triangle_visits": { "$ref": "#/$defs/nonnegative_integer" },
+        "pairwise_distance_checks": { "$ref": "#/$defs/nonnegative_integer" },
+        "surface_intersection_triangle_pairs": { "$ref": "#/$defs/nonnegative_integer" }
+      }
+    },
+    "tetrahedralization_work": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_participants", "input_points", "input_triangles", "output_points", "output_tetrahedra"],
+      "properties": {
+        "input_participants": { "$ref": "#/$defs/nonnegative_integer" },
+        "input_points": { "$ref": "#/$defs/nonnegative_integer" },
+        "input_triangles": { "$ref": "#/$defs/nonnegative_integer" },
+        "output_points": { "$ref": "#/$defs/nonnegative_integer" },
+        "output_tetrahedra": { "$ref": "#/$defs/nonnegative_integer" }
+      }
+    },
+    "cat_work": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "points_examined",
+        "tetrahedra_examined",
+        "relevant_tetrahedra",
+        "skipped_single_participant_tetrahedra",
+        "polygons_generated",
+        "polygon_vertices_generated",
+        "constraints_generated"
+      ],
+      "properties": {
+        "points_examined": { "$ref": "#/$defs/nonnegative_integer" },
+        "tetrahedra_examined": { "$ref": "#/$defs/nonnegative_integer" },
+        "relevant_tetrahedra": { "$ref": "#/$defs/nonnegative_integer" },
+        "skipped_single_participant_tetrahedra": { "$ref": "#/$defs/nonnegative_integer" },
+        "polygons_generated": { "$ref": "#/$defs/nonnegative_integer" },
+        "polygon_vertices_generated": { "$ref": "#/$defs/nonnegative_integer" },
+        "constraints_generated": { "$ref": "#/$defs/nonnegative_integer" }
+      }
+    },
+    "local_solve_work": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraints_prepared",
+        "objective_evaluations",
+        "objective_gradient_evaluations",
+        "constraint_rows_evaluated",
+        "jacobian_entries_evaluated",
+        "iterations",
+        "elapsed_milliseconds",
+        "minimum_solver_constraint",
+        "minimum_applied_constraint"
+      ],
+      "properties": {
+        "constraints_prepared": { "$ref": "#/$defs/nonnegative_integer" },
+        "objective_evaluations": { "$ref": "#/$defs/nonnegative_integer" },
+        "objective_gradient_evaluations": { "$ref": "#/$defs/nonnegative_integer" },
+        "constraint_rows_evaluated": { "$ref": "#/$defs/nonnegative_integer" },
+        "jacobian_entries_evaluated": { "$ref": "#/$defs/nonnegative_integer" },
+        "iterations": { "$ref": "#/$defs/nonnegative_integer" },
+        "elapsed_milliseconds": { "$ref": "#/$defs/nonnegative_integer" },
+        "minimum_solver_constraint": { "$ref": "#/$defs/nullable_number" },
+        "minimum_applied_constraint": { "$ref": "#/$defs/nullable_number" }
+      }
+    },
+    "collision_work": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object_pairs_examined", "triangle_pairs_tested", "containment_triangle_visits"],
+      "properties": {
+        "object_pairs_examined": { "$ref": "#/$defs/nonnegative_integer" },
+        "triangle_pairs_tested": { "$ref": "#/$defs/nonnegative_integer" },
+        "containment_triangle_visits": { "$ref": "#/$defs/nonnegative_integer" }
+      }
+    },
+    "packing_work": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completed_scale_steps",
+        "iterations",
+        "tetrahedralization_attempts",
+        "tetrahedralization_recoveries",
+        "cat_builds",
+        "local_solves",
+        "correction_passes",
+        "resampling_operations",
+        "tetrahedralization",
+        "cat",
+        "local_solve",
+        "collision",
+        "elapsed_milliseconds"
+      ],
+      "properties": {
+        "completed_scale_steps": { "$ref": "#/$defs/nonnegative_integer" },
+        "iterations": { "$ref": "#/$defs/nonnegative_integer" },
+        "tetrahedralization_attempts": { "$ref": "#/$defs/nonnegative_integer" },
+        "tetrahedralization_recoveries": { "$ref": "#/$defs/nonnegative_integer" },
+        "cat_builds": { "$ref": "#/$defs/nonnegative_integer" },
+        "local_solves": { "$ref": "#/$defs/nonnegative_integer" },
+        "correction_passes": { "$ref": "#/$defs/nonnegative_integer" },
+        "resampling_operations": { "$ref": "#/$defs/nonnegative_integer" },
+        "tetrahedralization": { "$ref": "#/$defs/tetrahedralization_work" },
+        "cat": { "$ref": "#/$defs/cat_work" },
+        "local_solve": { "$ref": "#/$defs/local_solve_work" },
+        "collision": { "$ref": "#/$defs/collision_work" },
+        "elapsed_milliseconds": { "$ref": "#/$defs/nonnegative_integer" }
+      }
+    },
+    "history_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scale_step",
+        "iteration",
+        "target_volume_scale",
+        "objects_at_target",
+        "sampled_object_triangles",
+        "sampled_container_triangles",
+        "cat_violations",
+        "container_violations",
+        "object_collisions",
+        "correction_passes"
+      ],
+      "properties": {
+        "scale_step": { "$ref": "#/$defs/nonnegative_integer" },
+        "iteration": { "$ref": "#/$defs/nonnegative_integer" },
+        "target_volume_scale": { "$ref": "#/$defs/positive_number" },
+        "objects_at_target": { "$ref": "#/$defs/nonnegative_integer" },
+        "sampled_object_triangles": { "$ref": "#/$defs/positive_integer" },
+        "sampled_container_triangles": { "$ref": "#/$defs/positive_integer" },
+        "cat_violations": { "$ref": "#/$defs/nonnegative_integer" },
+        "container_violations": { "$ref": "#/$defs/nonnegative_integer" },
+        "object_collisions": { "$ref": "#/$defs/nonnegative_integer" },
+        "correction_passes": { "$ref": "#/$defs/nonnegative_integer" }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "physical_scene_valid",
+        "cat_violation_object_ids",
+        "container_violation_object_ids",
+        "object_collisions",
+        "work"
+      ],
+      "properties": {
+        "status": { "enum": ["passed", "failed", "not_run"] },
+        "physical_scene_valid": { "type": ["boolean", "null"] },
+        "cat_violation_object_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonnegative_integer" }
+        },
+        "container_violation_object_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonnegative_integer" }
+        },
+        "object_collisions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/object_collision" }
+        },
+        "work": { "$ref": "#/$defs/collision_work" }
+      }
+    },
+    "object_collision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["first", "second"],
+      "properties": {
+        "first": { "$ref": "#/$defs/nonnegative_integer" },
+        "second": { "$ref": "#/$defs/nonnegative_integer" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "object_count",
+        "objects_at_final_target",
+        "target_volume_scale",
+        "minimum_volume_scale",
+        "maximum_volume_scale",
+        "mean_volume_scale",
+        "packed_object_volume",
+        "packing_fraction"
+      ],
+      "properties": {
+        "object_count": { "$ref": "#/$defs/nonnegative_integer" },
+        "objects_at_final_target": { "$ref": "#/$defs/nonnegative_integer" },
+        "target_volume_scale": { "$ref": "#/$defs/positive_number" },
+        "minimum_volume_scale": { "$ref": "#/$defs/nullable_number" },
+        "maximum_volume_scale": { "$ref": "#/$defs/nullable_number" },
+        "mean_volume_scale": { "$ref": "#/$defs/nullable_number" },
+        "packed_object_volume": { "$ref": "#/$defs/nullable_number" },
+        "packing_fraction": { "$ref": "#/$defs/nullable_number" }
+      }
+    }
+  }
+}

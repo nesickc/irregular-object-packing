@@ -6,6 +6,7 @@
 #include <bit>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -89,20 +90,18 @@ private:
     };
 }
 
-[[nodiscard]] inline TriangleMesh cube_mesh(const double half_extent = 1.0)
+[[nodiscard]] inline TriangleMesh box_mesh(const double half_x, const double half_y, const double half_z)
 {
-    const double low = -half_extent;
-    const double high = half_extent;
     return {
         .vertices = {
-            { low, low, low },
-            { high, low, low },
-            { high, high, low },
-            { low, high, low },
-            { low, low, high },
-            { high, low, high },
-            { high, high, high },
-            { low, high, high },
+            { -half_x, -half_y, -half_z },
+            { half_x, -half_y, -half_z },
+            { half_x, half_y, -half_z },
+            { -half_x, half_y, -half_z },
+            { -half_x, -half_y, half_z },
+            { half_x, -half_y, half_z },
+            { half_x, half_y, half_z },
+            { -half_x, half_y, half_z },
         },
         .triangles = {
             { 0, 2, 1 },
@@ -119,6 +118,49 @@ private:
             { 1, 6, 5 },
         },
     };
+}
+
+[[nodiscard]] inline TriangleMesh cube_mesh(const double half_extent = 1.0)
+{
+    return box_mesh(half_extent, half_extent, half_extent);
+}
+
+[[nodiscard]] inline TriangleMesh cylinder_mesh(const double radius, const double half_height,
+                                                const std::size_t segment_count = 12)
+{
+    if (!std::isfinite(radius) || !std::isfinite(half_height) || radius <= 0.0 || half_height <= 0.0 ||
+        segment_count < 3 || segment_count > std::numeric_limits<MeshIndex>::max() / 2) {
+        throw std::invalid_argument("test cylinder dimensions or segment count are invalid");
+    }
+
+    constexpr double two_pi = 6.28318530717958647692;
+    TriangleMesh mesh;
+    mesh.vertices.reserve(segment_count * 2);
+    for (std::size_t index = 0; index < segment_count; ++index) {
+        const double angle = two_pi * static_cast<double>(index) / static_cast<double>(segment_count);
+        mesh.vertices.push_back({ radius * std::cos(angle), radius * std::sin(angle), -half_height });
+    }
+    for (std::size_t index = 0; index < segment_count; ++index) {
+        const double angle = two_pi * static_cast<double>(index) / static_cast<double>(segment_count);
+        mesh.vertices.push_back({ radius * std::cos(angle), radius * std::sin(angle), half_height });
+    }
+
+    const MeshIndex top_offset = static_cast<MeshIndex>(segment_count);
+    for (std::size_t index = 0; index < segment_count; ++index) {
+        const MeshIndex bottom = static_cast<MeshIndex>(index);
+        const MeshIndex next = static_cast<MeshIndex>((index + 1) % segment_count);
+        const MeshIndex top = top_offset + bottom;
+        const MeshIndex top_next = top_offset + next;
+        mesh.triangles.push_back({ bottom, next, top_next });
+        mesh.triangles.push_back({ bottom, top_next, top });
+    }
+    for (std::size_t index = 1; index + 1 < segment_count; ++index) {
+        const MeshIndex current = static_cast<MeshIndex>(index);
+        const MeshIndex next = static_cast<MeshIndex>(index + 1);
+        mesh.triangles.push_back({ 0, next, current });
+        mesh.triangles.push_back({ top_offset, top_offset + current, top_offset + next });
+    }
+    return mesh;
 }
 
 [[nodiscard]] inline std::string ascii_tetrahedron()

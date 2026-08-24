@@ -1,6 +1,6 @@
 # C++ Project Definition
 
-Status: Approved baseline; Milestones 1 through 4 are verified; Milestone 5 is next.
+Status: Approved baseline; Milestones 1 through 5 are implemented and verified; Milestone 6 compatibility, robustness, and release readiness is in progress.
 
 ## Purpose
 
@@ -17,7 +17,7 @@ The first usable release will support:
 - The existing continuous packing phase: initialization, adaptive sampling, tetrahedralization, chordal axis transform constraints, per-object nonlinear optimization, collision correction, and scale-barrier iteration.
 - A local Windows command-line application.
 - STL as the required input and output mesh format.
-- JSON configuration and machine-readable run results.
+- CLI configuration and versioned machine-readable JSON run results.
 - Tangible output meshes that can be opened in an external mesh viewer.
 
 The first release will not include:
@@ -33,7 +33,7 @@ Those omissions are product boundaries, not permanent architectural prohibitions
 
 ## User-Facing Result
 
-The intended command shape is:
+The implemented Milestone 5 command shape is:
 
 ```powershell
 irop pack `
@@ -43,13 +43,27 @@ irop pack `
   --output out
 ```
 
-A successful run should produce:
+A successful run atomically publishes a new output directory containing:
 
 - `packed-objects.stl`: all transformed object copies combined into one mesh.
 - `container.stl`: the corresponding container geometry for inspection.
 - `placements.json`: per-object scale, rotation, translation, and transform data.
 - `run-summary.json`: resolved configuration, seed, timings, solver outcome, packing metrics, warnings, and dependency versions.
 - Optional individual object STL files when explicitly requested.
+
+The output path must not already exist. Expected unsuccessful packing outcomes
+atomically publish only `run-summary.json`; its non-success category is paired
+with null geometry/placement paths and no individual STLs. The summary records
+whether final physical validation was not run, passed, or failed. Success is
+gated against the exact float32 coordinates written to the binary STL artifacts,
+not only the in-memory geometry. Cancellation during input preparation or
+initialization, before an engine result exists, produces a 130 exit and no output
+directory. Cancellation returned by the engine or observed after engine success
+follows the summary-only failure contract; an already-final unsuccessful engine
+outcome remains authoritative. Usage and tuning examples are in the
+[experimental Windows C++ CLI guide](../README.md#experimental-windows-c-cli),
+and [ADR-0011](adr/0011-milestone-5-packing-outcome-and-artifact-contract.md)
+defines the complete outcome, exit, and atomic-publication contract.
 
 STL contains geometry but not a reliable scene graph, unit declaration, or instance metadata. JSON is therefore the canonical run record, while STL is the primary interoperable visual result. Input coordinates use arbitrary but consistent units; the application performs no implicit unit conversion.
 
@@ -105,6 +119,10 @@ At a high level, a run performs:
 
 The C++ port must not silently reinterpret scale semantics. The reference stores a volume scale and applies its cube root as a linear mesh scale.
 
+ADR-0012 deliberately corrects two unsuccessful reference behaviors: accepted
+local rotations are persisted by matrix composition, and packing-local scale
+objectives are finitely bounded near each barrier with exact postchecked completion.
+
 ## Compatibility Policy
 
 Preserve behavior observed during successful Python runs. Correct a clear defect only when its intended correction is evident and no meaningful downstream behavior is expected to rely on it.
@@ -112,7 +130,7 @@ Preserve behavior observed during successful Python runs. Correct a clear defect
 Use two stable code markers:
 
 ```cpp
-// COMPATIBILITY(IROP-COMPAT-0001):
+// COMPATIBILITY(IROP-COMPAT-0002):
 // Intentionally preserves questionable Python behavior.
 // See docs/COMPATIBILITY.md.
 ```

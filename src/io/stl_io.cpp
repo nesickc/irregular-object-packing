@@ -651,23 +651,7 @@ LoadedStl read_stl(const std::filesystem::path& input_path, const MeshLimits& li
 void detail::write_stl_transactional(const std::filesystem::path& output_path, const TriangleMesh& mesh,
                                      const std::function<void()>& completion)
 {
-    MeshLimits validation_limits {
-        .max_input_bytes = std::numeric_limits<std::uint64_t>::max(),
-        .max_vertices = static_cast<std::uint64_t>(mesh.vertices.size()),
-        .max_triangles = static_cast<std::uint64_t>(mesh.triangles.size()),
-    };
-    static_cast<void>(validate_and_measure_mesh(mesh, validation_limits));
-    if (mesh.triangles.size() > std::numeric_limits<std::uint32_t>::max()) {
-        throw Error(ErrorCategory::resource_limit, "mesh has too many triangles for binary STL");
-    }
-    for (const Point3& point : mesh.vertices) {
-        constexpr double maximum_stl_coordinate = static_cast<double>(std::numeric_limits<float>::max());
-        if (std::abs(point.x) > maximum_stl_coordinate || std::abs(point.y) > maximum_stl_coordinate ||
-            std::abs(point.z) > maximum_stl_coordinate) {
-            throw Error(ErrorCategory::invalid_mesh, "mesh contains a coordinate outside binary STL float range");
-        }
-    }
-    validate_binary_stl_quantization(mesh);
+    const TriangleMesh serialized_mesh = quantize_mesh_for_binary_stl(mesh);
 
     const std::filesystem::path stable_output_path = resolve_output_path(output_path);
 #ifdef _WIN32
@@ -682,7 +666,7 @@ void detail::write_stl_transactional(const std::filesystem::path& output_path, c
 #endif
 
     try {
-        vtkSmartPointer<vtkPolyData> poly_data = triangle_mesh_to_poly_data(mesh);
+        vtkSmartPointer<vtkPolyData> poly_data = triangle_mesh_to_poly_data(serialized_mesh);
         vtkNew<vtkSTLWriter> writer;
         bool vtk_error_observed = false;
         vtkNew<vtkCallbackCommand> error_observer;
@@ -701,7 +685,7 @@ void detail::write_stl_transactional(const std::filesystem::path& output_path, c
         }
 
         const std::uint64_t expected_size =
-            binary_header_bytes + static_cast<std::uint64_t>(mesh.triangles.size()) * binary_triangle_bytes;
+            binary_header_bytes + static_cast<std::uint64_t>(serialized_mesh.triangles.size()) * binary_triangle_bytes;
         std::error_code output_error;
         const std::uintmax_t output_size = std::filesystem::file_size(stable_output_path, output_error);
         if (output_error || output_size != expected_size) {
@@ -722,6 +706,31 @@ void detail::write_stl_transactional(const std::filesystem::path& output_path, c
         static_cast<void>(std::filesystem::remove(stable_output_path, remove_error));
         throw;
     }
+}
+
+TriangleMesh quantize_mesh_for_binary_stl(const TriangleMesh& mesh)
+{
+    const MeshLimits validation_limits {
+        .max_input_bytes = std::numeric_limits<std::uint64_t>::max(),
+        .max_vertices = static_cast<std::uint64_t>(mesh.vertices.size()),
+        .max_triangles = static_cast<std::uint64_t>(mesh.triangles.size()),
+    };
+    static_cast<void>(validate_and_measure_mesh(mesh, validation_limits));
+    if (mesh.triangles.size() > std::numeric_limits<std::uint32_t>::max()) {
+        throw Error(ErrorCategory::resource_limit, "mesh has too many triangles for binary STL");
+    }
+
+    TriangleMesh serialized_mesh = mesh;
+    for (Point3& point : serialized_mesh.vertices) {
+        constexpr double maximum_stl_coordinate = static_cast<double>(std::numeric_limits<float>::max());
+        if (std::abs(point.x) > maximum_stl_coordinate || std::abs(point.y) > maximum_stl_coordinate ||
+            std::abs(point.z) > maximum_stl_coordinate) {
+            throw Error(ErrorCategory::invalid_mesh, "mesh contains a coordinate outside binary STL float range");
+        }
+        point = quantize_binary_stl_point(point);
+    }
+    validate_binary_stl_quantization(serialized_mesh);
+    return serialized_mesh;
 }
 
 void write_stl(const std::filesystem::path& output_path, const TriangleMesh& mesh)
