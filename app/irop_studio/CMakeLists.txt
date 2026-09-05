@@ -1,0 +1,12 @@
+if(NOT WIN32)
+    message(FATAL_ERROR "IROP_BUILD_UI requires Windows.")
+endif()
+
+set(IROP_UI_VTK_TARGETS VTK::CommonCore VTK::CommonDataModel VTK::RenderingCore VTK::RenderingOpenGL2 VTK::RenderingUI VTK::InteractionStyle VTK::IOImage)
+add_executable(irop_studio WIN32 main.cpp job.cpp job.hpp viewport.cpp viewport.hpp studio.manifest)
+target_compile_features(irop_studio PRIVATE cxx_std_20)
+set_target_properties(irop_studio PROPERTIES CXX_EXTENSIONS OFF)
+target_compile_definitions(irop_studio PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE _WIN32_WINNT=0x0A00)
+target_link_libraries(irop_studio PRIVATE irop::core ${IROP_UI_VTK_TARGETS} comctl32 ole32 shell32 uuid)
+irop_enable_project_warnings(irop_studio)
+vtk_module_autoinit(TARGETS irop_studio MODULES ${IROP_UI_VTK_TARGETS} ${IROP_VTK_TARGETS})

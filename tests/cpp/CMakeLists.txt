@@ -18,12 +18,17 @@ add_executable(
     pack_scene_tests.cpp
     packing_tests.cpp
     practical_packing_tests.cpp
+    run_scene_tests.cpp
     sampling_policy_tests.cpp
     surface_resampling_tests.cpp
     stl_io_tests.cpp
     tetrahedralization_tests.cpp
     transform_tests.cpp
 )
+if(IROP_BUILD_UI)
+    target_sources(irop_tests PRIVATE studio_job_tests.cpp ../../app/irop_studio/job.cpp)
+    target_include_directories(irop_tests PRIVATE "${PROJECT_SOURCE_DIR}/app/irop_studio")
+endif()
 target_compile_features(irop_tests PRIVATE cxx_std_20)
 set_target_properties(irop_tests PROPERTIES CXX_EXTENSIONS OFF)
 target_compile_definitions(

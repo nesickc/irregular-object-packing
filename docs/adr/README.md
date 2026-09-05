@@ -29,6 +29,7 @@ Accepted ADRs are immutable apart from typo fixes and explicit amendment notes. 
 | [0011](0011-milestone-5-packing-outcome-and-artifact-contract.md) | Accepted | Bound the end-to-end packing loop and atomically distinguish successful artifacts from structured unsuccessful summaries |
 | [0012](0012-transform-consistent-barrier-bounded-local-solves.md) | Accepted | Compose local rotations exactly and bound scale optimization near the active barrier |
 | [0013](0013-bounded-structured-initialization-and-collision-broad-phase.md) | Accepted | Preserve successful seeded initialization, add a bounded structured fallback, and skip separated collision pairs with an explicit pair-work bound |
+| [0014](0014-native-windows-visualization-ui.md) | Accepted | Add an opt-in native Windows UI over the existing packing service with UI-thread VTK rendering and bounded local run-artifact loading |
 
 Use [0000-template.md](0000-template.md) for new records.
 

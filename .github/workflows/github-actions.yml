@@ -58,7 +58,7 @@ jobs:
 
       - name: Configure the supported Windows preset
         shell: pwsh
-        run: ./scripts/configure-windows-ci.ps1 -BuildBenchmarks
+        run: ./scripts/configure-windows-ci.ps1 -BuildBenchmarks -BuildUI
 
       - name: Verify C++ formatting
         shell: pwsh
@@ -96,7 +96,7 @@ jobs:
         run: |
           call "%VS_INSTALL_PATH%\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
           if errorlevel 1 exit /b %errorlevel%
-          cmake --preset windows-ninja-analysis -DIROP_BUILD_BENCHMARKS=ON
+          cmake --preset windows-ninja-analysis -DIROP_BUILD_BENCHMARKS=ON -DIROP_BUILD_UI=ON
           if errorlevel 1 exit /b %errorlevel%
           cmake --build --preset windows-ninja-analysis --parallel 2
           if errorlevel 1 exit /b %errorlevel%

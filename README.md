@@ -155,3 +155,15 @@ The issue is discussed here: [https://discourse.jupyter.org/t/jupyter-notebook-z
 
 **Module not found: irregular-object-packing (date: 29 may 2023)**
 Fix by running `pip install -e .` in the root folder of the project. which will install the package in editable mode.
+
+## Native Windows visualization
+
+Milestone 8 adds the optional **IROP Studio** application: load and preview STL
+meshes, configure and run packing, follow progress or cancel, and inspect saved
+pack/initialize results in an interactive 3D viewport. Enable the existing VTK
+rendering modules with `cmake --preset windows-vs2026 -DIROP_BUILD_UI=ON`, then build
+`irop_studio` using the Release preset. Run
+`build/windows-vs2026/app/irop_studio/Release/irop_studio.exe`.
+
+See the [Studio guide](docs/STUDIO_QUICKSTART.md) for controls, saved-result
+semantics, display limits, and the separate Windows/OpenGL smoke procedure.

@@ -195,17 +195,60 @@ Acceptance criteria:
 
 ## Milestone 8: Basic Visualization UI
 
-Goal: provide a simple local UI for loading, running, and inspecting a packing result.
+Goal: provide a native local Windows application for loading meshes, running the
+existing packing service, and inspecting published results and diagnostics.
 
-This milestone is intentionally deferred until the CLI and core library are stable.
+Scope activated at the maintainer's request on 2026-09-05, after the verified
+first measured Milestone 7 scope. Milestone 6's first hosted CI run remains an
+independent pending gate. The original first-release CLI-only boundary remains
+historical; this milestone implements the previously deferred UI extension.
+See [ADR-0014](adr/0014-native-windows-visualization-ui.md).
 
-Expected boundaries:
+Work:
 
-- The UI links to `irop_core` or opens its run-result format.
-- The core library remains independent of the UI framework.
-- Initial visualization emphasizes container/object inspection, progress, and final placement rather than editing or advanced scene management.
+- Add optional `irop_studio` under `IROP_BUILD_UI=ON`, using native Win32 controls
+  and the pinned VTK rendering/interaction modules privately on the application.
+  Add no new vcpkg dependency and keep the default core/CLI build independent.
+- Provide object/container STL pickers and previews, count, initial/final volume
+  scale, scale steps, seed, timeout and adaptive-sampling controls, and selection
+  of a new output directory.
+- Invoke `pack_scene` on one background worker with progress and cooperative
+  cancellation. Keep UI/VTK updates on the UI thread. Window close requests
+  cancellation and defers destruction until the worker is terminal and joined.
+- Provide camera orbit/pan/zoom, fit and axis views, container visibility and
+  object wireframe; keep the window usable while resizing and packing.
+- Add a bounded project-owned `load_run_scene` operation for successful pack and
+  initialize version-one summaries and unsuccessful packing diagnostics. Read
+  only fixed local artifact leaves after canonical containment checks, respect
+  resource limits, and never follow recorded original input paths.
+- Display saved validation as recorded state rather than rerunning or claiming
+  physical certification. Preserve packing algorithms, random ownership, error
+  categories, cancellation and atomic artifact publication semantics.
 
-Acceptance criteria will be defined when this milestone becomes active.
+Acceptance criteria:
+
+- `IROP_BUILD_UI=ON` builds the native application with the documented Visual
+  Studio Debug/Release presets; the default option-off CLI/core build remains
+  supported. Rendering/UI dependency types do not leak into core public APIs.
+- Focused saved-run loader tests cover pack/initialize success, summary-only
+  diagnostics, malformed and unsupported versions, contradictory output states,
+  summary/mesh resource limits, missing files, traversal and canonical escape,
+  and independence from recorded original input paths.
+- A real UI smoke exercise previews selected inputs, manipulates the camera,
+  completes a bounded pack, opens the published result and an unsuccessful run,
+  changes visibility/wireframe, and verifies resize behavior.
+- Cancellation and window close during an active run retain a responsive event
+  loop and safe worker/render ownership through the terminal outcome. Existing
+  no-output or summary-only failure rules remain observable.
+- Debug/Release builds and the affected test suites pass; changed project code
+  passes the authoritative formatter and the Ninja clang-tidy build/test gate.
+- Record the actual UI smoke and matrix evidence in `docs/STATUS.md`; mark the
+  milestone Verified only after these checks pass. Compilation alone is not
+  visual or interaction verification.
+
+Mesh editing, advanced scene management, per-iteration animated geometry,
+cross-platform UI support and changes to packing algorithms are outside this
+initial UI scope.
 
 ## Milestone Change Policy
 

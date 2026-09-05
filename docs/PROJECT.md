@@ -1,16 +1,16 @@
 # C++ Project Definition
 
-Status: Approved baseline; Milestones 1 through 5 are verified. Milestone 6 is implemented with its first hosted CI run pending. Milestone 7 is verified for its authorized first measured scope against the local parity baseline under ADR-0013.
+Status: Approved baseline; Milestones 1 through 5 are verified. Milestone 6 is implemented with its first hosted CI run pending. Milestone 7 is verified for its authorized first measured scope against the local parity baseline under ADR-0013. Milestone 8 native Windows visualization is verified under ADR-0014 with Debug/Release/Ninja, actual desktop workflow and option-off CLI evidence; the account-dependent symlink test is explicitly skipped.
 
 ## Purpose
 
-The C++ project will provide a Windows-native command-line tool for packing repeated copies of one irregular triangular mesh inside an arbitrary closed triangular container. It will reproduce the successful behavior of the Python implementation while creating a maintainable base for later performance improvements, larger workloads, and a basic visualization UI.
+The C++ project provides a Windows-native command-line tool for packing repeated copies of one irregular triangular mesh inside an arbitrary closed triangular container. It preserves successful Python behavior and supports measured scalability improvements. Milestone 8 provides an optional native Windows visualization application over the same reusable core.
 
 The Python package remains the behavioral reference until the C++ parity milestone is complete.
 
 ## Initial Product Scope
 
-The first usable release will support:
+The original first usable CLI release established these capabilities:
 
 - One source object mesh repeated a requested number of times.
 - One arbitrary closed container mesh.
@@ -20,7 +20,7 @@ The first usable release will support:
 - CLI configuration and versioned machine-readable JSON run results.
 - Tangible output meshes that can be opened in an external mesh viewer.
 
-The first release will not include:
+That initial CLI release intentionally excluded:
 
 - Object swapping, replacement, hole filling, or a discrete search phase.
 - Multiple independent source shapes in one run.
@@ -29,7 +29,9 @@ The first release will not include:
 - A network service.
 - Aggregation or spatial subdivision for very large populations.
 
-Those omissions are product boundaries, not permanent architectural prohibitions.
+Those omissions describe the initial CLI release boundary. Milestone 8 now
+activates the graphical UI extension described below; the other omissions remain
+outside the current scope.
 
 ## User-Facing Result
 
@@ -211,7 +213,9 @@ The initial target model should remain small:
 - `irop_core`: reusable packing library.
 - `irop`: command-line executable linked to `irop_core`.
 - Focused test executables or one Catch2 test target, based on measured build cost.
-- Benchmarks only after a benchmark milestone begins.
+- `irop_benchmarks`: opt-in measurement executable under `IROP_BUILD_BENCHMARKS`.
+- `irop_studio`: native Windows visualization application under `IROP_BUILD_UI`;
+  its rendering/interaction dependencies remain private to this target.
 
 Use target-based CMake. Do not use directory-wide include paths, compile flags, or link settings when target-scoped equivalents exist. Third-party warnings must not be promoted to project errors.
 
@@ -261,15 +265,54 @@ The packing engine owns orchestration and iteration policy. Geometry modules own
 
 Keep algorithm state explicit. Avoid hidden global state, class-level mutable histories, implicit random generators, and callbacks that mutate unrelated modules.
 
-### Future Visualization
+### Native Windows Visualization
 
-A later visualization application will link to `irop_core` and consume `PackingResult` or a serialized run record. The core library must not depend on UI event loops or windowing frameworks.
+Milestone 8 implements the optional C++20 `irop_studio` application under
+`IROP_BUILD_UI=ON`; the option is off by default. Native Win32 controls select
+object/container STLs, preview the centered object at its initial volume scale,
+configure count, initial/final volume scale, scale steps, seed, timeout, adaptive
+sampling and structured fallback, and choose a new output directory. Preview is
+source preparation, not an initialized placement. The packing timeout applies to
+the engine; input preparation and initialization retain their own resource bounds.
+
+A single background worker performs preview preparation, invokes `pack_scene`, or
+loads a saved run, with progress and cooperative cancellation. The UI thread owns
+VTK rendering and provides orbit/pan/zoom, fit and axis camera views, container
+visibility and object wireframe. Closing during a job requests cancellation and
+delays window destruction until the worker terminates and is joined; active
+dependency operations remain non-preemptible.
+
+The core library remains independent of UI event loops and VTK rendering
+objects; its public APIs expose no Win32 or VTK types. RenderingCore,
+RenderingOpenGL2, RenderingUI, InteractionStyle and IOImage
+come from the existing pinned VTK installation and are linked privately to the
+application; no new vcpkg dependency is required. Headless loader/worker tests are
+part of CTest. CI builds the optional UI and benchmark targets, while desktop
+interaction/rendering smoke remains a separate local OpenGL check.
+
+The project-owned [`load_run_scene`](../include/irop/io/run_scene.hpp) operation
+opens the display contract of supported version-one pack/initialize summaries and
+fixed local published geometry, or displays summary-only packing diagnostics.
+Canonical checks reject escaping artifacts, and bounded JSON and aggregate mesh
+limits control input resource use. Defaults permit a 16 MiB summary, depth 32,
+250,000 JSON nodes, and two display meshes sharing 128 MiB, three million vertices
+and one million triangles. These display limits are separate from packing limits.
+Recorded original input paths and individual STL paths are never followed.
+
+Loaded geometry is structurally validated for display. Saved physical validation
+is displayed as a recorded result; opening it does not recertify the packing, and
+initialization summaries do not contain that record. The UI preserves packing
+algorithms, RNG ownership, outcome categories and atomic publication. Build and
+usage instructions are in the [Studio quickstart](STUDIO_QUICKSTART.md);
+[ADR-0014](adr/0014-native-windows-visualization-ui.md) records the architecture and
+[STATUS.md](STATUS.md#milestone-8-implementation-and-evidence) records actual
+verification and outstanding environment limits.
 
 ## Dependency Baseline
 
 | Dependency | Initial role | Acquisition |
 | --- | --- | --- |
-| VTK | STL I/O, mesh processing, geometry queries, later visualization path | vcpkg |
+| VTK | STL I/O, mesh processing and geometry queries; optional app-private rendering for Milestone 8 | vcpkg |
 | Eigen3 | Linear algebra and fixed-size transforms | vcpkg |
 | Ipopt | Primary nonlinear optimization backend | Official 3.14.19 Windows archives through a local vcpkg overlay; private C adapter |
 | TetGen | Python-compatible CAT tetrahedralization; live `O0/0Q` point-union behavior | Patchless local vcpkg overlay; static private backend |

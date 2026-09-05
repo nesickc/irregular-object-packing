@@ -31,6 +31,7 @@ venv/
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 !app/irop/irop.manifest
+!app/irop_studio/studio.manifest
 *.spec
 
 # Installer logs

@@ -15,6 +15,7 @@ include(IropWarnings)
 
 option(IROP_WARNINGS_AS_ERRORS "Treat warnings in project-owned C++ code as errors" ON)
 option(IROP_ENABLE_CLANG_TIDY "Run the focused clang-tidy profile while compiling" OFF)
+option(IROP_BUILD_UI "Build the optional native Windows visualization application" OFF)
 option(IROP_BUILD_BENCHMARKS "Build the explicit Milestone 7 measurement executable" OFF)
 
 # CMake only integrates <LANG>_CLANG_TIDY with Makefile and Ninja generators.
@@ -27,6 +28,9 @@ find_package(Ipopt 3.14.19 EXACT CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(TetGen 1.6.0 EXACT CONFIG REQUIRED)
+if(IROP_BUILD_UI)
+    set(IROP_EXTRA_VTK_COMPONENTS RenderingCore RenderingOpenGL2 RenderingUI InteractionStyle IOImage)
+endif()
 find_package(
     VTK 9.3
     CONFIG
@@ -39,6 +43,7 @@ find_package(
         FiltersModeling
         IOGeometry
         IOXML
+        ${IROP_EXTRA_VTK_COMPONENTS}
 )
 
 set(
@@ -52,6 +57,7 @@ set(
     src/geometry/transform.cpp
     src/initialization/initialize_scene.cpp
     src/inspection/inspect_stl.cpp
+    src/io/run_scene.cpp
     src/io/stl_io.cpp
     src/io/diagnostic_geometry.cpp
     src/model/mesh_validation.cpp
@@ -73,6 +79,7 @@ set(
     include/irop/geometry/transform.hpp
     include/irop/initialization/initialize_scene.hpp
     include/irop/inspection/inspect_stl.hpp
+    include/irop/io/run_scene.hpp
     include/irop/io/stl_io.hpp
     include/irop/io/diagnostic_geometry.hpp
     include/irop/model/mesh_validation.hpp
@@ -133,6 +140,10 @@ target_link_libraries(
 )
 irop_enable_project_warnings(irop)
 vtk_module_autoinit(TARGETS irop_core irop MODULES ${IROP_VTK_TARGETS})
+
+if(IROP_BUILD_UI)
+    add_subdirectory(app/irop_studio)
+endif()
 
 if(BUILD_TESTING)
     add_subdirectory(tests/cpp)

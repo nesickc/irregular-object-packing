@@ -203,3 +203,10 @@ cmake --build --preset windows-vs2026-release --target irop_benchmarks --paralle
 The output directory must be new. See [benchmark instructions](../benchmarks/README.md)
 and [measured results](MILESTONE_7_RESULTS.md). Measurements are separate from
 normal correctness tests; CI checks the reporting contract without timing thresholds.
+
+## Optional desktop UI
+
+[IROP Studio](STUDIO_QUICKSTART.md) reuses the same packing services and result
+files. Configure the supported preset with `-DIROP_BUILD_UI=ON`, build the
+`irop_studio` target, and launch it from its configuration-specific build directory.
+The CLI remains available with or without the UI option.

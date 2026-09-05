@@ -13,7 +13,10 @@ Use this reference for CMake, presets, vcpkg, targets, third-party integration, 
 
 ## CMake Rules
 
-- Keep the initial production targets to `irop_core` and the thin `irop` executable.
+- Keep `irop_core` and the thin `irop` executable independent of the optional
+  `irop_studio` UI target (`IROP_BUILD_UI=ON`). Rendering/windowing modules link
+  privately to Studio. Resolve requested VTK modules at the root so imported
+  transitive targets remain visible consistently to all consumers.
 - Attach include paths, features, definitions, warnings, and link libraries to targets with the narrowest visibility.
 - Do not use global `include_directories`, `link_directories`, or compiler-flag mutation when target equivalents exist.
 - Keep project warnings strict while treating third-party headers as external/system inputs.
@@ -42,3 +45,13 @@ Prefer the standard library for small utilities. Do not casually implement geome
 - Report exact commands and versions when changing the toolchain or baseline.
 
 Add an ADR when replacing a foundational dependency, changing the build/dependency strategy, or changing the supported platform/language baseline.
+
+## Desktop UI Verification
+
+Build Studio in Debug/Release and the Ninja analysis configuration. Its ordinary
+worker/loader tests run without a display; use `tests/cpp/studio_smoke.cmake`
+separately on Windows with a working OpenGL desktop. Read `docs/STUDIO_QUICKSTART.md`
+for the complete command and inspect the captured geometry/window images. Preserve
+the UI-thread-only renderer and one-worker ownership boundary; defer close while
+cancellation is pending. Do not add rendering dependencies to `irop_core` or confuse
+recorded physical validation with a new validation of imported result files.

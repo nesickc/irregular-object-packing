@@ -8,35 +8,52 @@ detailed implementation trail requested for the migration.
 
 ## Current Position
 
-- Latest completed milestone: Milestone 7 — Measured Scalability Improvements,
-  Verified for the authorized first measured scope.
+- Latest completed milestone: Milestone 8 — Basic Visualization UI, Verified
+  for the authorized native Windows scope with documented environment limits.
 - State: Milestones 1 through 5 are Verified. Milestone 6 remains Implemented:
   its local parity/release-readiness gates pass, while the first hosted workflow
-  run is pending. The user authorized Milestone 7 against that local baseline,
-  as recorded by ADR-0013 and the implementation plan.
-- Current outcome: Milestone 7 is Verified. A deterministic bounded grid
-  recovers the demonstrated dense initialization failures after the unchanged
-  random search; strict collision AABB filtering removes unnecessary exact work.
-  Successful reference transforms, RNG consumption and work remain preserved.
-  Explicit initializer and cumulative collision budgets, independent actual
-  geometry proofs, cancellation, compatible summary fields, and the optional
-  benchmark executable/runner are integrated.
-- Current evidence: Visual Studio Debug, Release and Ninja clang-tidy each pass
-  192/192 tests (188 Catch2 plus four process tests); a focused 19-case selection
-  passes 746 assertions. Ninja analysis builds with zero diagnostics and the live
-  pinned Python parity oracle passes. Eleven before/after benchmark cases with three process repeats per version retain 66
-  reports in `benchmarks/results/windows-20260905.json`; analysis is in
-  `docs/MILESTONE_7_RESULTS.md`. Actual supplied STL runs pack ten and 36 objects
-  at full scale with physical/output validation. No general solver or packing
-  speedup is claimed by the separated-scene collision result.
+  run is pending. The user authorized Milestone 7 against that local baseline
+  under ADR-0013, followed by the Milestone 8 native Windows UI under ADR-0014.
+- Current outcome: Milestone 8 is Verified. Optional `irop_studio` wraps the
+  existing reusable core with native input/configuration controls, preview,
+  background packing/loading, progress/cancel and safe close lifetime, camera
+  controls, and bounded reopening of saved version-one runs. Packing algorithms
+  and compatibility policies remain unchanged.
+- Current evidence: native Debug/Release/Ninja builds succeed; each full CTest
+  run has 202 passed, one skipped and no failures out of 203 tests. Ninja
+  clang-tidy emits zero diagnostics, and formatting and diff checks pass. Focused
+  loader/worker coverage has 10 passed, one skipped and 186 assertions across
+  11 cases. Six real desktop smoke cases pass in both Release and Debug,
+  including genuine `0.1 -> 0.2` growth, cancellation and close during active work.
+  Native camera/visibility/resize events, inspected real 36-object rendering and
+  unsuccessful-summary display pass. A fresh option-off Release CLI build also
+  succeeds. The symlink guard test cannot run under this account, which lacks
+  permission to create file symlinks; manual file-picker dialog interaction was
+  not automated.
+
 - Blocking ambiguities: none. ADR-0009/0010 retain the approved dependency paths
   and separate public-distribution review. ADR-0011 defines packing artifacts;
-  ADR-0012 defines transform/barrier corrections; ADR-0013 defines this measured
-  initializer/collision scope. Compatibility is synchronized through
-  `IROP-COMPAT-0007` and `IROP-DEV-0027`.
+  ADR-0012 defines transform/barrier corrections; ADR-0013 defines the verified
+  measured initializer/collision scope; ADR-0014 defines the UI/worker/loading
+  boundaries. Compatibility remains synchronized through `IROP-COMPAT-0007`
+  and `IROP-DEV-0027`.
 
 ## Decisions Applied
 
+- Keep the optional native Windows UI over reusable project-owned core APIs.
+  Link existing VTK rendering privately to `irop_studio`, with no new vcpkg
+  dependency and no renderer required for headless loader/worker tests.
+- Use one background worker for preview, packing and saved-run loading, with
+  latest progress delivered to UI-thread controls/rendering. Close requests
+  cooperative cancellation and retains the window until terminal worker join;
+  active dependency operations are not hard-preemptible.
+- Read only fixed sibling artifacts from bounded version-one saved summaries.
+  Apply canonical checks, JSON and aggregate mesh budgets, and cancellation;
+  never follow recorded original inputs or individual STL paths. Treat saved
+  physical validation as recorded metadata, not fresh certification.
+- Keep native desktop interaction/rendering smoke separate from headless CI
+  build/test evidence, and explicitly record unavailable environment-dependent
+  coverage such as file-symlink creation.
 - Preserve the Python implementation as the behavioral reference through parity.
 - Preserve successful reference origin/random initialization exactly. The recorded
   local parity baseline now permits DEV-0026's bounded six-orientation grid only
@@ -326,6 +343,32 @@ detailed implementation trail requested for the migration.
 - [x] Pass the final Ninja clang-tidy build with zero diagnostics and its full
   192/192 CTest suite (14.26 seconds); rerun the pinned live Python parity oracle
   successfully and mark the authorized Milestone 7 scope Verified.
+
+## Milestone 8 Checklist
+
+- [x] Record the authorized native Windows scope and architecture in ADR-0014.
+- [x] Add opt-in `irop_studio` with native controls and private existing VTK
+  rendering/interaction modules; keep the default core/CLI boundary unchanged.
+- [x] Provide input pickers, centered/scaled preview, packing configuration and
+  new output selection, camera/visibility controls, progress and cancellation.
+- [x] Use a single background job and UI-thread rendering; defer active-job
+  window destruction until cancellation completes and the worker is joined.
+- [x] Add bounded project-owned `load_run_scene`, fixed local saved artifacts,
+  recorded-validation labels and summary-only unsuccessful diagnostics.
+- [x] Add eight loader and three worker cases covering real/relocated contracts,
+  hostile JSON/artifact inputs, shared resource budgets, cancellation and reuse.
+  Release focused evidence is 10 passed/one skipped with 186 assertions; the
+  file-symlink escape case is skipped for unavailable account privileges.
+- [x] Build native Debug, Release and Ninja and run full CTest: each has 202
+  passed, one skipped and no failures out of 203 tests; retain the symlink skip.
+- [x] Pass six real desktop smoke cases in Debug and Release, native camera/
+  visibility/resize events, and whole-window inspection. Open/render the actual
+  36-object result and display a real unsuccessful run without success geometry.
+- [x] Enable optional UI and benchmarks in CI while documenting desktop OpenGL
+  smoke separately, and publish the Studio quickstart.
+- [x] Complete the final Ninja clang-tidy build with zero diagnostics, formatter
+  and diff checks, and a fresh option-off Release CLI configure/build; record the
+  actual evidence and mark Milestone 8 Verified with explicit environment limits.
 
 ## Post-Parity Initializer Baseline
 
@@ -746,6 +789,40 @@ detailed implementation trail requested for the migration.
   succeeds for ten with 100 reference attempts. Disabling fallback restores the
   old six-of-ten failure, exit 4 and no published output directory.
 
+### 2026-09-05 — Milestone 8 native visualization verified
+
+- Added optional native Win32 `irop_studio` over `irop_core`, with STL selection,
+  prepared-input preview, packing controls, a new output directory, progress,
+  cancellation, saved-run reopening and camera/visibility controls. VTK remains
+  private to the app and runs on the UI thread; preparation, packing and loading
+  share one background worker with safe terminal ownership when closing.
+- Added `load_run_scene` and project-owned loaded-scene/limit types. The bounded
+  parser checks the display-relevant version-one pack/initialize contract,
+  fixed artifact names, canonical containment, contradictory outcomes, resource
+  use and cancellation. It does not load source paths or individual STL paths,
+  nor claim a new physical validation of recorded results.
+- Added loader/worker regression coverage and a six-case native desktop smoke
+  driver. Debug/Release smoke proves preview, genuine `0.1 -> 0.2` packing, reopen,
+  cancel, close-active and malformed-input behavior. Actual native mouse/control
+  events verify orbit, fit/X/Y/Z, visibility/wireframe, resizing and guarded
+  `q/Q/e/E` keys. Rendered and whole-window captures were retained and inspected.
+- Debug/Release/Ninja each complete 203 CTest cases with 202 passed, one skipped
+  and no failures; focused coverage has 10 passed, one skipped and 186 assertions
+  across 11 cases. File-symlink creation is unavailable to this account, so its
+  canonical-escape case is explicitly skipped. Ninja clang-tidy emits zero
+  diagnostics and formatting/diff checks pass. A fresh option-off Release CLI
+  configuration/build also passes; Milestone 8 is Verified.
+- Opened and rendered the actual 36-object full-scale run with the final native
+  application and inspected the whole-window capture. Opened an existing
+  two-object resource-exhausted summary and displayed diagnostics without success
+  geometry. These checks supplement the synthetic tetrahedron smoke.
+- The Computer Use runtime could not start its sandbox helper. Verification uses
+  the application's real native desktop events and captured rendered output;
+  Windows file-picker dialog interaction was not automated. UI-enabled CI builds
+  and headless CTest are documented separately from local desktop/OpenGL smoke.
+- Packing algorithms and compatibility markers are unchanged. Milestone 7 stays
+  Verified and Milestone 6's first hosted CI run remains independently pending.
+
 ## Verification Evidence
 
 - Toolchain: CMake 4.2.3; Visual Studio Community 2026 18.8.3; MSVC 19.51.36252;
@@ -855,7 +932,61 @@ detailed implementation trail requested for the migration.
   checks. Fallback-disable behavior and the historical Python/C++ failure oracle
   remain reproducible without mutating the reference implementation.
 
+### Milestone 8 evidence (2026-09-05)
+
+- Supported native Visual Studio Debug, Release and Ninja clang-tidy builds
+  succeed with `IROP_BUILD_UI=ON`. Each full CTest run has 202 passed, one skipped
+  and no failures out of 203 tests: Debug takes 14.07 seconds, Release 9.23 and
+  Ninja 10.04. Focused loader/worker coverage has 10 passed, one skipped and
+  186 assertions across 11 cases. The skipped test is `saved scene artifacts
+  cannot resolve through a symlink outside their run directory`: this Windows
+  account cannot create the required file symlink.
+- The final Ninja build emits zero clang-tidy diagnostics. `irop-format-check`,
+  workflow YAML/PowerShell configuration-script parsing, and `git diff --check`
+  pass. A fresh UI-option-off configuration and Release `irop` target build pass
+  in `build/windows-vs2026-m8-cli-only` using the existing pinned dependency install.
+- `tests/cpp/studio_smoke.cmake` passes six cases in both
+  `build/studio-smoke-release-final` and `build/studio-smoke-debug`: preview, pack,
+  open, cancel, close-active and malformed. The pack case performs genuine growth
+  from volume scale `0.1` to `0.2`, publishes its normal result set and reopens it.
+- The preview/pack/open folders retain `viewport.png`, `orbit.png`,
+  `wireframe.png` and `window.bmp`. Native events check a changed camera after
+  mouse orbit, fit/X/Y/Z views, wireframe/container toggles, resize behavior and
+  non-exiting `q/Q/e/E` keys. Whole-window visual inspection confirms clear
+  controls without clipping and output-path tail scrolling.
+- `build/studio-real-36` reports success with 36 objects for the supplied full-scale
+  run; the final Ninja application repeats opening/rendering in
+  `build/studio-real-36-final`, whose `studio-window.png` was visually inspected.
+  `build/studio-unsuccessful` reports `resource_exhausted` with count two and
+  displays the existing summary's diagnostics without rendering success geometry.
+- Loader tests cover real and relocated pack/initialize records, summary-only
+  outcomes, hostile/ambiguous JSON, fixed artifact names, aggregate mesh budgets,
+  damaged input and cancellation. Worker tests cover prepared preview geometry,
+  preserving a published result after late cancellation, rejecting overlapping
+  jobs and reuse after a failed load. They require no UI rendering dependency.
+- CI enables `IROP_BUILD_UI=ON` and `IROP_BUILD_BENCHMARKS=ON`; desktop smoke
+  remains a separate local OpenGL gate. The Computer Use sandbox helper was
+  unavailable, so native desktop events and inspected captures provide actual
+  UI evidence. Manual Windows file-picker interaction was not automated; native
+  dialog integration exists and worker tests exercise Unicode paths.
+
 ## Risks and Follow-up
+
+- Milestone 8 is locally Verified with its symlink-escape regression explicitly
+  skipped under the current Windows account. Run it where file-symlink creation
+  is allowed to exercise that branch.
+- Native visualization requires a Windows desktop and working OpenGL context.
+  Headless CI compilation/CTest does not certify desktop rendering. The recorded
+  native smoke and inspected captures cover actual controls and rendering;
+  manual file-picker dialog interaction was not automated.
+- Opening saved geometry validates display structure and resource limits, not
+  physical packing validity. The UI labels saved physical validation as recorded
+  and uses separate conservative display limits; a larger valid CLI result may
+  exceed the viewer's default budgets.
+- Window close is cooperative: it preserves ownership and the event loop until
+  the background job terminates, and cannot forcibly interrupt an active backend
+  operation or individual file call.
+
 
 - The official GL2PS `geuz.org` download endpoint was unreachable during verification.
   The scoped official port is unchanged, and the fallback archive is byte-identical

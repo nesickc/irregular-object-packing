@@ -2,7 +2,8 @@
 param(
     [ValidateNotNullOrEmpty()]
     [string] $Preset = "windows-vs2026",
-    [switch] $BuildBenchmarks
+    [switch] $BuildBenchmarks,
+    [switch] $BuildUI
 )
 
 Set-StrictMode -Version Latest
@@ -17,6 +18,7 @@ function Invoke-Configure {
     $lines = [System.Collections.Generic.List[string]]::new()
     $configureArguments = @('--preset', $ConfigurePreset)
     if ($BuildBenchmarks) { $configureArguments += '-DIROP_BUILD_BENCHMARKS=ON' }
+    if ($BuildUI) { $configureArguments += '-DIROP_BUILD_UI=ON' }
     & cmake @configureArguments 2>&1 | ForEach-Object {
         $line = "$_"
         $lines.Add($line)
