@@ -8,39 +8,50 @@ detailed implementation trail requested for the migration.
 
 ## Current Position
 
-- Active milestone: Milestone 6 — Compatibility, Robustness, and Release Readiness.
-- State: Milestones 1 through 5 are Verified; Milestone 6 is Implemented and its
-  local acceptance gates pass. The first hosted workflow run remains pending.
-- Current outcome: `irop_core` composes bounded initialization, adaptive
-  resampling, TetGen, CAT, deterministic Ipopt solves, full-resolution collision
-  correction, exact scale barriers, termination, and output-quantized validation.
-  The live pinned Python oracle and C++ fixture now establish representative parity
-  for initialization, dense accepted prefixes and bounded exhaustion, transforms,
-  CAT constraints, local mathematics, outcomes, metrics, and artifacts. Targeted
-  fixtures cover recovery and all physical-correction selection branches, including
-  preserved CAT-only diagnostics, while a real Windows Ctrl+Break process test
-  proves summary-only cancellation. The source-only hosted workflow, exact
-  39-package notice audit, clean-checkout guide, and release checklist are in place.
-  The supported Visual Studio Release/format path and all Visual Studio Debug,
-  Visual Studio Release, and Ninja clang-tidy test matrices pass 178/178 tests.
-  Python tests, Ruff, the live oracle, package-build validation, and the
-  representative adaptive profile pass locally. Dense-initializer search-quality
-  improvement now belongs to Milestone 7.
-- Blocking ambiguities: none. ADR-0009 records the approved TetGen AGPL source and
-  integration path; ADR-0010 records the exact Ipopt binary path and public-binary
-  review gate; ADR-0011 records the packing outcome/artifact contract; ADR-0012
-  records the transform-consistent barrier-bounded solve correction. The
-  compatibility catalog is synchronized through `IROP-COMPAT-0007` and
-  `IROP-DEV-0025`. Public binary or hosted-service distribution remains a separate
-  release-specific decision, not unfinished Milestone 6 implementation.
+- Latest completed milestone: Milestone 7 — Measured Scalability Improvements,
+  Verified for the authorized first measured scope.
+- State: Milestones 1 through 5 are Verified. Milestone 6 remains Implemented:
+  its local parity/release-readiness gates pass, while the first hosted workflow
+  run is pending. The user authorized Milestone 7 against that local baseline,
+  as recorded by ADR-0013 and the implementation plan.
+- Current outcome: Milestone 7 is Verified. A deterministic bounded grid
+  recovers the demonstrated dense initialization failures after the unchanged
+  random search; strict collision AABB filtering removes unnecessary exact work.
+  Successful reference transforms, RNG consumption and work remain preserved.
+  Explicit initializer and cumulative collision budgets, independent actual
+  geometry proofs, cancellation, compatible summary fields, and the optional
+  benchmark executable/runner are integrated.
+- Current evidence: Visual Studio Debug, Release and Ninja clang-tidy each pass
+  192/192 tests (188 Catch2 plus four process tests); a focused 19-case selection
+  passes 746 assertions. Ninja analysis builds with zero diagnostics and the live
+  pinned Python parity oracle passes. Eleven before/after benchmark cases with three process repeats per version retain 66
+  reports in `benchmarks/results/windows-20260905.json`; analysis is in
+  `docs/MILESTONE_7_RESULTS.md`. Actual supplied STL runs pack ten and 36 objects
+  at full scale with physical/output validation. No general solver or packing
+  speedup is claimed by the separated-scene collision result.
+- Blocking ambiguities: none. ADR-0009/0010 retain the approved dependency paths
+  and separate public-distribution review. ADR-0011 defines packing artifacts;
+  ADR-0012 defines transform/barrier corrections; ADR-0013 defines this measured
+  initializer/collision scope. Compatibility is synchronized through
+  `IROP-COMPAT-0007` and `IROP-DEV-0027`.
 
 ## Decisions Applied
 
 - Preserve the Python implementation as the behavioral reference through parity.
-- Preserve the reference's greedy bounding-sphere initialization through the
-  Milestone 6 parity comparison. Treat candidate-attempt exhaustion as bounded
-  search failure rather than geometric infeasibility, and defer structured or
-  shape-aware placement improvements until the parity baseline is recorded.
+- Preserve successful reference origin/random initialization exactly. The recorded
+  local parity baseline now permits DEV-0026's bounded six-orientation grid only
+  after candidate-attempt exhaustion; geometry/pair/surface/cancellation failures
+  never restart with fresh resources. Keep the historical failure oracle explicit
+  with `--no-initialization-fallback` and treat all search exhaustion as bounded
+  failure rather than proof of geometric infeasibility.
+- Independently reconstruct actual transformed envelopes and containment proofs
+  for structured states; never trust method metadata as physical evidence.
+- Use strictly separated validated AABBs to avoid unnecessary collision predicates
+  while retaining contact/nesting checks and pair order. Bound all enumerated
+  object pairs cumulatively through engine and binary-STL output validation.
+- Retain deterministic single-thread orchestration and use the opt-in benchmark
+  harness/runner for measured changes. Aggregation, regional subdivision and
+  concurrency need further evidence rather than speculative implementation.
 - Keep the command-line application thin and dependency-specific VTK types inside the
   mesh I/O and geometry adapters.
 - Represent meshes and results with project-owned types at core boundaries.
@@ -288,7 +299,35 @@ detailed implementation trail requested for the migration.
 - [ ] Observe and retain evidence from the first hosted workflow run before marking
   Milestone 6 Verified.
 
-## Deferred Post-Parity Improvements
+## Milestone 7 Checklist
+
+- [x] Record authorization to proceed against the locally verified parity baseline
+  while retaining Milestone 6's outstanding hosted-run gate under ADR-0013.
+- [x] Save the unchanged production baseline executable before applying core edits.
+- [x] Add the opt-in standard-library benchmark target and serial Windows runner
+  with wall/CPU timing, process peak memory, environment/configuration/source
+  metadata, per-stage work, outcomes, and successful placements.
+- [x] Run 11 bounded cases with three before/after process repeats each and retain
+  all 66 reports in the tracked aggregate and accompanying result analysis.
+- [x] Add DEV-0026's deterministic six-orientation structured fallback after the
+  reference candidate limit; preserve successful transforms/RNG/work and the
+  explicit historical-failure disable path.
+- [x] Enforce shared geometry/pair/surface budgets, separate structured candidate
+  bounds, finite arithmetic, cancellation, actual containment and independent
+  envelope separation, including concave/shifted containers and forged states.
+- [x] Add strict collision AABB rejection and DEV-0027's cumulative object-pair
+  budget through correction, engine validation and quantized-output validation.
+- [x] Extend CLI/configuration and version-one schemas with method/work fields;
+  preserve historical documents and use null sphere-clearance metrics for grids.
+- [x] Verify generated and actual supplied ten/36-cylinder full-scale scenes,
+  serialized artifact validity, bounded disable behavior and successful-seed parity.
+- [x] Pass 19 focused cases/746 assertions and Visual Studio Debug/Release matrices
+  at 192/192 each (188 Catch2 plus four process tests).
+- [x] Pass the final Ninja clang-tidy build with zero diagnostics and its full
+  192/192 CTest suite (14.26 seconds); rerun the pinned live Python parity oracle
+  successfully and mark the authorized Milestone 7 scope Verified.
+
+## Post-Parity Initializer Baseline
 
 ### Dense full-scale initialization
 
@@ -305,16 +344,15 @@ detailed implementation trail requested for the migration.
   limit cannot place object seven without relocating earlier objects. A
   constructive two-layer ten-sphere layout still satisfies the proxy, and a
   sideways `3 x 4 x 3` grid demonstrates room for 36 actual cylinders.
-- Decision: the live Python/C++ corpus now records this dense failure path, ordinary
-  successful seeds, random draw order, accepted prefixes, rejection counts, and
-  Python timeout/restart behavior. Preserve those successful parity cases while
-  evaluating initializer improvements in Milestone 7.
-- Candidate post-parity work is a bounded structured/maximin or backtracking
-  fallback, followed by orientation-aware exact-geometry placement if justified.
-  Keep explicit safety limits, preserve existing successful seeded results, and
-  improve diagnostics so search exhaustion is not presented as infeasibility.
-- Future acceptance evidence should include generated ten- and 36-cylinder cases
-  plus regression protection for the established Python/C++ parity corpus.
+- The live Python/C++ corpus records this dense failure path, ordinary successful
+  seeds, random draw order, accepted prefixes, rejection counts and Python
+  timeout/restart behavior. Milestone 7 retains those successful cases and selects
+  the old bounded failure explicitly by disabling the fallback.
+- The first post-parity improvement is now implemented under DEV-0026: a bounded
+  structured restart using actual-mesh containment and six fixed orientations.
+  Generated and supplied ten/36-cylinder results pass, with existing successful
+  seeded results unchanged. Maximin/backtracking or continuous-orientation search
+  remains future measured work; a failed grid still does not prove infeasibility.
 
 ## Activity Log
 
@@ -681,6 +719,33 @@ detailed implementation trail requested for the migration.
   Visual Studio Release/format/CTest and exact notice audit pass. Milestone 6 remains
   Implemented until the first hosted workflow run is observed.
 
+### 2026-09-05 — Milestone 7 measured initializer and collision scope verified
+
+- Retained the original core baseline before implementation, then ran the same
+  11-case matrix with three separate process repeats on each version. Tracked
+  timing/CPU/peak-memory samples, stage work, provenance and placement comparisons
+  are in `benchmarks/results/windows-20260905.json`; interpretation and reproduction
+  conditions are in `docs/MILESTONE_7_RESULTS.md`.
+- Added DEV-0026's bounded grid fallback and method/work diagnostics. Ten and 36
+  dense cylinders now succeed after the same million reference attempts, at
+  approximately 278 ms total. This improves search success; it does not shorten
+  the preserved random phase. Sparse transforms, ordering, RNG and work remain exact.
+- Added conservative collision AABB rejection plus DEV-0027's cumulative pair
+  limit. For 100 separated cylinders, median whole-case time changes from
+  144.0279 to 1.1271 ms and triangle work from 9,636,000 to 52,800. The same 4,950
+  pairs are enumerated. No material memory reduction or general solver speedup
+  was measured.
+- Integrated CLI options, summary/schema compatibility, benchmark CI smoke and
+  the repository performance workflow. Root integration review found no remaining
+  correctness blocker in cumulative limits or schema/CLI dispatch.
+- Visual Studio Debug, Release and Ninja clang-tidy each pass 192/192 tests; the
+  focused selection passes 19 cases/746 assertions. The Ninja build emits zero
+  diagnostics and the live pinned Python parity oracle passes.
+- The supplied STL pair succeeds at full scale for ten and 36 objects in
+  `build/manual-m7-exact-ten` and `build/manual-m7-exact-36`. The initialize command
+  succeeds for ten with 100 reference attempts. Disabling fallback restores the
+  old six-of-ten failure, exit 4 and no published output directory.
+
 ## Verification Evidence
 
 - Toolchain: CMake 4.2.3; Visual Studio Community 2026 18.8.3; MSVC 19.51.36252;
@@ -768,6 +833,28 @@ detailed implementation trail requested for the migration.
 - The Release executable embeds `activeCodePage=UTF-8` and `longPathAware=true`; the
   Unicode-path CLI smoke test passed in all three verified test configurations.
 
+### Milestone 7 evidence (2026-09-05)
+
+- Supported Visual Studio Debug, Release and Ninja clang-tidy builds and their
+  complete CTest suites pass 192/192 each. New behavior is exercised by structured-initialization,
+  strict-contact/nesting, cumulative output-pair-budget and full 36-object artifact
+  regressions. The focused initializer/parity/collision/integration selection
+  passes 19 cases and 746 assertions.
+- The final Ninja clang-tidy build completes with zero diagnostics and its complete
+  CTest suite passes 192/192 in 14.26 seconds. The command
+  `build/python-parity-py310/Scripts/python.exe tests/parity/verify_python_reference.py`
+  passes the live pinned Python oracle again on 2026-09-05.
+- Final `irop-format-check` and `git diff --check` pass. The Ninja benchmark smoke
+  reports physical success with 45 pairs and 5,280 triangle tests; the initializer
+  and collision source hashes remain identical to the measured implementation.
+- Before/after benchmark commands and all 66 retained samples are cited in
+  `docs/MILESTONE_7_RESULTS.md`. Process peak-memory includes startup/dependency
+  loading, CPU accounting is coarse for short operations, and the three cold
+  repeats support only the stated local comparison.
+- Actual generated and supplied full-scale ten/36-object outputs pass physical
+  checks. Fallback-disable behavior and the historical Python/C++ failure oracle
+  remain reproducible without mutating the reference implementation.
+
 ## Risks and Follow-up
 
 - The official GL2PS `geuz.org` download endpoint was unreachable during verification.
@@ -787,18 +874,24 @@ detailed implementation trail requested for the migration.
 - Initialization accepts exactly one connected closed surface component. Supporting
   nested cavity shells or disjoint solids requires an explicit domain contract rather
   than summing component magnitudes.
-- Dense full-scale initialization can exhaust its candidate bound for physically
-  feasible scenes because the Python-compatible sampler uses conservative
-  rotation-independent spheres and never relocates an accepted center. The supplied
-  count-10 case jams at 6 for seed 1918 even after ten million attempts, while ten
-  proxy spheres and at least 36 oriented cylinders have constructive layouts.
-  Its successful/failure behavior is now captured by the parity corpus; Milestone 7
-  should evaluate bounded structured/maximin placement and shape-aware validation
-  while retaining established successful seeds.
-  Raising `--max-sampling-attempts` alone is not a remedy.
+- The reference random phase can still jam because conservative spheres and accepted
+  centers are unchanged. The bounded structured fallback recovers the demonstrated
+  ten/36-cylinder cases but tries only six fixed orientations and centered grids
+  with disjoint AABB envelopes. Feasible irregular/concave scenes can require other
+  offsets, interlocking envelopes, backtracking or continuous orientations and
+  still fail this heuristic. Raising the random attempt limit alone is not a remedy.
+- Structured candidates, discarded orientations and final initialization validation
+  share the geometry/pair/surface work budgets with the random prefix. Candidate
+  limits do not renew an exhausted budget. Exact containment is still linear in
+  container triangles per point and quadratic for object/container surface pairs.
+- Collision AABB filtering reduces narrow-phase work only for separated bounds.
+  Enumerating object pairs remains quadratic under the explicit cumulative bound;
+  dense/touching scenes retain exact work. Further spatial indexing, sparse solves,
+  concurrency, aggregation or regional subdivision requires new measurements.
 - Initialization resource failures use stable diagnostics/exit categories and publish
-  no success set; a persisted structured unsuccessful result is deferred to the later
-  packing-result coordinator.
+  no success set. Failures before the packing engine receives a state still publish
+  no run-summary directory; summary-only unsuccessful results apply after an engine
+  result exists. Initialization exceptions do not return partial-state work metrics.
 - Each initialization output path is a new atomic artifact-set identity and cannot be
   an existing reusable directory.
 - TetGen 1.6.0 makes any conveyed combined build and any hosted-service release subject
@@ -836,9 +929,10 @@ detailed implementation trail requested for the migration.
   already-final unsuccessful engine outcome wins over a later interruption.
   Active VTK reads and remeshing, TetGen, MUMPS, collision queries, and
   individual file-write calls are not hard-preemptible.
-- Remaining Milestone 6 evidence is the first observed hosted workflow run; local
-  acceptance gates pass. After that, Milestone 7 can address measured initializer
-  and packing scalability.
+- Remaining Milestone 6 evidence is the first observed hosted workflow run. The user
+  authorized Milestone 7 against the passing local baseline under ADR-0013; this does
+  not imply hosted CI acceptance. Milestone 7 now has complete local Debug, Release,
+  Ninja clang-tidy, regression and benchmark evidence for its revised measured scope.
 - Public binary and hosted-service distribution remain intentionally subject to the
   release-specific ADR-0009/ADR-0010 source, notice, payload, and license review.
   Those gates do not make the implementation milestone incomplete.

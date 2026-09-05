@@ -15,6 +15,7 @@ include(IropWarnings)
 
 option(IROP_WARNINGS_AS_ERRORS "Treat warnings in project-owned C++ code as errors" ON)
 option(IROP_ENABLE_CLANG_TIDY "Run the focused clang-tidy profile while compiling" OFF)
+option(IROP_BUILD_BENCHMARKS "Build the explicit Milestone 7 measurement executable" OFF)
 
 # CMake only integrates <LANG>_CLANG_TIDY with Makefile and Ninja generators.
 # Keep analysis opt-in so the supported Visual Studio generator remains usable.
@@ -138,11 +139,17 @@ if(BUILD_TESTING)
     vtk_module_autoinit(TARGETS irop_tests MODULES ${IROP_VTK_TARGETS})
 endif()
 
+if(IROP_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
+endif()
+
 file(
     GLOB_RECURSE IROP_FORMAT_FILES
     CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/app/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/app/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/benchmarks/*.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"

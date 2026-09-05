@@ -286,6 +286,8 @@ void remove_file_noexcept(const std::filesystem::path& path) noexcept
               { "initial_volume_scale", result.state.config.initial_volume_scale },
               { "seed", result.state.config.seed },
               { "max_sampling_attempts", result.state.config.max_sampling_attempts },
+              { "enable_structured_fallback", result.state.config.enable_structured_fallback },
+              { "max_structured_candidates", result.state.config.max_structured_candidates },
               { "max_geometry_query_triangle_visits", result.state.config.max_geometry_query_triangle_visits },
               { "max_pairwise_distance_checks", result.state.config.max_pairwise_distance_checks },
               { "max_surface_intersection_triangle_pairs",
@@ -304,10 +306,22 @@ void remove_file_noexcept(const std::filesystem::path& path) noexcept
           }                                               },
         { "sampling",
          {
-              { "policy", "uniform-aabb-rejection-bounding-sphere" },
+              { "policy", result.state.initialization_method == InitializationMethod::structured_grid
+                              ? "structured-aabb-grid"
+                              : "uniform-aabb-rejection-bounding-sphere" },
+              { "method", to_string(result.state.initialization_method) },
+              { "sampling_attempts", result.state.sampling_attempts },
+              { "structured_candidates", result.state.structured_candidates },
+              { "orientations_examined", result.state.orientations_examined },
+              { "reference_accepted_count", result.state.reference_accepted_count },
               { "initial_linear_scale", result.state.initial_linear_scale },
-              { "minimum_boundary_clearance", result.state.object_bounding_radius },
-              { "minimum_center_distance", result.state.minimum_center_distance },
+              { "minimum_boundary_clearance",
+                result.state.initialization_method == InitializationMethod::structured_grid
+                    ? nlohmann::json(nullptr)
+                    : nlohmann::json(result.state.object_bounding_radius) },
+              { "minimum_center_distance", result.state.initialization_method == InitializationMethod::structured_grid
+                                               ? nlohmann::json(nullptr)
+                                               : nlohmann::json(result.state.minimum_center_distance) },
               { "rejected_candidate_count", result.state.rejected_candidate_count },
               { "random_draw_count", result.state.random_state.draw_count() },
               { "random_generator", "numpy-legacy-mt19937-compatible" },

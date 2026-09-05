@@ -16,6 +16,7 @@ struct ObjectCollisionPair {
 };
 
 struct SceneCollisionLimits {
+    static constexpr std::uint64_t default_max_object_pair_checks = 100'000'000ULL;
     static constexpr std::uint64_t default_max_triangle_pair_tests = 100'000'000ULL;
     static constexpr std::uint64_t default_max_containment_triangle_visits = 100'000'000ULL;
     static constexpr std::uint64_t default_max_reported_violations = 1'000'000ULL;
@@ -23,6 +24,7 @@ struct SceneCollisionLimits {
     std::uint64_t max_triangle_pair_tests = default_max_triangle_pair_tests;
     std::uint64_t max_containment_triangle_visits = default_max_containment_triangle_visits;
     std::uint64_t max_reported_violations = default_max_reported_violations;
+    std::uint64_t max_object_pair_checks = default_max_object_pair_checks;
 };
 
 struct SceneCollisionWork {

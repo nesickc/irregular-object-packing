@@ -1,11 +1,13 @@
 #include "irop/packing/initialization.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <numbers>
+#include <numeric>
 #include <string>
 #include <utility>
 #include <vector>
@@ -154,6 +156,172 @@ void consume_work(const std::uint64_t amount, const std::uint64_t limit, std::ui
     return !intersection.intersects;
 }
 
+[[nodiscard]] MeshBounds transformed_bounds(const TriangleMesh& object, const Matrix4& matrix,
+                                            const std::function<bool()>& cancellation_requested)
+{
+    if (object.vertices.empty()) {
+        throw Error(ErrorCategory::invalid_mesh, "structured initialization requires object vertices");
+    }
+    const Point3 first = transform_point(matrix, object.vertices.front());
+    MeshBounds bounds { first, first };
+    for (const Point3& vertex : object.vertices) {
+        throw_if_cancelled(cancellation_requested);
+        const Point3 point = transform_point(matrix, vertex);
+        bounds.minimum.x = std::min(bounds.minimum.x, point.x);
+        bounds.minimum.y = std::min(bounds.minimum.y, point.y);
+        bounds.minimum.z = std::min(bounds.minimum.z, point.z);
+        bounds.maximum.x = std::max(bounds.maximum.x, point.x);
+        bounds.maximum.y = std::max(bounds.maximum.y, point.y);
+        bounds.maximum.z = std::max(bounds.maximum.z, point.z);
+    }
+    return bounds;
+}
+
+[[nodiscard]] bool strictly_separated(const MeshBounds& first, const MeshBounds& second) noexcept
+{
+    return first.maximum.x < second.minimum.x || second.maximum.x < first.minimum.x ||
+           first.maximum.y < second.minimum.y || second.maximum.y < first.minimum.y ||
+           first.maximum.z < second.minimum.z || second.maximum.z < first.minimum.z;
+}
+
+struct StructuredAxis {
+    std::uint64_t count = 0;
+    double first_translation = 0.0;
+    double pitch = 0.0;
+};
+
+[[nodiscard]] StructuredAxis structured_axis(const double container_min, const double container_max,
+                                             const double object_min, const double object_max,
+                                             const std::uint64_t count_limit)
+{
+    const double width = container_max - container_min;
+    const double extent = object_max - object_min;
+    // Leave more than float32 rounding error between envelopes and the AABB
+    // boundary. This is a numerical margin in input units, not a fit tolerance.
+    const double magnitude = std::max({ std::abs(container_min), std::abs(container_max), extent });
+    const double margin = magnitude * (8.0 * std::numeric_limits<float>::epsilon());
+    const double pitch = extent + margin;
+    const double available = width - margin;
+    if (!std::isfinite(width) || !std::isfinite(extent) || !std::isfinite(pitch) || !std::isfinite(available) ||
+        extent <= 0.0 || margin <= 0.0 || !(pitch > extent) || !(available < width) || available < pitch) {
+        return {};
+    }
+    const double quotient = std::floor(available / pitch);
+    // Clamp in floating point before converting; a huge finite container/tiny
+    // object ratio can exceed uint64_t even though we only need a few cells.
+    const std::uint64_t count =
+        quotient >= static_cast<double>(count_limit) ? count_limit : static_cast<std::uint64_t>(quotient);
+    if (count == 0) {
+        return {};
+    }
+    const double occupied = static_cast<double>(count) * pitch - margin;
+    const double first = std::midpoint(container_min, container_max) - occupied / 2.0 - object_min;
+    if (!std::isfinite(occupied) || !std::isfinite(first) || !(occupied < width)) {
+        return {};
+    }
+    return { count, first, pitch };
+}
+
+[[nodiscard]] bool structured_capacity_suffices(const std::array<StructuredAxis, 3>& axes,
+                                                const std::uint64_t required) noexcept
+{
+    std::uint64_t capacity = 1;
+    for (const StructuredAxis& axis : axes) {
+        if (axis.count == 0) {
+            return false;
+        }
+        capacity = axis.count > required / capacity ? required : std::min(required, capacity * axis.count);
+    }
+    return capacity >= required;
+}
+
+[[nodiscard]] bool initialize_structured(const TriangleMesh& object, const TriangleMesh& container,
+                                         const ClosedMeshQuery& container_query, PackingState& state,
+                                         const std::function<bool()>& cancellation_requested)
+{
+    // DEVIATION(IROP-DEV-0026): Only an exhausted reference candidate search
+    // triggers this bounded deterministic restart. Its partial prefix and RNG
+    // consumption remain reported; successful reference placements are unchanged.
+    // See docs/COMPATIBILITY.md.
+    constexpr double half_pi = std::numbers::pi_v<double> / 2.0;
+    constexpr std::array<EulerRotationRadians, 6> orientations {
+        EulerRotationRadians {},
+        EulerRotationRadians { .y = half_pi },
+        EulerRotationRadians { .x = half_pi },
+        EulerRotationRadians { .z = half_pi },
+        EulerRotationRadians { .x = half_pi, .z = half_pi },
+        EulerRotationRadians { .x = half_pi, .y = half_pi },
+    };
+    const PackingConfig& config = state.config;
+    const MeshBounds& container_bounds = container_query.bounds();
+    const std::uint64_t container_triangles = static_cast<std::uint64_t>(container.triangles.size());
+    const std::uint64_t count_limit = std::min(config.object_count, config.max_structured_candidates);
+    std::vector<Transform> candidates;
+    std::vector<MeshBounds> accepted_bounds;
+    candidates.reserve(static_cast<std::size_t>(config.object_count));
+    accepted_bounds.reserve(static_cast<std::size_t>(config.object_count));
+    for (const EulerRotationRadians& rotation : orientations) {
+        throw_if_cancelled(cancellation_requested);
+        ++state.orientations_examined;
+        candidates.clear();
+        accepted_bounds.clear();
+        Transform candidate { .volume_scale = config.initial_volume_scale, .rotation = rotation };
+        const MeshBounds bounds = transformed_bounds(object, matrix_for(candidate), cancellation_requested);
+        const std::array<StructuredAxis, 3> axes {
+            structured_axis(container_bounds.minimum.x, container_bounds.maximum.x, bounds.minimum.x, bounds.maximum.x,
+                            count_limit),
+            structured_axis(container_bounds.minimum.y, container_bounds.maximum.y, bounds.minimum.y, bounds.maximum.y,
+                            count_limit),
+            structured_axis(container_bounds.minimum.z, container_bounds.maximum.z, bounds.minimum.z, bounds.maximum.z,
+                            count_limit),
+        };
+        if (!structured_capacity_suffices(axes, config.object_count)) {
+            continue;
+        }
+        for (std::uint64_t z = 0; z < axes[2].count; ++z) {
+            for (std::uint64_t y = 0; y < axes[1].count; ++y) {
+                for (std::uint64_t x = 0; x < axes[0].count; ++x) {
+                    throw_if_cancelled(cancellation_requested);
+                    consume_work(1, config.max_structured_candidates, state.structured_candidates,
+                                 "structured-candidate limit");
+                    candidate.translation = {
+                        axes[0].first_translation + static_cast<double>(x) * axes[0].pitch,
+                        axes[1].first_translation + static_cast<double>(y) * axes[1].pitch,
+                        axes[2].first_translation + static_cast<double>(z) * axes[2].pitch,
+                    };
+                    const Matrix4 matrix = matrix_for(candidate);
+                    const MeshBounds actual = transformed_bounds(object, matrix, cancellation_requested);
+                    bool separated = true;
+                    for (const MeshBounds& previous : accepted_bounds) {
+                        throw_if_cancelled(cancellation_requested);
+                        consume_work(1, config.max_pairwise_distance_checks, state.pairwise_distance_checks,
+                                     "pairwise-distance-check limit");
+                        if (!strictly_separated(actual, previous)) {
+                            separated = false;
+                            break;
+                        }
+                    }
+                    if (!separated || !transformed_object_is_contained(
+                                          object, matrix, container_query, container, container_triangles, config,
+                                          state.geometry_query_triangle_visits,
+                                          state.surface_intersection_triangle_pairs, cancellation_requested)) {
+                        continue;
+                    }
+                    candidates.push_back(candidate);
+                    accepted_bounds.push_back(actual);
+                    if (candidates.size() == static_cast<std::size_t>(config.object_count)) {
+                        state.transforms = std::move(candidates);
+                        state.initialization_method = InitializationMethod::structured_grid;
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    throw_if_cancelled(cancellation_requested);
+    return false;
+}
+
 [[nodiscard]] bool is_reference_origin_transform(const Transform& transform) noexcept
 {
     return transform.rotation.x == 0.0 && transform.rotation.y == 0.0 && transform.rotation.z == 0.0 &&
@@ -176,6 +344,11 @@ void validate_initial_state_bounded(const TriangleMesh& centered_object, const T
                                     const std::function<bool()>& cancellation_requested)
 {
     validate_packing_config(state.config);
+    if (state.initialization_method != InitializationMethod::random_rejection &&
+        state.initialization_method != InitializationMethod::reference_origin &&
+        state.initialization_method != InitializationMethod::structured_grid) {
+        throw Error(ErrorCategory::invalid_configuration, "initial state has an unknown initialization method");
+    }
     throw_if_cancelled(cancellation_requested);
     if (state.transforms.size() != static_cast<std::size_t>(state.config.object_count)) {
         throw Error(ErrorCategory::invalid_mesh, "initial state transform count differs from its configuration");
@@ -187,6 +360,14 @@ void validate_initial_state_bounded(const TriangleMesh& centered_object, const T
     const double minimum_distance = 2.0 * radius;
     const double minimum_distance_squared = minimum_distance * minimum_distance;
 
+    std::vector<MeshBounds> structured_bounds;
+    if (state.initialization_method == InitializationMethod::structured_grid) {
+        // Recompute envelopes from the supplied geometry/transforms. Method
+        // metadata selects the proof, but never substitutes for physical checks.
+        static_cast<void>(ClosedMeshQuery(centered_object));
+        structured_bounds.reserve(state.transforms.size());
+    }
+
     for (std::size_t index = 0; index < state.transforms.size(); ++index) {
         throw_if_cancelled(cancellation_requested);
         const Transform& transform = state.transforms[index];
@@ -197,6 +378,25 @@ void validate_initial_state_bounded(const TriangleMesh& centered_object, const T
             throw Error(ErrorCategory::invalid_mesh, "initial transform rotation and translation must be finite");
         }
         const Matrix4 matrix = matrix_for(transform);
+
+        if (state.initialization_method == InitializationMethod::structured_grid) {
+            const MeshBounds actual = transformed_bounds(centered_object, matrix, cancellation_requested);
+            for (const MeshBounds& previous : structured_bounds) {
+                throw_if_cancelled(cancellation_requested);
+                consume_work(1, state.config.max_pairwise_distance_checks, pairwise_checks,
+                             "pairwise-distance-check limit");
+                if (!strictly_separated(actual, previous)) {
+                    throw Error(ErrorCategory::invalid_mesh, "structured initial object envelopes overlap or touch");
+                }
+            }
+            if (!transformed_object_is_contained(centered_object, matrix, container_query, container,
+                                                 container_triangles, state.config, triangle_visits, surface_pair_tests,
+                                                 cancellation_requested)) {
+                throw Error(ErrorCategory::invalid_mesh, "structured initial object violates strict containment");
+            }
+            structured_bounds.push_back(actual);
+            continue;
+        }
 
         // DEVIATION(IROP-DEV-0008): The Python validator only checks surface
         // intersections. Prefer a bounding-sphere containment proof and fall
@@ -244,13 +444,26 @@ void validate_packing_config(const PackingConfig& config)
         throw Error(ErrorCategory::invalid_configuration,
                     "maximum sampling attempts must be positive and at least the object count");
     }
-    if (config.max_geometry_query_triangle_visits == 0 || config.max_pairwise_distance_checks == 0 ||
-        config.max_surface_intersection_triangle_pairs == 0) {
+    if (config.max_structured_candidates == 0 || config.max_geometry_query_triangle_visits == 0 ||
+        config.max_pairwise_distance_checks == 0 || config.max_surface_intersection_triangle_pairs == 0) {
         throw Error(ErrorCategory::invalid_configuration, "initialization work limits must be positive");
     }
     if (config.output_mesh_limits.max_vertices == 0 || config.output_mesh_limits.max_triangles == 0) {
         throw Error(ErrorCategory::invalid_configuration, "output mesh count limits must be positive");
     }
+}
+
+const char* to_string(const InitializationMethod method) noexcept
+{
+    switch (method) {
+    case InitializationMethod::random_rejection:
+        return "random_rejection";
+    case InitializationMethod::reference_origin:
+        return "reference_origin";
+    case InitializationMethod::structured_grid:
+        return "structured_grid";
+    }
+    return "unknown";
 }
 
 DeterministicRandomState::DeterministicRandomState(const std::uint32_t seed) : seed_(seed), engine_(seed) {}
@@ -326,6 +539,8 @@ PackingState initialize_packing(const TriangleMesh& centered_object, const Trian
                                          container_triangles, config, state.geometry_query_triangle_visits,
                                          state.surface_intersection_triangle_pairs, cancellation_requested))) {
         state.transforms.push_back(origin_transform);
+        state.initialization_method = InitializationMethod::reference_origin;
+        state.reference_accepted_count = 1;
         validate_initial_state_bounded(centered_object, container, state, state.geometry_query_triangle_visits,
                                        state.pairwise_distance_checks, state.surface_intersection_triangle_pairs,
                                        cancellation_requested);
@@ -372,13 +587,24 @@ PackingState initialize_packing(const TriangleMesh& centered_object, const Trian
         }
         state.transforms.push_back(Transform { .volume_scale = config.initial_volume_scale, .translation = candidate });
     }
-    state.rejected_candidate_count = attempts - static_cast<std::uint64_t>(state.transforms.size());
+    state.sampling_attempts = attempts;
+    state.reference_accepted_count = static_cast<std::uint64_t>(state.transforms.size());
+    state.rejected_candidate_count = attempts - state.reference_accepted_count;
     throw_if_cancelled(cancellation_requested);
     if (state.transforms.size() != static_cast<std::size_t>(config.object_count)) {
+        if (config.enable_structured_fallback &&
+            initialize_structured(centered_object, container, container_query, state, cancellation_requested)) {
+            validate_initial_state_bounded(centered_object, container, state, state.geometry_query_triangle_visits,
+                                           state.pairwise_distance_checks, state.surface_intersection_triangle_pairs,
+                                           cancellation_requested);
+            throw_if_cancelled(cancellation_requested);
+            return state;
+        }
         throw Error(ErrorCategory::resource_limit,
                     "initial placement exhausted " + std::to_string(config.max_sampling_attempts) +
-                        " candidate attempts after placing " + std::to_string(state.transforms.size()) + " of " +
-                        std::to_string(config.object_count) + " objects");
+                        " candidate attempts after placing " + std::to_string(state.reference_accepted_count) + " of " +
+                        std::to_string(config.object_count) + " objects" +
+                        (config.enable_structured_fallback ? "; bounded structured search also found no layout" : ""));
     }
 
     for (Transform& transform : state.transforms) {

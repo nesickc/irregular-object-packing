@@ -27,8 +27,8 @@ namespace {
 
 void validate_limits(const SceneCollisionLimits& limits)
 {
-    if (limits.max_triangle_pair_tests == 0 || limits.max_containment_triangle_visits == 0 ||
-        limits.max_reported_violations == 0) {
+    if (limits.max_object_pair_checks == 0 || limits.max_triangle_pair_tests == 0 ||
+        limits.max_containment_triangle_visits == 0 || limits.max_reported_violations == 0) {
         throw Error(ErrorCategory::invalid_configuration, "scene-collision limits must be positive");
     }
 }
@@ -73,10 +73,24 @@ void consume_containment_visits(const TriangleMesh& queried_surface, const Scene
     return intersection.intersects;
 }
 
-void increment_object_pairs(SceneCollisionWork& work)
+[[nodiscard]] bool bounds_are_disjoint(const MeshBounds& first, const MeshBounds& second) noexcept
 {
-    if (work.object_pairs_examined == std::numeric_limits<std::uint64_t>::max()) {
-        throw Error(ErrorCategory::resource_limit, "scene collision object-pair counter overflowed");
+    // Bounds come from the validated closed-mesh snapshots. Strict comparisons
+    // retain face, edge, and vertex contacts for the exact narrow phase, while
+    // also retaining all possible nesting when the surfaces do not intersect.
+    return first.maximum.x < second.minimum.x || second.maximum.x < first.minimum.x ||
+           first.maximum.y < second.minimum.y || second.maximum.y < first.minimum.y ||
+           first.maximum.z < second.minimum.z || second.maximum.z < first.minimum.z;
+}
+
+// DEVIATION(IROP-DEV-0027): Bound enumerated pairs even when the broad phase
+// skips all narrow-phase geometry work. See docs/COMPATIBILITY.md.
+void increment_object_pairs(const SceneCollisionLimits& limits, SceneCollisionWork& work)
+{
+    // Broad-phase rejections still consume pair work: separated populations
+    // must not bypass the bound on the quadratic enumeration itself.
+    if (work.object_pairs_examined >= limits.max_object_pair_checks) {
+        throw Error(ErrorCategory::resource_limit, "scene collision validation exhausted the object-pair check limit");
     }
     ++work.object_pairs_examined;
 }
@@ -165,7 +179,10 @@ void record_violation(std::uint64_t& reported_violation_count, const SceneCollis
 
     for (std::size_t first = 0; first < objects.size(); ++first) {
         for (std::size_t second = first + 1; second < objects.size(); ++second) {
-            increment_object_pairs(report.work);
+            increment_object_pairs(limits, report.work);
+            if (bounds_are_disjoint(object_queries[first].bounds(), object_queries[second].bounds())) {
+                continue;
+            }
             bool collision = bounded_surface_intersection(objects[first], objects[second], limits, report.work);
             if (!collision) {
                 collision =

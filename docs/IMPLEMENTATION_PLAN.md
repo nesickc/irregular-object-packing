@@ -165,6 +165,14 @@ Acceptance criteria:
 
 Goal: remove demonstrated bottlenecks without destabilizing parity.
 
+Scope clarification (2026-09-05): implementation proceeds on the recorded local
+Milestone 6 parity baseline at the maintainer's request; hosted CI acceptance
+remains an independent outstanding Milestone 6 gate. The first measured scope is
+reproducible stage/count/mesh-size benchmarks, bounded structured initialization
+that preserves successful reference seeds, and conservative collision broad-phase
+filtering. See ADR-0013. General backtracking, aggregation, subdivision and
+parallelism require evidence beyond this first measured workload.
+
 Work:
 
 - Establish timing and memory baselines for representative object counts and mesh sizes.
@@ -177,6 +185,11 @@ Acceptance criteria:
 
 - Benchmarks are reproducible and record inputs, configuration, build type, and environment.
 - Each optimization has before/after evidence and correctness regression coverage.
+- Generated ten- and 36-cylinder scenes demonstrate bounded dense initialization,
+  while established successful Python/C++ seeds and explicit legacy failure cases
+  retain their oracle behavior.
+- Collision broad-phase filtering preserves touching, nesting and deterministic
+  reports while bounding all enumerated pairs, including skipped candidates.
 - Performance changes do not introduce an undocumented compatibility deviation.
 - Remaining scaling limits are documented honestly.
 

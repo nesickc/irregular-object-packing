@@ -197,7 +197,8 @@ void discard_staged_success_artifacts(const std::filesystem::path& staging)
 [[nodiscard]] std::optional<SceneCollisionLimits> remaining_output_collision_limits(
     const SceneCollisionWork& consumed, const SceneCollisionLimits& configured) noexcept
 {
-    if (consumed.triangle_pairs_tested >= configured.max_triangle_pair_tests ||
+    if (consumed.object_pairs_examined >= configured.max_object_pair_checks ||
+        consumed.triangle_pairs_tested >= configured.max_triangle_pair_tests ||
         consumed.containment_triangle_visits >= configured.max_containment_triangle_visits) {
         return std::nullopt;
     }
@@ -206,6 +207,7 @@ void discard_staged_success_artifacts(const std::filesystem::path& staging)
         .max_containment_triangle_visits =
             configured.max_containment_triangle_visits - consumed.containment_triangle_visits,
         .max_reported_violations = configured.max_reported_violations,
+        .max_object_pair_checks = configured.max_object_pair_checks - consumed.object_pairs_examined,
     };
 }
 
@@ -412,6 +414,8 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
         { "initialization_limits",
          {
               { "max_sampling_attempts", initialization.max_sampling_attempts },
+              { "enable_structured_fallback", initialization.enable_structured_fallback },
+              { "max_structured_candidates", initialization.max_structured_candidates },
               { "max_geometry_query_triangle_visits", initialization.max_geometry_query_triangle_visits },
               { "max_pairwise_distance_checks", initialization.max_pairwise_distance_checks },
               { "max_surface_intersection_triangle_pairs", initialization.max_surface_intersection_triangle_pairs },
@@ -462,6 +466,7 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
                     { "max_triangle_pair_tests", limits.collision.max_triangle_pair_tests },
                     { "max_containment_triangle_visits", limits.collision.max_containment_triangle_visits },
                     { "max_reported_violations", limits.collision.max_reported_violations },
+                    { "max_object_pair_checks", limits.collision.max_object_pair_checks },
                 } },
           }                                                                                                            },
     };
@@ -713,10 +718,23 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
         { "config", algorithm_config_json(options, result) },
         { "initialization",
          {
-              { "policy", "uniform-aabb-rejection-bounding-sphere" },
+              { "policy", result.packing.state.initialization_method == InitializationMethod::structured_grid
+                              ? "structured-aabb-grid"
+                              : "uniform-aabb-rejection-bounding-sphere" },
+              { "method", to_string(result.packing.state.initialization_method) },
+              { "sampling_attempts", result.packing.state.sampling_attempts },
+              { "structured_candidates", result.packing.state.structured_candidates },
+              { "orientations_examined", result.packing.state.orientations_examined },
+              { "reference_accepted_count", result.packing.state.reference_accepted_count },
               { "initial_linear_scale", result.packing.state.initial_linear_scale },
-              { "minimum_boundary_clearance", result.packing.state.object_bounding_radius },
-              { "minimum_center_distance", result.packing.state.minimum_center_distance },
+              { "minimum_boundary_clearance",
+                result.packing.state.initialization_method == InitializationMethod::structured_grid
+                    ? nlohmann::json(nullptr)
+                    : nlohmann::json(result.packing.state.object_bounding_radius) },
+              { "minimum_center_distance",
+                result.packing.state.initialization_method == InitializationMethod::structured_grid
+                    ? nlohmann::json(nullptr)
+                    : nlohmann::json(result.packing.state.minimum_center_distance) },
               { "rejected_candidate_count", result.packing.state.rejected_candidate_count },
               { "random_draw_count", result.packing.state.random_state.draw_count() },
               { "random_generator", "numpy-legacy-mt19937-compatible" },

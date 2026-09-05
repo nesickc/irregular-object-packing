@@ -55,6 +55,8 @@
         "initial_volume_scale": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
         "seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
         "max_sampling_attempts": { "type": "integer", "minimum": 1 },
+        "enable_structured_fallback": { "type": "boolean" },
+        "max_structured_candidates": { "type": "integer", "minimum": 1 },
         "max_geometry_query_triangle_visits": { "type": "integer", "minimum": 1 },
         "max_pairwise_distance_checks": { "type": "integer", "minimum": 1 },
         "max_surface_intersection_triangle_pairs": { "type": "integer", "minimum": 1 },
@@ -77,11 +79,37 @@
         "pairwise_distance_checks",
         "surface_intersection_triangle_pairs"
       ],
+      "allOf": [{
+        "if": { "properties": { "policy": { "const": "structured-aabb-grid" } } },
+        "then": {
+          "required": ["method", "sampling_attempts", "structured_candidates", "orientations_examined", "reference_accepted_count"],
+          "properties": {
+            "method": { "const": "structured_grid" },
+            "minimum_boundary_clearance": { "type": "null" },
+            "minimum_center_distance": { "type": "null" },
+            "sampling_attempts": { "minimum": 1 },
+            "structured_candidates": { "minimum": 1 },
+            "orientations_examined": { "minimum": 1 }
+          }
+        },
+        "else": {
+          "properties": {
+            "method": { "enum": ["reference_origin", "random_rejection"] },
+            "minimum_boundary_clearance": { "type": "number", "exclusiveMinimum": 0 },
+            "minimum_center_distance": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      }],
       "properties": {
-        "policy": { "const": "uniform-aabb-rejection-bounding-sphere" },
+        "method": { "enum": ["reference_origin", "random_rejection", "structured_grid"] },
+        "sampling_attempts": { "type": "integer", "minimum": 0 },
+        "structured_candidates": { "type": "integer", "minimum": 0 },
+        "orientations_examined": { "type": "integer", "minimum": 0, "maximum": 6 },
+        "reference_accepted_count": { "type": "integer", "minimum": 0 },
+        "policy": { "enum": ["uniform-aabb-rejection-bounding-sphere", "structured-aabb-grid"] },
         "initial_linear_scale": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
-        "minimum_boundary_clearance": { "type": "number", "exclusiveMinimum": 0 },
-        "minimum_center_distance": { "type": "number", "exclusiveMinimum": 0 },
+        "minimum_boundary_clearance": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "minimum_center_distance": { "type": ["number", "null"], "exclusiveMinimum": 0 },
         "rejected_candidate_count": { "type": "integer", "minimum": 0 },
         "random_draw_count": { "type": "integer", "minimum": 0 },
         "random_generator": { "const": "numpy-legacy-mt19937-compatible" },

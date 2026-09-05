@@ -89,3 +89,7 @@ dump/
 renders/
 
 hemocell
+
+#testing models
+rc/*
+artifacts/*

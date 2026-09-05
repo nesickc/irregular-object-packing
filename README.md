@@ -75,6 +75,14 @@ for reference parity, but its container refinement formula can be expensive for
 coarse toy meshes; use `--no-adaptive-sampling` for those inputs and for
 full-resolution diagnostic runs. Run `irop.exe pack --help` for limits and
 tuning flags.
+Dense initialization now tries a bounded deterministic grid after the original
+random search exhausts its attempt limit. Successful seeded random placements are
+unchanged. Use `--no-initialization-fallback` for the historical bounded search,
+`--max-structured-candidates` to limit fallback work, and
+`--max-collision-object-pair-checks` to bound packing collision pair enumeration.
+The summary records the selected initialization method and separate work counts.
+Measured results and limitations are in [Milestone 7 results](/docs/MILESTONE_7_RESULTS.md).
+
 Configuration is currently supplied through CLI flags; JSON files are result
 formats, not yet configuration inputs.
 

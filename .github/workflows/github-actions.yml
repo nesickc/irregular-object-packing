@@ -58,7 +58,7 @@ jobs:
 
       - name: Configure the supported Windows preset
         shell: pwsh
-        run: ./scripts/configure-windows-ci.ps1
+        run: ./scripts/configure-windows-ci.ps1 -BuildBenchmarks
 
       - name: Verify C++ formatting
         shell: pwsh
@@ -74,6 +74,16 @@ jobs:
         shell: pwsh
         run: ctest --preset windows-vs2026-release
 
+      - name: Exercise the benchmark report contract
+        shell: pwsh
+        run: |
+          & build/windows-vs2026/benchmarks/Release/irop_benchmarks.exe collision --count 10 --segments 12 --output build/benchmark-smoke.json
+          if ($LASTEXITCODE -ne 0) { throw "Benchmark execution failed." }
+          $report = Get-Content build/benchmark-smoke.json -Raw | ConvertFrom-Json
+          if ($report.status -ne 'success' -or -not $report.physically_valid) {
+            throw "Benchmark smoke case did not report a valid scene."
+          }
+
       - name: Audit exact dependency notices
         shell: pwsh
         run: >-
@@ -86,7 +96,7 @@ jobs:
         run: |
           call "%VS_INSTALL_PATH%\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
           if errorlevel 1 exit /b %errorlevel%
-          cmake --preset windows-ninja-analysis
+          cmake --preset windows-ninja-analysis -DIROP_BUILD_BENCHMARKS=ON
           if errorlevel 1 exit /b %errorlevel%
           cmake --build --preset windows-ninja-analysis --parallel 2
           if errorlevel 1 exit /b %errorlevel%

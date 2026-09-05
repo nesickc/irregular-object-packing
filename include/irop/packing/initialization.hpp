@@ -26,6 +26,7 @@ private:
 
 struct PackingConfig {
     static constexpr std::uint64_t default_max_sampling_attempts = 1'000'000ULL;
+    static constexpr std::uint64_t default_max_structured_candidates = 100'000ULL;
     static constexpr std::uint64_t default_max_geometry_query_triangle_visits = 100'000'000ULL;
     static constexpr std::uint64_t default_max_pairwise_distance_checks = 100'000'000ULL;
     static constexpr std::uint64_t default_max_surface_intersection_triangle_pairs = 100'000'000ULL;
@@ -34,6 +35,8 @@ struct PackingConfig {
     double initial_volume_scale = 0.1;
     std::uint32_t seed = 1918;
     std::uint64_t max_sampling_attempts = default_max_sampling_attempts;
+    bool enable_structured_fallback = true;
+    std::uint64_t max_structured_candidates = default_max_structured_candidates;
     std::uint64_t max_geometry_query_triangle_visits = default_max_geometry_query_triangle_visits;
     std::uint64_t max_pairwise_distance_checks = default_max_pairwise_distance_checks;
     std::uint64_t max_surface_intersection_triangle_pairs = default_max_surface_intersection_triangle_pairs;
@@ -43,6 +46,10 @@ struct PackingConfig {
     // option is deliberately absent from the project-owned configuration.
     // See docs/COMPATIBILITY.md.
 };
+
+enum class InitializationMethod { random_rejection, reference_origin, structured_grid };
+
+[[nodiscard]] const char* to_string(InitializationMethod method) noexcept;
 
 struct PackingState {
     explicit PackingState(PackingConfig configuration);
@@ -58,6 +65,11 @@ struct PackingState {
     double initial_linear_scale = 0.0;
     double object_bounding_radius = 0.0;
     double minimum_center_distance = 0.0;
+    InitializationMethod initialization_method = InitializationMethod::random_rejection;
+    std::uint64_t sampling_attempts = 0;
+    std::uint64_t structured_candidates = 0;
+    std::uint64_t orientations_examined = 0;
+    std::uint64_t reference_accepted_count = 0;
     std::uint64_t rejected_candidate_count = 0;
     std::uint64_t geometry_query_triangle_visits = 0;
     std::uint64_t pairwise_distance_checks = 0;

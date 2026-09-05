@@ -1,0 +1,2056 @@
+{
+  "schema_version": 1,
+  "measured_date": "2026-09-05",
+  "scope": "Milestone 7 first measured scope: structured initialization fallback and strict mesh-bounds collision broad phase",
+  "measurements": {
+    "repeats_per_case_per_build": 3,
+    "case_count": 11,
+    "process_count": 66,
+    "ordering": "baseline matrix then changed matrix; serial independent cold processes",
+    "aggregation": "median; sample arrays retained; compare outcome/work before timing",
+    "wall_cpu_scope": "case invocation including generated input setup; excludes report serialization",
+    "memory_scope": "process lifetime to measurement snapshot, including executable startup and dependency loading",
+    "cpu_limitations": "Windows process accounting may report zero for short stages; includes all dependency worker threads",
+    "placement_comparison": "exact equality of parsed JSON numeric arrays and objects across all six reports; canonical SHA256 is UTF-8 PowerShell ConvertTo-Json -Depth 20 -Compress"
+  },
+  "before": {
+    "label": "milestone6",
+    "production_revision": "02961e785c730ad47c810da16df15fc966d835ef",
+    "provenance": "Milestone 6 core built before implementation edits; local executable retained before rebuilding changed core",
+    "build": {
+      "compiler": "MSVC 19.51.36252.0",
+      "configuration": "Release"
+    },
+    "source_sha256_at_configure": null,
+    "source_hash_limitation": "initial harness did not capture source hashes or CPU model; revision follows recorded build sequence",
+    "production_git_blobs": {
+      "src/packing/initialization.cpp": "01b1401e4aa3a914391441639626a0eea0faef90",
+      "src/geometry/collision.cpp": "a7602400a9d467c69029533c59ad0620e41c61b5"
+    },
+    "machine": {
+      "logical_processors": 32,
+      "os": "Windows",
+      "page_size_bytes": 4096,
+      "physical_memory_bytes": 66155331584,
+      "pointer_bits": 64,
+      "processor_architecture": 9
+    },
+    "dependencies": {
+      "eigen": "3.4.1",
+      "ipopt": "3.14.19",
+      "tetgen": "1.6.0",
+      "vtk": "9.3.20231030"
+    },
+    "executable_sha256_at_aggregation": "216e85d1e7788119ba81e6231b814a2cfc17814c84457079287dd9230a56f68c",
+    "source_reports": "build/benchmarks/m7-baseline",
+    "command": "./benchmarks/run-windows.ps1 -Executable build/windows-vs2026/benchmarks/Release/irop_benchmarks-m6.exe -OutputDirectory build/benchmarks/m7-baseline -Repeats 3 -Label milestone6"
+  },
+  "after": {
+    "label": "milestone7",
+    "provenance": "Uncommitted Milestone 7 implementation over the same HEAD; measured source hashes identify the changed implementation",
+    "build": {
+      "collision_sha256_at_configure": "4d621aebbde87f4826e409e8beb7ea4396102a084e20126bf426f2bcdf7bff3f",
+      "compiler": "MSVC 19.51.36252.0",
+      "configuration": "Release",
+      "initializer_sha256_at_configure": "04ae7eecc926be6274ff7ae96af10d24742d712e68f7efbdac8dac26a9905173",
+      "revision_at_configure": "02961e785c730ad47c810da16df15fc966d835ef"
+    },
+    "machine": {
+      "cpu_model": "AMD Ryzen 9 9950X 16-Core Processor            ",
+      "logical_processors": 32,
+      "os": "Windows",
+      "page_size_bytes": 4096,
+      "physical_memory_bytes": 66155331584,
+      "pointer_bits": 64,
+      "processor_architecture": 9
+    },
+    "dependencies": {
+      "eigen": "3.4.1",
+      "ipopt": "3.14.19",
+      "tetgen": "1.6.0",
+      "vtk": "9.3.20231030"
+    },
+    "executable_sha256_at_aggregation": "972920c1c8dcdec718ae40b7f10ec43ab9c3b1dae99442be92f9b37bb547f068",
+    "source_reports": "build/benchmarks/m7-after",
+    "command": "./benchmarks/run-windows.ps1 -Executable build/windows-vs2026/benchmarks/Release/irop_benchmarks.exe -OutputDirectory build/benchmarks/m7-after -Repeats 3 -Label milestone7"
+  },
+  "cases": [
+    {
+      "id": "sparse-10-s12",
+      "case": "init-sparse",
+      "before_configuration": {
+        "container_dimensions": [
+          350.0,
+          400.0,
+          285.0
+        ],
+        "cylinder_diameter": 90.46,
+        "cylinder_height": 105.507,
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "initial_volume_scale": 0.1,
+        "max_sampling_attempts": 1000000,
+        "object_count": 10,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "after_configuration": {
+        "container_dimensions": [
+          350.0,
+          400.0,
+          285.0
+        ],
+        "cylinder_diameter": 90.46,
+        "cylinder_height": 105.507,
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "enable_structured_fallback": true,
+        "initial_volume_scale": 0.1,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "object_count": 10,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "meshes": {
+        "container": {
+          "triangles": 12,
+          "vertices": 8
+        },
+        "object": {
+          "triangles": 44,
+          "vertices": 24
+        }
+      },
+      "placements_identical_across_all_six_reports": true,
+      "before": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 0.0782,
+        "median_cpu_ms": 0.0,
+        "median_peak_working_set_bytes": 16474112.0,
+        "median_peak_commit_bytes": 9199616.0,
+        "samples": {
+          "wall_ms": [
+            0.0782,
+            0.0796,
+            0.0764
+          ],
+          "cpu_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "peak_working_set_bytes": [
+            16474112,
+            16445440,
+            16474112
+          ],
+          "peak_commit_bytes": [
+            9203712,
+            9170944,
+            9199616
+          ]
+        },
+        "stage_medians": {
+          "initialization": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0528,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "accepted_objects": 10,
+          "geometry_query_triangle_visits": 768,
+          "pairwise_distance_checks": 116,
+          "random_draws": 99,
+          "rejected_candidates": 13,
+          "surface_intersection_triangle_pairs": 0
+        },
+        "diagnostic": null,
+        "physically_valid": null,
+        "placements_canonical_sha256": "208052c0cd287990807f504220943131db88e405ed314cbf02ba3e4b1104fd39"
+      },
+      "after": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 0.0802,
+        "median_cpu_ms": 0.0,
+        "median_peak_working_set_bytes": 16470016.0,
+        "median_peak_commit_bytes": 9183232.0,
+        "samples": {
+          "wall_ms": [
+            0.0952,
+            0.0796,
+            0.0802
+          ],
+          "cpu_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "peak_working_set_bytes": [
+            16490496,
+            16449536,
+            16470016
+          ],
+          "peak_commit_bytes": [
+            9199616,
+            9162752,
+            9183232
+          ]
+        },
+        "stage_medians": {
+          "initialization": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0566,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "accepted_objects": 10,
+          "geometry_query_triangle_visits": 768,
+          "method": "random_rejection",
+          "orientations_examined": 0,
+          "pairwise_distance_checks": 116,
+          "random_draws": 99,
+          "reference_accepted_count": 10,
+          "rejected_candidates": 13,
+          "sampling_attempts": 23,
+          "structured_candidates": 0,
+          "surface_intersection_triangle_pairs": 0
+        },
+        "diagnostic": null,
+        "physically_valid": null,
+        "placements_canonical_sha256": "208052c0cd287990807f504220943131db88e405ed314cbf02ba3e4b1104fd39"
+      }
+    },
+    {
+      "id": "sparse-36-s12",
+      "case": "init-sparse",
+      "before_configuration": {
+        "container_dimensions": [
+          350.0,
+          400.0,
+          285.0
+        ],
+        "cylinder_diameter": 90.46,
+        "cylinder_height": 105.507,
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "initial_volume_scale": 0.1,
+        "max_sampling_attempts": 1000000,
+        "object_count": 36,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "after_configuration": {
+        "container_dimensions": [
+          350.0,
+          400.0,
+          285.0
+        ],
+        "cylinder_diameter": 90.46,
+        "cylinder_height": 105.507,
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "enable_structured_fallback": true,
+        "initial_volume_scale": 0.1,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "object_count": 36,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "meshes": {
+        "container": {
+          "triangles": 12,
+          "vertices": 8
+        },
+        "object": {
+          "triangles": 44,
+          "vertices": 24
+        }
+      },
+      "placements_identical_across_all_six_reports": true,
+      "before": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 0.2459,
+        "median_cpu_ms": 0.0,
+        "median_peak_working_set_bytes": 16474112.0,
+        "median_peak_commit_bytes": 9195520.0,
+        "samples": {
+          "wall_ms": [
+            0.2538,
+            0.2459,
+            0.2447
+          ],
+          "cpu_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "peak_working_set_bytes": [
+            16474112,
+            16474112,
+            16470016
+          ],
+          "peak_commit_bytes": [
+            9195520,
+            9195520,
+            9191424
+          ]
+        },
+        "stage_medians": {
+          "initialization": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.201,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "accepted_objects": 36,
+          "geometry_query_triangle_visits": 5172,
+          "pairwise_distance_checks": 4717,
+          "random_draws": 819,
+          "rejected_candidates": 201,
+          "surface_intersection_triangle_pairs": 0
+        },
+        "diagnostic": null,
+        "physically_valid": null,
+        "placements_canonical_sha256": "ac7c25b75140dbc9ce7380a9781474c21675c007996fd0abd7cf74273475a1be"
+      },
+      "after": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 0.2576,
+        "median_cpu_ms": 0.0,
+        "median_peak_working_set_bytes": 16506880.0,
+        "median_peak_commit_bytes": 9220096.0,
+        "samples": {
+          "wall_ms": [
+            0.2578,
+            0.2486,
+            0.2576
+          ],
+          "cpu_ms": [
+            0.0,
+            0.0,
+            15.625
+          ],
+          "peak_working_set_bytes": [
+            16551936,
+            16506880,
+            16490496
+          ],
+          "peak_commit_bytes": [
+            9269248,
+            9220096,
+            9203712
+          ]
+        },
+        "stage_medians": {
+          "initialization": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.2087,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "accepted_objects": 36,
+          "geometry_query_triangle_visits": 5172,
+          "method": "random_rejection",
+          "orientations_examined": 0,
+          "pairwise_distance_checks": 4717,
+          "random_draws": 819,
+          "reference_accepted_count": 36,
+          "rejected_candidates": 201,
+          "sampling_attempts": 237,
+          "structured_candidates": 0,
+          "surface_intersection_triangle_pairs": 0
+        },
+        "diagnostic": null,
+        "physically_valid": null,
+        "placements_canonical_sha256": "ac7c25b75140dbc9ce7380a9781474c21675c007996fd0abd7cf74273475a1be"
+      }
+    },
+    {
+      "id": "dense-10-s12",
+      "case": "init-dense",
+      "before_configuration": {
+        "container_dimensions": [
+          350.0,
+          400.0,
+          285.0
+        ],
+        "cylinder_diameter": 90.46,
+        "cylinder_height": 105.507,
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "initial_volume_scale": 1.0,
+        "max_sampling_attempts": 1000000,
+        "object_count": 10,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "after_configuration": {
+        "container_dimensions": [
+          350.0,
+          400.0,
+          285.0
+        ],
+        "cylinder_diameter": 90.46,
+        "cylinder_height": 105.507,
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "enable_structured_fallback": true,
+        "initial_volume_scale": 1.0,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "object_count": 10,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "meshes": {
+        "container": {
+          "triangles": 12,
+          "vertices": 8
+        },
+        "object": {
+          "triangles": 44,
+          "vertices": 24
+        }
+      },
+      "placements_identical_across_all_six_reports": null,
+      "before": {
+        "statuses": [
+          {
+            "status": "resource_limit",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 278.099,
+        "median_cpu_ms": 281.25,
+        "median_peak_working_set_bytes": 16535552.0,
+        "median_peak_commit_bytes": 9203712.0,
+        "samples": {
+          "wall_ms": [
+            278.0053,
+            278.099,
+            278.3183
+          ],
+          "cpu_ms": [
+            265.625,
+            281.25,
+            281.25
+          ],
+          "peak_working_set_bytes": [
+            16519168,
+            16535552,
+            16539648
+          ],
+          "peak_commit_bytes": [
+            9195520,
+            9203712,
+            9220096
+          ]
+        },
+        "stage_medians": {
+          "initialization": {
+            "completed_samples": 3,
+            "median_wall_ms": 278.0773,
+            "median_cpu_ms": 281.25
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": null,
+        "diagnostic": "initial placement exhausted 1000000 candidate attempts after placing 6 of 10 objects",
+        "physically_valid": null,
+        "placements_canonical_sha256": null
+      },
+      "after": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 278.3951,
+        "median_cpu_ms": 281.25,
+        "median_peak_working_set_bytes": 16510976.0,
+        "median_peak_commit_bytes": 9195520.0,
+        "samples": {
+          "wall_ms": [
+            278.4065,
+            278.2022,
+            278.3951
+          ],
+          "cpu_ms": [
+            281.25,
+            281.25,
+            281.25
+          ],
+          "peak_working_set_bytes": [
+            16515072,
+            16506880,
+            16510976
+          ],
+          "peak_commit_bytes": [
+            9199616,
+            9195520,
+            9195520
+          ]
+        },
+        "stage_medians": {
+          "initialization": {
+            "completed_samples": 3,
+            "median_wall_ms": 278.3666,
+            "median_cpu_ms": 281.25
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "accepted_objects": 10,
+          "geometry_query_triangle_visits": 13580028,
+          "method": "structured_grid",
+          "orientations_examined": 1,
+          "pairwise_distance_checks": 3150106,
+          "random_draws": 3000000,
+          "reference_accepted_count": 6,
+          "rejected_candidates": 999994,
+          "sampling_attempts": 1000000,
+          "structured_candidates": 10,
+          "surface_intersection_triangle_pairs": 10560
+        },
+        "diagnostic": null,
+        "physically_valid": null,
+        "placements_canonical_sha256": "65b93c2223cf489c1865567ad1689dc6c352f431e1b284020e7b8ee2e61485dd"
+      }
+    },
+    {
+      "id": "dense-36-s12",
+      "case": "init-dense",
+      "before_configuration": {
+        "container_dimensions": [
+          350.0,
+          400.0,
+          285.0
+        ],
+        "cylinder_diameter": 90.46,
+        "cylinder_height": 105.507,
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "initial_volume_scale": 1.0,
+        "max_sampling_attempts": 1000000,
+        "object_count": 36,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "after_configuration": {
+        "container_dimensions": [
+          350.0,
+          400.0,
+          285.0
+        ],
+        "cylinder_diameter": 90.46,
+        "cylinder_height": 105.507,
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "enable_structured_fallback": true,
+        "initial_volume_scale": 1.0,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "object_count": 36,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "meshes": {
+        "container": {
+          "triangles": 12,
+          "vertices": 8
+        },
+        "object": {
+          "triangles": 44,
+          "vertices": 24
+        }
+      },
+      "placements_identical_across_all_six_reports": null,
+      "before": {
+        "statuses": [
+          {
+            "status": "resource_limit",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 278.2885,
+        "median_cpu_ms": 281.25,
+        "median_peak_working_set_bytes": 16543744.0,
+        "median_peak_commit_bytes": 9224192.0,
+        "samples": {
+          "wall_ms": [
+            278.2831,
+            278.2885,
+            278.7132
+          ],
+          "cpu_ms": [
+            281.25,
+            281.25,
+            265.625
+          ],
+          "peak_working_set_bytes": [
+            16556032,
+            16543744,
+            16510976
+          ],
+          "peak_commit_bytes": [
+            9224192,
+            9224192,
+            9183232
+          ]
+        },
+        "stage_medians": {
+          "initialization": {
+            "completed_samples": 3,
+            "median_wall_ms": 278.2702,
+            "median_cpu_ms": 281.25
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": null,
+        "diagnostic": "initial placement exhausted 1000000 candidate attempts after placing 6 of 36 objects",
+        "physically_valid": null,
+        "placements_canonical_sha256": null
+      },
+      "after": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 278.9067,
+        "median_cpu_ms": 281.25,
+        "median_peak_working_set_bytes": 16543744.0,
+        "median_peak_commit_bytes": 9240576.0,
+        "samples": {
+          "wall_ms": [
+            278.8412,
+            278.9067,
+            279.7059
+          ],
+          "cpu_ms": [
+            281.25,
+            281.25,
+            281.25
+          ],
+          "peak_working_set_bytes": [
+            16543744,
+            16515072,
+            16543744
+          ],
+          "peak_commit_bytes": [
+            9244672,
+            9203712,
+            9240576
+          ]
+        },
+        "stage_medians": {
+          "initialization": {
+            "completed_samples": 3,
+            "median_wall_ms": 278.8545,
+            "median_cpu_ms": 281.25
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "accepted_objects": 36,
+          "geometry_query_triangle_visits": 13609980,
+          "method": "structured_grid",
+          "orientations_examined": 2,
+          "pairwise_distance_checks": 3151276,
+          "random_draws": 3000000,
+          "reference_accepted_count": 6,
+          "rejected_candidates": 999994,
+          "sampling_attempts": 1000000,
+          "structured_candidates": 36,
+          "surface_intersection_triangle_pairs": 38016
+        },
+        "diagnostic": null,
+        "physically_valid": null,
+        "placements_canonical_sha256": "6e9916a8e238c84b457662bc704bf2fd84d8b255230ed264124dbb4e7ab8795d"
+      }
+    },
+    {
+      "id": "collision-10-s12",
+      "case": "collision",
+      "before_configuration": {
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "max_sampling_attempts": 1000000,
+        "object_count": 10,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "after_configuration": {
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "enable_structured_fallback": true,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "object_count": 10,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "meshes": {
+        "container": {
+          "triangles": 12,
+          "vertices": 8
+        },
+        "object": {
+          "triangles": 44,
+          "vertices": 24
+        }
+      },
+      "placements_identical_across_all_six_reports": null,
+      "before": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 1.4529,
+        "median_cpu_ms": 0.0,
+        "median_peak_working_set_bytes": 16527360.0,
+        "median_peak_commit_bytes": 9236480.0,
+        "samples": {
+          "wall_ms": [
+            1.4849,
+            1.4529,
+            1.4509
+          ],
+          "cpu_ms": [
+            15.625,
+            0.0,
+            0.0
+          ],
+          "peak_working_set_bytes": [
+            16547840,
+            16527360,
+            16523264
+          ],
+          "peak_commit_bytes": [
+            9269248,
+            9236480,
+            9236480
+          ]
+        },
+        "stage_medians": {
+          "collision": {
+            "completed_samples": 3,
+            "median_wall_ms": 1.4233,
+            "median_cpu_ms": 0.0
+          },
+          "transforms": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0185,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "containment_triangle_visits": 4080,
+          "object_pairs_examined": 45,
+          "triangle_pairs_tested": 92400
+        },
+        "diagnostic": null,
+        "physically_valid": true,
+        "placements_canonical_sha256": null
+      },
+      "after": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 0.1631,
+        "median_cpu_ms": 0.0,
+        "median_peak_working_set_bytes": 16547840.0,
+        "median_peak_commit_bytes": 9256960.0,
+        "samples": {
+          "wall_ms": [
+            0.1765,
+            0.1631,
+            0.1614
+          ],
+          "cpu_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "peak_working_set_bytes": [
+            16547840,
+            16535552,
+            16551936
+          ],
+          "peak_commit_bytes": [
+            9261056,
+            9244672,
+            9256960
+          ]
+        },
+        "stage_medians": {
+          "collision": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.1322,
+            "median_cpu_ms": 0.0
+          },
+          "transforms": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.017,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "containment_triangle_visits": 120,
+          "object_pairs_examined": 45,
+          "triangle_pairs_tested": 5280
+        },
+        "diagnostic": null,
+        "physically_valid": true,
+        "placements_canonical_sha256": null
+      }
+    },
+    {
+      "id": "collision-36-s12",
+      "case": "collision",
+      "before_configuration": {
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "max_sampling_attempts": 1000000,
+        "object_count": 36,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "after_configuration": {
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "enable_structured_fallback": true,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "object_count": 36,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "meshes": {
+        "container": {
+          "triangles": 12,
+          "vertices": 8
+        },
+        "object": {
+          "triangles": 44,
+          "vertices": 24
+        }
+      },
+      "placements_identical_across_all_six_reports": null,
+      "before": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 18.5782,
+        "median_cpu_ms": 15.625,
+        "median_peak_working_set_bytes": 16625664.0,
+        "median_peak_commit_bytes": 9342976.0,
+        "samples": {
+          "wall_ms": [
+            18.5782,
+            18.7069,
+            18.5457
+          ],
+          "cpu_ms": [
+            15.625,
+            15.625,
+            15.625
+          ],
+          "peak_working_set_bytes": [
+            16642048,
+            16605184,
+            16625664
+          ],
+          "peak_commit_bytes": [
+            9359360,
+            9338880,
+            9342976
+          ]
+        },
+        "stage_medians": {
+          "collision": {
+            "completed_samples": 3,
+            "median_wall_ms": 18.4979,
+            "median_cpu_ms": 15.625
+          },
+          "transforms": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0559,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "containment_triangle_visits": 55872,
+          "object_pairs_examined": 630,
+          "triangle_pairs_tested": 1238688
+        },
+        "diagnostic": null,
+        "physically_valid": true,
+        "placements_canonical_sha256": null
+      },
+      "after": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 0.4485,
+        "median_cpu_ms": 0.0,
+        "median_peak_working_set_bytes": 16637952.0,
+        "median_peak_commit_bytes": 9355264.0,
+        "samples": {
+          "wall_ms": [
+            0.4485,
+            0.4523,
+            0.4401
+          ],
+          "cpu_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "peak_working_set_bytes": [
+            16646144,
+            16637952,
+            16621568
+          ],
+          "peak_commit_bytes": [
+            9367552,
+            9355264,
+            9347072
+          ]
+        },
+        "stage_medians": {
+          "collision": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.3643,
+            "median_cpu_ms": 0.0
+          },
+          "transforms": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0572,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "containment_triangle_visits": 432,
+          "object_pairs_examined": 630,
+          "triangle_pairs_tested": 19008
+        },
+        "diagnostic": null,
+        "physically_valid": true,
+        "placements_canonical_sha256": null
+      }
+    },
+    {
+      "id": "collision-100-s12",
+      "case": "collision",
+      "before_configuration": {
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "max_sampling_attempts": 1000000,
+        "object_count": 100,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "after_configuration": {
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "enable_structured_fallback": true,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "object_count": 100,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "meshes": {
+        "container": {
+          "triangles": 12,
+          "vertices": 8
+        },
+        "object": {
+          "triangles": 44,
+          "vertices": 24
+        }
+      },
+      "placements_identical_across_all_six_reports": null,
+      "before": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 144.0279,
+        "median_cpu_ms": 140.625,
+        "median_peak_working_set_bytes": 16850944.0,
+        "median_peak_commit_bytes": 9572352.0,
+        "samples": {
+          "wall_ms": [
+            143.9638,
+            144.1499,
+            144.0279
+          ],
+          "cpu_ms": [
+            140.625,
+            140.625,
+            140.625
+          ],
+          "peak_working_set_bytes": [
+            16850944,
+            16863232,
+            16834560
+          ],
+          "peak_commit_bytes": [
+            9572352,
+            9580544,
+            9564160
+          ]
+        },
+        "stage_medians": {
+          "collision": {
+            "completed_samples": 3,
+            "median_wall_ms": 143.8496,
+            "median_cpu_ms": 140.625
+          },
+          "transforms": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.1209,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "containment_triangle_visits": 436800,
+          "object_pairs_examined": 4950,
+          "triangle_pairs_tested": 9636000
+        },
+        "diagnostic": null,
+        "physically_valid": true,
+        "placements_canonical_sha256": null
+      },
+      "after": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 1.1271,
+        "median_cpu_ms": 0.0,
+        "median_peak_working_set_bytes": 16871424.0,
+        "median_peak_commit_bytes": 9596928.0,
+        "samples": {
+          "wall_ms": [
+            1.1091,
+            1.1271,
+            1.1302
+          ],
+          "cpu_ms": [
+            0.0,
+            0.0,
+            15.625
+          ],
+          "peak_working_set_bytes": [
+            16908288,
+            16859136,
+            16871424
+          ],
+          "peak_commit_bytes": [
+            9637888,
+            9588736,
+            9596928
+          ]
+        },
+        "stage_medians": {
+          "collision": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.9731,
+            "median_cpu_ms": 0.0
+          },
+          "transforms": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.1205,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "containment_triangle_visits": 1200,
+          "object_pairs_examined": 4950,
+          "triangle_pairs_tested": 52800
+        },
+        "diagnostic": null,
+        "physically_valid": true,
+        "placements_canonical_sha256": null
+      }
+    },
+    {
+      "id": "collision-10-s48",
+      "case": "collision",
+      "before_configuration": {
+        "cylinder_segments": 48,
+        "dependency_thread_policy": "unchanged library defaults",
+        "max_sampling_attempts": 1000000,
+        "object_count": 10,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "after_configuration": {
+        "cylinder_segments": 48,
+        "dependency_thread_policy": "unchanged library defaults",
+        "enable_structured_fallback": true,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "object_count": 10,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "meshes": {
+        "container": {
+          "triangles": 12,
+          "vertices": 8
+        },
+        "object": {
+          "triangles": 188,
+          "vertices": 96
+        }
+      },
+      "placements_identical_across_all_six_reports": null,
+      "before": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 23.2644,
+        "median_cpu_ms": 31.25,
+        "median_peak_working_set_bytes": 16723968.0,
+        "median_peak_commit_bytes": 9453568.0,
+        "samples": {
+          "wall_ms": [
+            23.2638,
+            23.313,
+            23.2644
+          ],
+          "cpu_ms": [
+            31.25,
+            31.25,
+            31.25
+          ],
+          "peak_working_set_bytes": [
+            16728064,
+            16723968,
+            16719872
+          ],
+          "peak_commit_bytes": [
+            9453568,
+            9453568,
+            9437184
+          ]
+        },
+        "stage_medians": {
+          "collision": {
+            "completed_samples": 3,
+            "median_wall_ms": 23.1855,
+            "median_cpu_ms": 31.25
+          },
+          "transforms": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0439,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "containment_triangle_visits": 17040,
+          "object_pairs_examined": 45,
+          "triangle_pairs_tested": 1613040
+        },
+        "diagnostic": null,
+        "physically_valid": true,
+        "placements_canonical_sha256": null
+      },
+      "after": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 0.5297,
+        "median_cpu_ms": 0.0,
+        "median_peak_working_set_bytes": 16728064.0,
+        "median_peak_commit_bytes": 9453568.0,
+        "samples": {
+          "wall_ms": [
+            0.5148,
+            0.5297,
+            0.5319
+          ],
+          "cpu_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "peak_working_set_bytes": [
+            16732160,
+            16719872,
+            16728064
+          ],
+          "peak_commit_bytes": [
+            9457664,
+            9445376,
+            9453568
+          ]
+        },
+        "stage_medians": {
+          "collision": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.4478,
+            "median_cpu_ms": 0.0
+          },
+          "transforms": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0451,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "containment_triangle_visits": 120,
+          "object_pairs_examined": 45,
+          "triangle_pairs_tested": 22560
+        },
+        "diagnostic": null,
+        "physically_valid": true,
+        "placements_canonical_sha256": null
+      }
+    },
+    {
+      "id": "collision-10-s96",
+      "case": "collision",
+      "before_configuration": {
+        "cylinder_segments": 96,
+        "dependency_thread_policy": "unchanged library defaults",
+        "max_sampling_attempts": 1000000,
+        "object_count": 10,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "after_configuration": {
+        "cylinder_segments": 96,
+        "dependency_thread_policy": "unchanged library defaults",
+        "enable_structured_fallback": true,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "object_count": 10,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "meshes": {
+        "container": {
+          "triangles": 12,
+          "vertices": 8
+        },
+        "object": {
+          "triangles": 380,
+          "vertices": 192
+        }
+      },
+      "placements_identical_across_all_six_reports": null,
+      "before": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 93.7278,
+        "median_cpu_ms": 93.75,
+        "median_peak_working_set_bytes": 16887808.0,
+        "median_peak_commit_bytes": 9728000.0,
+        "samples": {
+          "wall_ms": [
+            93.7971,
+            93.7278,
+            93.1632
+          ],
+          "cpu_ms": [
+            93.75,
+            93.75,
+            78.125
+          ],
+          "peak_working_set_bytes": [
+            16879616,
+            16887808,
+            16900096
+          ],
+          "peak_commit_bytes": [
+            9715712,
+            9728000,
+            9736192
+          ]
+        },
+        "stage_medians": {
+          "collision": {
+            "completed_samples": 3,
+            "median_wall_ms": 93.6089,
+            "median_cpu_ms": 93.75
+          },
+          "transforms": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0728,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "containment_triangle_visits": 34320,
+          "object_pairs_examined": 45,
+          "triangle_pairs_tested": 6543600
+        },
+        "diagnostic": null,
+        "physically_valid": true,
+        "placements_canonical_sha256": null
+      },
+      "after": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 1.1332,
+        "median_cpu_ms": 0.0,
+        "median_peak_working_set_bytes": 16887808.0,
+        "median_peak_commit_bytes": 9719808.0,
+        "samples": {
+          "wall_ms": [
+            1.0848,
+            1.1543,
+            1.1332
+          ],
+          "cpu_ms": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "peak_working_set_bytes": [
+            16887808,
+            16941056,
+            16887808
+          ],
+          "peak_commit_bytes": [
+            9711616,
+            9773056,
+            9719808
+          ]
+        },
+        "stage_medians": {
+          "collision": {
+            "completed_samples": 3,
+            "median_wall_ms": 1.0159,
+            "median_cpu_ms": 0.0
+          },
+          "transforms": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0749,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "containment_triangle_visits": 120,
+          "object_pairs_examined": 45,
+          "triangle_pairs_tested": 45600
+        },
+        "diagnostic": null,
+        "physically_valid": true,
+        "placements_canonical_sha256": null
+      }
+    },
+    {
+      "id": "stages",
+      "case": "stages",
+      "before_configuration": {
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "description": "one independently measured local growth pipeline; not an engine run",
+        "max_sampling_attempts": 1000000,
+        "object_count": 1,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "after_configuration": {
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "description": "one independently measured local growth pipeline; not an engine run",
+        "enable_structured_fallback": true,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "object_count": 1,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "meshes": {
+        "container": {
+          "triangles": 48,
+          "vertices": 26
+        },
+        "object": {
+          "triangles": 16,
+          "vertices": 10
+        }
+      },
+      "placements_identical_across_all_six_reports": null,
+      "before": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 18.6552,
+        "median_cpu_ms": 250.0,
+        "median_peak_working_set_bytes": 25522176.0,
+        "median_peak_commit_bytes": 22601728.0,
+        "samples": {
+          "wall_ms": [
+            19.073,
+            18.5913,
+            18.6552
+          ],
+          "cpu_ms": [
+            15.625,
+            250.0,
+            265.625
+          ],
+          "peak_working_set_bytes": [
+            25456640,
+            25522176,
+            25608192
+          ],
+          "peak_commit_bytes": [
+            22573056,
+            22601728,
+            22851584
+          ]
+        },
+        "stage_medians": {
+          "cat": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0776,
+            "median_cpu_ms": 0.0
+          },
+          "collision": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0302,
+            "median_cpu_ms": 0.0
+          },
+          "constraint_and_analytic_gradient": {
+            "completed_samples": 3,
+            "median_wall_ms": 2.2442,
+            "median_cpu_ms": 0.0
+          },
+          "ipopt_solve": {
+            "completed_samples": 3,
+            "median_wall_ms": 13.8597,
+            "median_cpu_ms": 234.375
+          },
+          "resampling": {
+            "completed_samples": 3,
+            "median_wall_ms": 1.1033,
+            "median_cpu_ms": 0.0
+          },
+          "stl_serialization": {
+            "completed_samples": 3,
+            "median_wall_ms": 1.1978,
+            "median_cpu_ms": 0.0
+          },
+          "tetrahedralization": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.1323,
+            "median_cpu_ms": 0.0
+          },
+          "transforms": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0058,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "cat_constraints": 376,
+          "collision": {
+            "containment_triangle_visits": 48,
+            "object_pairs_examined": 0,
+            "triangle_pairs_tested": 768
+          },
+          "constraint_checksum": 14170.532357972188,
+          "solver_constraint_rows": 1560,
+          "solver_iterations": 7,
+          "solver_jacobian_entries": 9828,
+          "standalone_constraint_rows": 15600,
+          "tetrahedra": 107
+        },
+        "diagnostic": null,
+        "physically_valid": true,
+        "placements_canonical_sha256": null
+      },
+      "after": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 20.3143,
+        "median_cpu_ms": 250.0,
+        "median_peak_working_set_bytes": 25575424.0,
+        "median_peak_commit_bytes": 22675456.0,
+        "samples": {
+          "wall_ms": [
+            20.3143,
+            20.1019,
+            20.5076
+          ],
+          "cpu_ms": [
+            15.625,
+            250.0,
+            265.625
+          ],
+          "peak_working_set_bytes": [
+            25563136,
+            25575424,
+            25575424
+          ],
+          "peak_commit_bytes": [
+            22679552,
+            22622208,
+            22675456
+          ]
+        },
+        "stage_medians": {
+          "cat": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0764,
+            "median_cpu_ms": 0.0
+          },
+          "collision": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0394,
+            "median_cpu_ms": 0.0
+          },
+          "constraint_and_analytic_gradient": {
+            "completed_samples": 3,
+            "median_wall_ms": 2.2566,
+            "median_cpu_ms": 0.0
+          },
+          "ipopt_solve": {
+            "completed_samples": 3,
+            "median_wall_ms": 15.1856,
+            "median_cpu_ms": 250.0
+          },
+          "resampling": {
+            "completed_samples": 3,
+            "median_wall_ms": 1.1208,
+            "median_cpu_ms": 0.0
+          },
+          "stl_serialization": {
+            "completed_samples": 3,
+            "median_wall_ms": 1.2146,
+            "median_cpu_ms": 0.0
+          },
+          "tetrahedralization": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.1436,
+            "median_cpu_ms": 0.0
+          },
+          "transforms": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0063,
+            "median_cpu_ms": 0.0
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "cat_constraints": 376,
+          "collision": {
+            "containment_triangle_visits": 48,
+            "object_pairs_examined": 0,
+            "triangle_pairs_tested": 768
+          },
+          "constraint_checksum": 14170.532357972188,
+          "solver_constraint_rows": 1560,
+          "solver_iterations": 7,
+          "solver_jacobian_entries": 9828,
+          "standalone_constraint_rows": 15600,
+          "tetrahedra": 107
+        },
+        "diagnostic": null,
+        "physically_valid": true,
+        "placements_canonical_sha256": null
+      }
+    },
+    {
+      "id": "growth",
+      "case": "growth",
+      "before_configuration": {
+        "adaptive_sampling": true,
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "final_volume_scale": 0.2,
+        "initial_volume_scale": 0.1,
+        "max_iterations_per_scale_step": 4,
+        "max_sampling_attempts": 1000000,
+        "object_count": 1,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "after_configuration": {
+        "adaptive_sampling": true,
+        "cylinder_segments": 12,
+        "dependency_thread_policy": "unchanged library defaults",
+        "enable_structured_fallback": true,
+        "final_volume_scale": 0.2,
+        "initial_volume_scale": 0.1,
+        "max_iterations_per_scale_step": 4,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "object_count": 1,
+        "orchestration_threads": 1,
+        "seed": 1918,
+        "timeout_ms": 10000
+      },
+      "meshes": {
+        "container": {
+          "triangles": 12,
+          "vertices": 8
+        },
+        "object": {
+          "triangles": 4,
+          "vertices": 4
+        }
+      },
+      "placements_identical_across_all_six_reports": true,
+      "before": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 47.6749,
+        "median_cpu_ms": 515.625,
+        "median_peak_working_set_bytes": 27422720.0,
+        "median_peak_commit_bytes": 30466048.0,
+        "samples": {
+          "wall_ms": [
+            60.1717,
+            47.6749,
+            47.6501
+          ],
+          "cpu_ms": [
+            500.0,
+            562.5,
+            515.625
+          ],
+          "peak_working_set_bytes": [
+            27430912,
+            27340800,
+            27422720
+          ],
+          "peak_commit_bytes": [
+            30539776,
+            30412800,
+            30466048
+          ]
+        },
+        "stage_medians": {
+          "initialization": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0295,
+            "median_cpu_ms": 0.0
+          },
+          "packing_engine": {
+            "completed_samples": 3,
+            "median_wall_ms": 47.6206,
+            "median_cpu_ms": 515.625
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "cat_builds": 1,
+          "collision": {
+            "containment_triangle_visits": 24,
+            "object_pairs_examined": 0,
+            "triangle_pairs_tested": 3664
+          },
+          "constraint_rows_evaluated": 12600,
+          "iterations": 1,
+          "jacobian_entries_evaluated": 75600,
+          "local_solves": 1,
+          "resamples": 2,
+          "solver_iterations": 10,
+          "tetgen_calls": 1
+        },
+        "diagnostic": "packing completed successfully",
+        "physically_valid": true,
+        "placements_canonical_sha256": "28b9bcd7f90350d977b0fe29c30bb79563e402c3f3e2e7aa03f02d7cb1d89ca9"
+      },
+      "after": {
+        "statuses": [
+          {
+            "status": "success",
+            "count": 3
+          }
+        ],
+        "median_wall_ms": 52.347,
+        "median_cpu_ms": 765.625,
+        "median_peak_working_set_bytes": 27299840.0,
+        "median_peak_commit_bytes": 30384128.0,
+        "samples": {
+          "wall_ms": [
+            52.347,
+            51.2864,
+            53.1756
+          ],
+          "cpu_ms": [
+            765.625,
+            765.625,
+            515.625
+          ],
+          "peak_working_set_bytes": [
+            27283456,
+            27443200,
+            27299840
+          ],
+          "peak_commit_bytes": [
+            30351360,
+            30482432,
+            30384128
+          ]
+        },
+        "stage_medians": {
+          "initialization": {
+            "completed_samples": 3,
+            "median_wall_ms": 0.0294,
+            "median_cpu_ms": 0.0
+          },
+          "packing_engine": {
+            "completed_samples": 3,
+            "median_wall_ms": 52.2814,
+            "median_cpu_ms": 765.625
+          }
+        },
+        "work_identical_across_repeats": true,
+        "work": {
+          "cat_builds": 1,
+          "collision": {
+            "containment_triangle_visits": 24,
+            "object_pairs_examined": 0,
+            "triangle_pairs_tested": 3664
+          },
+          "constraint_rows_evaluated": 12600,
+          "iterations": 1,
+          "jacobian_entries_evaluated": 75600,
+          "local_solves": 1,
+          "resamples": 2,
+          "solver_iterations": 10,
+          "tetgen_calls": 1
+        },
+        "diagnostic": "packing completed successfully",
+        "physically_valid": true,
+        "placements_canonical_sha256": "28b9bcd7f90350d977b0fe29c30bb79563e402c3f3e2e7aa03f02d7cb1d89ca9"
+      }
+    }
+  ],
+  "actual_input_validation": {
+    "scope": "single smoke runs; independent of the 66 generated benchmark process samples",
+    "inputs": {
+      "object": {
+        "path": "rc/input_models/ulamok_2kg_simplified.stl",
+        "vertices": 386,
+        "triangles": 768,
+        "sha256": "39bcc1c3a5849176fc83473ce191ec5106854ea68836aed412c7c93b11b5bb7e"
+      },
+      "container": {
+        "path": "rc/containers/10_kg_np.stl",
+        "vertices": 8,
+        "triangles": 12,
+        "sha256": "357e06464e7190e9c53d1263985ee507842b760302a061c719986431eea53c1a"
+      }
+    },
+    "successful_runs": [
+      {
+        "source_summary": "build/manual-m7-exact-ten/run-summary.json",
+        "command": "pack",
+        "configuration": {
+          "object_count": 10,
+          "initial_volume_scale": 1.0,
+          "final_volume_scale": 1.0,
+          "seed": 1918,
+          "max_sampling_attempts": 1000000,
+          "adaptive_sampling": false,
+          "scale_step_count": 1
+        },
+        "outcome": {
+          "category": "success",
+          "diagnostic": "packing completed successfully"
+        },
+        "initialization": {
+          "geometry_query_triangle_visits": 13753752,
+          "initial_linear_scale": 1.0,
+          "method": "structured_grid",
+          "minimum_boundary_clearance": null,
+          "minimum_center_distance": null,
+          "orientations_examined": 1,
+          "pairwise_distance_checks": 3150090,
+          "policy": "structured-aabb-grid",
+          "random_draw_count": 3000000,
+          "random_generator": "numpy-legacy-mt19937-compatible",
+          "reference_accepted_count": 6,
+          "rejected_candidate_count": 999994,
+          "sampling_attempts": 1000000,
+          "structured_candidates": 10,
+          "surface_intersection_triangle_pairs": 184320
+        },
+        "metrics": {
+          "maximum_volume_scale": 1.0,
+          "mean_volume_scale": 1.0,
+          "minimum_volume_scale": 1.0,
+          "object_count": 10,
+          "objects_at_final_target": 10,
+          "packed_object_volume": 6770014.322373023,
+          "packing_fraction": 0.16967454442037652,
+          "target_volume_scale": 1.0
+        },
+        "validation": {
+          "cat_violation_object_ids": [],
+          "container_violation_object_ids": [],
+          "object_collisions": [],
+          "physical_scene_valid": true,
+          "status": "passed",
+          "work": {
+            "containment_triangle_visits": 120,
+            "object_pairs_examined": 45,
+            "triangle_pairs_tested": 92160
+          }
+        },
+        "packing_iteration_count": 0,
+        "local_solve_count": 0,
+        "tetrahedralization_attempt_count": 0,
+        "artifacts": [
+          "container.stl",
+          "packed-objects.stl",
+          "placements.json",
+          "run-summary.json"
+        ],
+        "timings_seconds_single_run": {
+          "artifact_preparation_seconds": 0.0114506,
+          "initialization_seconds": 0.2247223,
+          "packing_seconds": 0.0055519
+        }
+      },
+      {
+        "source_summary": "build/manual-m7-exact-36/run-summary.json",
+        "command": "pack",
+        "configuration": {
+          "object_count": 36,
+          "initial_volume_scale": 1.0,
+          "final_volume_scale": 1.0,
+          "seed": 1918,
+          "max_sampling_attempts": 1000000,
+          "adaptive_sampling": false,
+          "scale_step_count": 1
+        },
+        "outcome": {
+          "category": "success",
+          "diagnostic": "packing completed successfully"
+        },
+        "initialization": {
+          "geometry_query_triangle_visits": 14235480,
+          "initial_linear_scale": 1.0,
+          "method": "structured_grid",
+          "minimum_boundary_clearance": null,
+          "minimum_center_distance": null,
+          "orientations_examined": 2,
+          "pairwise_distance_checks": 3151260,
+          "policy": "structured-aabb-grid",
+          "random_draw_count": 3000000,
+          "random_generator": "numpy-legacy-mt19937-compatible",
+          "reference_accepted_count": 6,
+          "rejected_candidate_count": 999994,
+          "sampling_attempts": 1000000,
+          "structured_candidates": 36,
+          "surface_intersection_triangle_pairs": 663552
+        },
+        "metrics": {
+          "maximum_volume_scale": 1.0,
+          "mean_volume_scale": 1.0,
+          "minimum_volume_scale": 1.0,
+          "object_count": 36,
+          "objects_at_final_target": 36,
+          "packed_object_volume": 24372051.56054288,
+          "packing_fraction": 0.6108283599133554,
+          "target_volume_scale": 1.0
+        },
+        "validation": {
+          "cat_violation_object_ids": [],
+          "container_violation_object_ids": [],
+          "object_collisions": [],
+          "physical_scene_valid": true,
+          "status": "passed",
+          "work": {
+            "containment_triangle_visits": 432,
+            "object_pairs_examined": 630,
+            "triangle_pairs_tested": 331776
+          }
+        },
+        "packing_iteration_count": 0,
+        "local_solve_count": 0,
+        "tetrahedralization_attempt_count": 0,
+        "artifacts": [
+          "container.stl",
+          "packed-objects.stl",
+          "placements.json",
+          "run-summary.json"
+        ],
+        "timings_seconds_single_run": {
+          "artifact_preparation_seconds": 0.0141794,
+          "initialization_seconds": 0.2241951,
+          "packing_seconds": 0.0145715
+        }
+      },
+      {
+        "source_summary": "build/manual-m7-initialize-ten/run-summary.json",
+        "command": "initialize",
+        "configuration": {
+          "object_count": 10,
+          "initial_volume_scale": 1.0,
+          "final_volume_scale": null,
+          "seed": 1918,
+          "max_sampling_attempts": 100,
+          "adaptive_sampling": null,
+          "scale_step_count": null
+        },
+        "outcome": {
+          "category": "success"
+        },
+        "initialization": {
+          "geometry_query_triangle_visits": 187044,
+          "initial_linear_scale": 1.0,
+          "method": "structured_grid",
+          "minimum_boundary_clearance": null,
+          "minimum_center_distance": null,
+          "orientations_examined": 1,
+          "pairwise_distance_checks": 269,
+          "policy": "structured-aabb-grid",
+          "random_draw_count": 300,
+          "random_generator": "numpy-legacy-mt19937-compatible",
+          "reference_accepted_count": 3,
+          "rejected_candidate_count": 97,
+          "sampling_attempts": 100,
+          "structured_candidates": 10,
+          "surface_intersection_triangle_pairs": 184320
+        },
+        "metrics": null,
+        "validation": null,
+        "packing_iteration_count": null,
+        "local_solve_count": null,
+        "tetrahedralization_attempt_count": null,
+        "artifacts": [
+          "container.stl",
+          "initialized-objects.stl",
+          "placements.json",
+          "run-summary.json"
+        ],
+        "timings_seconds_single_run": {
+          "artifact_preparation_seconds": 0.0088971,
+          "initialization_seconds": 0.0057646
+        }
+      }
+    ],
+    "reference_only": {
+      "source_log": "build/manual-m7-reference-disabled.log",
+      "object_count": 10,
+      "initial_volume_scale": 1.0,
+      "final_volume_scale": 1.0,
+      "seed": 1918,
+      "max_sampling_attempts": 1000000,
+      "enable_structured_fallback": false,
+      "status": "resource_limit",
+      "exit_code_observed_by_runner": 4,
+      "accepted_count_from_diagnostic": 6,
+      "output_directory_published": false
+    }
+  }
+}

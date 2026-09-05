@@ -100,7 +100,8 @@ void accumulate(SceneCollisionWork& destination, const SceneCollisionWork& sourc
 [[nodiscard]] SceneCollisionLimits remaining_collision_limits(const SceneCollisionWork& consumed,
                                                               const SceneCollisionLimits& configured)
 {
-    if (consumed.triangle_pairs_tested >= configured.max_triangle_pair_tests ||
+    if (consumed.object_pairs_examined >= configured.max_object_pair_checks ||
+        consumed.triangle_pairs_tested >= configured.max_triangle_pair_tests ||
         consumed.containment_triangle_visits >= configured.max_containment_triangle_visits) {
         throw Error(ErrorCategory::resource_limit, "packing total collision-validation work limit was exhausted");
     }
@@ -109,6 +110,7 @@ void accumulate(SceneCollisionWork& destination, const SceneCollisionWork& sourc
         .max_containment_triangle_visits =
             configured.max_containment_triangle_visits - consumed.containment_triangle_visits,
         .max_reported_violations = configured.max_reported_violations,
+        .max_object_pair_checks = configured.max_object_pair_checks - consumed.object_pairs_examined,
     };
 }
 
@@ -509,7 +511,7 @@ void validate_packing_algorithm_config(const double initial_scale, const Packing
         limits.local_solve.max_jacobian_entries_evaluated == 0 || limits.local_solve.max_iterations == 0 ||
         limits.local_solve.max_elapsed_time <= std::chrono::milliseconds::zero() ||
         limits.collision.max_triangle_pair_tests == 0 || limits.collision.max_containment_triangle_visits == 0 ||
-        limits.collision.max_reported_violations == 0) {
+        limits.collision.max_reported_violations == 0 || limits.collision.max_object_pair_checks == 0) {
         throw Error(ErrorCategory::invalid_configuration, "packing engine limits must be positive");
     }
 

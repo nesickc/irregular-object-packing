@@ -1,5 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 #include "irop/error.hpp"
@@ -33,8 +35,8 @@ TEST_CASE("scene collision validation accepts separated contained closed objects
     CHECK(report.container_violation_object_ids.empty());
     CHECK(report.object_collisions.empty());
     CHECK(report.work.object_pairs_examined == 1);
-    CHECK(report.work.triangle_pairs_tested == 432);
-    CHECK(report.work.containment_triangle_visits == 48);
+    CHECK(report.work.triangle_pairs_tested == 288);
+    CHECK(report.work.containment_triangle_visits == 24);
 }
 
 TEST_CASE("scene collision validation reports crossing touching and nested object solids")
@@ -54,13 +56,20 @@ TEST_CASE("scene collision validation reports crossing touching and nested objec
 
     SECTION("surface contact")
     {
-        const std::vector<irop::TriangleMesh> objects {
-            irop::test::cube_mesh(1.0),
-            translated(irop::test::cube_mesh(1.0), 2.0),
-        };
-        const irop::SceneCollisionReport report = irop::validate_scene_collisions(objects, container);
-        REQUIRE(report.object_collisions.size() == 1);
-        CHECK((report.object_collisions.front() == irop::ObjectCollisionPair { 0, 1 }));
+        for (const irop::Point3 offset : {
+                 irop::Point3 { 2.0, 0.0, 0.0 },
+                  irop::Point3 { 2.0, 2.0, 0.0 },
+                  irop::Point3 { 2.0, 2.0, 2.0 }
+        }) {
+            CAPTURE(offset.x, offset.y, offset.z);
+            const std::vector<irop::TriangleMesh> objects {
+                irop::test::cube_mesh(1.0),
+                translated(irop::test::cube_mesh(1.0), offset.x, offset.y, offset.z),
+            };
+            const irop::SceneCollisionReport report = irop::validate_scene_collisions(objects, container);
+            REQUIRE(report.object_collisions.size() == 1);
+            CHECK((report.object_collisions.front() == irop::ObjectCollisionPair { 0, 1 }));
+        }
     }
 
     SECTION("nested solids without surface contact")
@@ -126,15 +135,83 @@ TEST_CASE("scene collision validation reports deterministic pair order")
 {
     const std::vector<irop::TriangleMesh> objects {
         irop::test::cube_mesh(3.0),
+        translated(irop::test::cube_mesh(0.25), 5.0),
         irop::test::cube_mesh(2.0),
         irop::test::cube_mesh(1.0),
     };
     const irop::SceneCollisionReport report = irop::validate_scene_collisions(objects, irop::test::cube_mesh(10.0));
 
     REQUIRE(report.object_collisions.size() == 3);
-    CHECK((report.object_collisions[0] == irop::ObjectCollisionPair { 0, 1 }));
-    CHECK((report.object_collisions[1] == irop::ObjectCollisionPair { 0, 2 }));
-    CHECK((report.object_collisions[2] == irop::ObjectCollisionPair { 1, 2 }));
+    CHECK((report.object_collisions[0] == irop::ObjectCollisionPair { 0, 2 }));
+    CHECK((report.object_collisions[1] == irop::ObjectCollisionPair { 0, 3 }));
+    CHECK((report.object_collisions[2] == irop::ObjectCollisionPair { 2, 3 }));
+    CHECK(report.work.object_pairs_examined == 6);
+}
+
+TEST_CASE("scene collision broad phase skips separated objects within exact narrow-phase budgets")
+{
+    std::vector<irop::TriangleMesh> objects;
+    for (const double x : { -2.0, 0.0, 2.0 }) {
+        for (const double y : { -2.0, 0.0, 2.0 }) {
+            for (const double z : { -2.0, 0.0, 2.0 }) {
+                objects.push_back(translated(irop::test::cube_mesh(0.25), x, y, z));
+            }
+        }
+    }
+
+    irop::SceneCollisionLimits limits;
+    limits.max_object_pair_checks = 351;
+    limits.max_triangle_pair_tests = 27 * 144;
+    limits.max_containment_triangle_visits = 27 * 12;
+    const irop::SceneCollisionReport report =
+        irop::validate_scene_collisions(objects, irop::test::cube_mesh(5.0), {}, limits);
+
+    CHECK(report.physical_scene_valid());
+    CHECK(report.work.object_pairs_examined == 351);
+    CHECK(report.work.triangle_pairs_tested == 27 * 144);
+    CHECK(report.work.containment_triangle_visits == 27 * 12);
+}
+
+TEST_CASE("scene collision broad phase retains representable gaps on each axis")
+{
+    const double separation = std::nextafter(2.0, 3.0);
+    for (const irop::Point3 offset : {
+             irop::Point3 { separation,  0.0,         0.0         },
+             irop::Point3 { -separation, 0.0,         0.0         },
+             irop::Point3 { 0.0,         separation,  0.0         },
+             irop::Point3 { 0.0,         -separation, 0.0         },
+             irop::Point3 { 0.0,         0.0,         separation  },
+             irop::Point3 { 0.0,         0.0,         -separation },
+    }) {
+        CAPTURE(offset.x, offset.y, offset.z);
+        const std::vector<irop::TriangleMesh> objects {
+            irop::test::cube_mesh(1.0),
+            translated(irop::test::cube_mesh(1.0), offset.x, offset.y, offset.z),
+        };
+        irop::SceneCollisionLimits limits;
+        limits.max_triangle_pair_tests = 288;
+        limits.max_containment_triangle_visits = 24;
+        const irop::SceneCollisionReport report =
+            irop::validate_scene_collisions(objects, irop::test::cube_mesh(5.0), {}, limits);
+        CHECK(report.physical_scene_valid());
+        CHECK(report.work.object_pairs_examined == 1);
+        CHECK(report.work.triangle_pairs_tested == 288);
+        CHECK(report.work.containment_triangle_visits == 24);
+    }
+}
+
+TEST_CASE("scene collision broad phase leaves overlapping bounds to the narrow phase")
+{
+    const std::vector<irop::TriangleMesh> objects {
+        irop::test::tetrahedron_mesh(),
+        translated(irop::test::tetrahedron_mesh(), 0.75, 0.75, 0.75),
+    };
+    const irop::SceneCollisionReport report = irop::validate_scene_collisions(objects, irop::test::cube_mesh(5.0));
+
+    CHECK(report.physical_scene_valid());
+    CHECK(report.work.object_pairs_examined == 1);
+    CHECK(report.work.triangle_pairs_tested == 2 * 4 * 12 + 4 * 4);
+    CHECK(report.work.containment_triangle_visits == 2 * 12 + 2 * 4);
 }
 
 TEST_CASE("scene collision validation enforces cumulative work limits")
@@ -169,16 +246,36 @@ TEST_CASE("scene collision validation enforces cumulative work limits")
             translated(irop::test::cube_mesh(0.5), 1.0),
         };
         irop::SceneCollisionLimits limits;
-        limits.max_triangle_pair_tests = 431;
+        limits.max_triangle_pair_tests = 287;
         irop::test::require_error_category([&]() {
             static_cast<void>(irop::validate_scene_collisions(separated_objects, container, {}, limits));
         }, irop::ErrorCategory::resource_limit);
 
-        limits.max_triangle_pair_tests = 432;
+        limits.max_triangle_pair_tests = 288;
         const irop::SceneCollisionReport report =
             irop::validate_scene_collisions(separated_objects, container, {}, limits);
         CHECK(report.physical_scene_valid());
-        CHECK(report.work.triangle_pairs_tested == 432);
+        CHECK(report.work.triangle_pairs_tested == 288);
+    }
+
+    SECTION("broad-phase rejections consume the object-pair budget")
+    {
+        const std::vector<irop::TriangleMesh> separated_objects {
+            translated(irop::test::cube_mesh(0.25), -1.0),
+            irop::test::cube_mesh(0.25),
+            translated(irop::test::cube_mesh(0.25), 1.0),
+        };
+        irop::SceneCollisionLimits limits;
+        limits.max_object_pair_checks = 2;
+        irop::test::require_error_category([&]() {
+            static_cast<void>(irop::validate_scene_collisions(separated_objects, container, {}, limits));
+        }, irop::ErrorCategory::resource_limit);
+
+        limits.max_object_pair_checks = 3;
+        const irop::SceneCollisionReport report =
+            irop::validate_scene_collisions(separated_objects, container, {}, limits);
+        CHECK(report.physical_scene_valid());
+        CHECK(report.work.object_pairs_examined == 3);
     }
 
     SECTION("containment visit budget")
@@ -243,6 +340,25 @@ TEST_CASE("scene collision validation rejects invalid inputs and limits")
         const std::vector<irop::TriangleMesh> open_objects { open };
         irop::test::require_error_category([&]() {
             static_cast<void>(irop::validate_scene_collisions(open_objects, container));
+        }, irop::ErrorCategory::invalid_mesh);
+    }
+
+    SECTION("zero object-pair limit")
+    {
+        irop::SceneCollisionLimits limits;
+        limits.max_object_pair_checks = 0;
+        irop::test::require_error_category([&]() {
+            static_cast<void>(irop::validate_scene_collisions(objects, container, {}, limits));
+        }, irop::ErrorCategory::invalid_configuration);
+    }
+
+    SECTION("separated objects are validated before broad-phase rejection")
+    {
+        irop::TriangleMesh malformed = translated(irop::test::cube_mesh(0.5), 100.0);
+        malformed.vertices.front().x = std::numeric_limits<double>::infinity();
+        const std::vector<irop::TriangleMesh> malformed_objects { objects.front(), malformed };
+        irop::test::require_error_category([&]() {
+            static_cast<void>(irop::validate_scene_collisions(malformed_objects, container));
         }, irop::ErrorCategory::invalid_mesh);
     }
 

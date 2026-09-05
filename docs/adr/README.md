@@ -28,6 +28,7 @@ Accepted ADRs are immutable apart from typo fixes and explicit amendment notes. 
 | [0010](0010-ipopt-3-14-19-official-windows-binary-adapter.md) | Accepted | Package official Ipopt 3.14.19 Windows binaries behind a private C adapter and binary-release gate |
 | [0011](0011-milestone-5-packing-outcome-and-artifact-contract.md) | Accepted | Bound the end-to-end packing loop and atomically distinguish successful artifacts from structured unsuccessful summaries |
 | [0012](0012-transform-consistent-barrier-bounded-local-solves.md) | Accepted | Compose local rotations exactly and bound scale optimization near the active barrier |
+| [0013](0013-bounded-structured-initialization-and-collision-broad-phase.md) | Accepted | Preserve successful seeded initialization, add a bounded structured fallback, and skip separated collision pairs with an explicit pair-work bound |
 
 Use [0000-template.md](0000-template.md) for new records.
 

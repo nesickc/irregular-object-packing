@@ -144,6 +144,13 @@ void log_error_noexcept(const char* category, const char* message) noexcept
         ->add_option("--max-sampling-attempts", initialization_options.packing.max_sampling_attempts,
                      "Maximum candidate centers sampled across the run")
         ->check(CLI::PositiveNumber);
+    initialize_command->add_flag("!--no-initialization-fallback",
+                                 initialization_options.packing.enable_structured_fallback,
+                                 "Disable structured placement after random sampling exhausts its attempt limit");
+    initialize_command
+        ->add_option("--max-structured-candidates", initialization_options.packing.max_structured_candidates,
+                     "Maximum candidate placements across all structured fallback orientations")
+        ->check(CLI::PositiveNumber);
     initialize_command
         ->add_option("--max-geometry-query-triangle-visits",
                      initialization_options.packing.max_geometry_query_triangle_visits,
@@ -151,7 +158,7 @@ void log_error_noexcept(const char* category, const char* message) noexcept
         ->check(CLI::PositiveNumber);
     initialize_command
         ->add_option("--max-pairwise-distance-checks", initialization_options.packing.max_pairwise_distance_checks,
-                     "Maximum center-to-center distance checks across initialization")
+                     "Maximum center-distance or structured-envelope separation checks across initialization")
         ->check(CLI::PositiveNumber);
     initialize_command
         ->add_option("--max-surface-intersection-triangle-pairs",
@@ -258,6 +265,12 @@ void log_error_noexcept(const char* category, const char* message) noexcept
         ->add_option("--max-sampling-attempts", pack_options.initialization.max_sampling_attempts,
                      "Maximum initialization candidate samples")
         ->check(CLI::PositiveNumber);
+    pack_command->add_flag("!--no-initialization-fallback", pack_options.initialization.enable_structured_fallback,
+                           "Disable structured placement after random sampling exhausts its attempt limit");
+    pack_command
+        ->add_option("--max-structured-candidates", pack_options.initialization.max_structured_candidates,
+                     "Maximum candidate placements across all structured fallback orientations")
+        ->check(CLI::PositiveNumber);
     pack_command
         ->add_option("--max-geometry-query-triangle-visits",
                      pack_options.initialization.max_geometry_query_triangle_visits,
@@ -265,12 +278,16 @@ void log_error_noexcept(const char* category, const char* message) noexcept
         ->check(CLI::PositiveNumber);
     pack_command
         ->add_option("--max-pairwise-distance-checks", pack_options.initialization.max_pairwise_distance_checks,
-                     "Maximum center-to-center distance checks across initialization")
+                     "Maximum center-distance or structured-envelope separation checks across initialization")
         ->check(CLI::PositiveNumber);
     pack_command
         ->add_option("--max-surface-intersection-triangle-pairs",
                      pack_options.initialization.max_surface_intersection_triangle_pairs,
                      "Maximum initialization surface-intersection triangle-pair tests")
+        ->check(CLI::PositiveNumber);
+    pack_command
+        ->add_option("--max-collision-object-pair-checks", pack_options.limits.collision.max_object_pair_checks,
+                     "Maximum object-pair checks across packing and output validation")
         ->check(CLI::PositiveNumber);
     pack_command
         ->add_option("--max-correction-passes", pack_options.limits.max_correction_passes_per_iteration,

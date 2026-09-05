@@ -10,6 +10,7 @@ add_executable(
     diagnostic_geometry_tests.cpp
     initialization_scene_tests.cpp
     initialization_tests.cpp
+    structured_initialization_tests.cpp
     inspection_tests.cpp
     local_solver_tests.cpp
     mesh_geometry_tests.cpp

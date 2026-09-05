@@ -41,3 +41,22 @@ Use this reference for profiling, benchmarks, memory work, parallelism, collisio
 Record input meshes, object count, configuration, seed, thread count, build configuration, compiler, dependency versions, and machine characteristics. Keep representative benchmarks small enough to run deliberately. Do not put long-running performance cases in the ordinary unit-test path.
 
 Update `docs/STATUS.md` with before/after evidence and add an ADR when adopting a new scaling architecture such as aggregation or spatial subdivision.
+
+## Existing Windows Benchmark Workflow
+
+Use the checked-in optional harness and runner before adding measurement tools:
+
+```powershell
+cmake --preset windows-vs2026 -DIROP_BUILD_BENCHMARKS=ON
+cmake --build --preset windows-vs2026-release --target irop_benchmarks
+./benchmarks/run-windows.ps1 -Executable build/windows-vs2026/benchmarks/Release/irop_benchmarks.exe -OutputDirectory build/benchmarks/measurement -Repeats 3 -Label measurement
+```
+
+Use a new output directory per matrix. Reconfigure after changing measured source
+so the recorded source hashes match the build. Read `benchmarks/README.md` for the
+bounded case modes and `docs/MILESTONE_7_RESULTS.md` for the existing baseline.
+Preserve baseline production source while building its measurement executable;
+disabling initialization fallback in a new binary does not restore old collision
+code. Compare outcomes, exact successful seeded placements/RNG, and work alongside
+median timing. Retain process peak-memory and CPU-resolution caveats, and keep
+performance thresholds out of ordinary correctness tests.

@@ -213,6 +213,8 @@ TEST_CASE("parity corpus preserves the dense Python greedy prefix and bounds its
         DYNAMIC_SECTION("count " << failure.at("object_count").get<std::uint64_t>())
         {
             irop::PackingConfig failure_config = success_config;
+            // Keep the historical failure oracle explicit when the Milestone 7 fallback is enabled by default.
+            failure_config.enable_structured_fallback = false;
             CHECK(failure.at("expected_placed_count") == accepted_prefix.at("object_count"));
             failure_config.object_count = failure.at("object_count").get<std::uint64_t>();
             failure_config.max_sampling_attempts = failure.at("max_sampling_attempts").get<std::uint64_t>();

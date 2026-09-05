@@ -7,9 +7,10 @@ Visual Studio 2026, CMake, MSVC, and the pinned vcpkg manifest. Milestone 6 is
 implemented and its local Python/C++ parity, robustness, static-analysis,
 source-release, and notice gates pass; the first hosted workflow run remains
 pending, so the milestone is not yet marked Verified. The C++ command line
-remains experimental. Dense-initializer search-quality and measured scalability
-work begin in Milestone 7, while a bounded initializer search ending in resource
-exhaustion is not proof that a packing is impossible. A visualization UI remains
+remains experimental. Milestone 7 adds measured
+collision filtering and a bounded structured initializer fallback. A bounded
+initializer search ending in resource exhaustion is not proof that a packing
+is impossible. A visualization UI remains
 deferred.
 
 Public source distribution is supported under the release checklist. Public
@@ -161,11 +162,20 @@ and re-export the mesh as a watertight triangular STL before packing.
 
 ### Initial placement exhausts attempts
 
-This is a bounded greedy bounding-sphere search, not a packing proof. Record the
-seed and work counters from the summary. Raising max-sampling-attempts can be a
-diagnostic, but it may repeat heuristic jamming; reducing the initial volume
-scale or trying another seed is usually more informative until the post-parity
-initializer redesign.
+The original bounding-sphere sampler runs first. After its candidate-attempt
+limit, a deterministic grid tries six axis orientations with strict actual mesh
+containment and separated object envelopes. Successful random placements and RNG
+state are preserved. `--no-initialization-fallback` disables this restart;
+`--max-structured-candidates` bounds its candidate count. Existing geometry and
+pair-work limits are shared across both phases and validation, so exhausting one
+stops the run immediately.
+
+The grid is conservative and can also fail in feasible scenes. Initialization
+failure reports an actionable terminal diagnostic and creates no success set;
+there may be no summary before a valid initial state exists. For successful runs,
+inspect the initialization method and separate random/grid work counters. Sphere
+clearance metrics are null for structured placements because they are not the
+validation rule for that method.
 
 ### TetGen recovery or an Ipopt iteration limit occurs
 
@@ -179,3 +189,17 @@ unsuccessful summary as a usable placement.
 Artifact publication is intentionally no-overwrite and atomic. Choose a new
 output directory. Remove or archive an earlier output yourself only after
 confirming it is no longer needed.
+
+## Milestone 7 measurements
+
+Build the optional measurement executable and run each case in a fresh process:
+
+~~~powershell
+cmake --preset windows-vs2026 -DIROP_BUILD_BENCHMARKS=ON
+cmake --build --preset windows-vs2026-release --target irop_benchmarks --parallel 2
+./benchmarks/run-windows.ps1 -Executable build/windows-vs2026/benchmarks/Release/irop_benchmarks.exe -OutputDirectory build/benchmark-results
+~~~
+
+The output directory must be new. See [benchmark instructions](../benchmarks/README.md)
+and [measured results](MILESTONE_7_RESULTS.md). Measurements are separate from
+normal correctness tests; CI checks the reporting contract without timing thresholds.

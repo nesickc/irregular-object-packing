@@ -2,13 +2,16 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <vector>
 
 #include "irop/error.hpp"
+#include "irop/geometry/collision.hpp"
 #include "irop/initialization/initialize_scene.hpp"
 #include "irop/io/stl_io.hpp"
 #include "irop/model/mesh_validation.hpp"
@@ -121,6 +124,13 @@ TEST_CASE("initialization scene emits combined individual container and placemen
     CHECK(summary.at("outcome").at("category") == "success");
     CHECK(summary.at("config").at("object_count") == 3);
     CHECK(summary.at("config").at("seed") == 123);
+    CHECK(summary.at("config").at("enable_structured_fallback") == options.packing.enable_structured_fallback);
+    CHECK(summary.at("config").at("max_structured_candidates") == options.packing.max_structured_candidates);
+    CHECK(summary.at("sampling").at("method") == "random_rejection");
+    CHECK(summary.at("sampling").at("structured_candidates") == 0);
+    CHECK(summary.at("sampling").at("orientations_examined") == 0);
+    CHECK(summary.at("sampling").at("minimum_boundary_clearance").is_number());
+    CHECK(summary.at("sampling").at("minimum_center_distance").is_number());
     CHECK(summary.at("config").at("max_geometry_query_triangle_visits") ==
           options.packing.max_geometry_query_triangle_visits);
     CHECK(summary.at("config").at("max_pairwise_distance_checks") == options.packing.max_pairwise_distance_checks);
@@ -135,6 +145,71 @@ TEST_CASE("initialization scene emits combined individual container and placemen
     CHECK(summary.at("outputs").at("placements_json") == path_as_utf8(result.placements_path));
     REQUIRE(summary.at("outputs").at("individual_object_stls").size() == 3);
     CHECK(summary.at("versions").at("eigen") == "3.4.1");
+}
+
+TEST_CASE("initialization publishes structured fallback metadata and dense cylinder artifacts")
+{
+    irop::test::TempDirectory temporary;
+    const SceneInputs inputs {
+        .object = temporary.path() / "cylinder.stl",
+        .container = temporary.path() / "box.stl",
+    };
+    const irop::TriangleMesh object = irop::test::cylinder_mesh(45.23, 52.7535, 12);
+    irop::write_stl(inputs.object, object);
+    irop::write_stl(inputs.container, irop::test::box_mesh(175.0, 200.0, 142.5));
+    irop::InitializationOptions options;
+    options.packing.object_count = 10;
+    options.packing.initial_volume_scale = 1.0;
+    options.packing.seed = 1918;
+    options.packing.max_sampling_attempts = 100;
+    options.packing.enable_structured_fallback = true;
+    options.packing.max_structured_candidates = 10'000;
+    options.write_individual_objects = true;
+
+    const irop::InitializationResult result =
+        irop::initialize_scene(inputs.object, inputs.container, temporary.path() / "structured", options);
+
+    CHECK(result.state.initialization_method == irop::InitializationMethod::structured_grid);
+    REQUIRE(result.state.transforms.size() == 10);
+    for (const irop::Transform& transform : result.state.transforms) {
+        CHECK(transform.volume_scale == 1.0);
+    }
+    REQUIRE(result.individual_object_paths.size() == 10);
+    std::vector<irop::TriangleMesh> serialized_objects;
+    for (const std::filesystem::path& path : result.individual_object_paths) {
+        const irop::LoadedStl serialized = irop::read_stl(path, {});
+        CHECK(serialized.encoding == irop::StlEncoding::binary);
+        CHECK(serialized.mesh.triangles.size() == object.triangles.size());
+        serialized_objects.push_back(serialized.mesh);
+    }
+    const irop::LoadedStl serialized_container = irop::read_stl(result.container_output_path, {});
+    CHECK(irop::validate_scene_collisions(serialized_objects, serialized_container.mesh).physical_scene_valid());
+    CHECK(irop::read_stl(result.initialized_objects_path, {}).mesh.triangles.size() == 10 * object.triangles.size());
+    CHECK(read_json(result.placements_path).at("placements").size() == 10);
+
+    const nlohmann::json summary = read_json(result.run_summary_path);
+    CHECK(summary.at("outcome").at("category") == "success");
+    const nlohmann::json& config = summary.at("config");
+    CHECK(config.at("object_count") == 10);
+    CHECK(config.at("initial_volume_scale") == 1.0);
+    CHECK(config.at("seed") == 1918);
+    CHECK(config.at("max_sampling_attempts") == 100);
+    CHECK(config.at("enable_structured_fallback") == true);
+    CHECK(config.at("max_structured_candidates") == 10'000);
+    const nlohmann::json& sampling = summary.at("sampling");
+    CHECK(sampling.at("policy") == "structured-aabb-grid");
+    CHECK(sampling.at("method") == "structured_grid");
+    CHECK(sampling.at("sampling_attempts") == 100);
+    CHECK(sampling.at("structured_candidates").get<std::uint64_t>() >= 10);
+    CHECK(sampling.at("structured_candidates").get<std::uint64_t>() <= 10'000);
+    CHECK(sampling.at("orientations_examined").get<std::uint64_t>() > 0);
+    CHECK(sampling.at("reference_accepted_count").get<std::uint64_t>() < 10);
+    CHECK(sampling.at("minimum_boundary_clearance").is_null());
+    CHECK(sampling.at("minimum_center_distance").is_null());
+    for (const char* counter :
+         { "sampling_attempts", "structured_candidates", "orientations_examined", "reference_accepted_count" }) {
+        CHECK(sampling.at(counter).is_number_integer());
+    }
 }
 
 TEST_CASE("placement transform content is reproducible across output directories")
@@ -225,6 +300,19 @@ TEST_CASE("checked-in initialization run-summary schema fixes the success contra
     }
     CHECK(schema.at("properties").at("outcome").at("properties").at("category").at("const") == "success");
     CHECK(schema.at("properties").at("versions").at("additionalProperties") == false);
+    const nlohmann::json& config_properties = schema.at("properties").at("config").at("properties");
+    CHECK(config_properties.at("enable_structured_fallback").at("type") == "boolean");
+    CHECK(config_properties.at("max_structured_candidates").at("type") == "integer");
+    const nlohmann::json& sampling_schema = schema.at("properties").at("sampling");
+    CHECK(sampling_schema.at("properties").at("method").at("enum") ==
+          nlohmann::json::array({ "reference_origin", "random_rejection", "structured_grid" }));
+    for (const char* counter :
+         { "sampling_attempts", "structured_candidates", "orientations_examined", "reference_accepted_count" }) {
+        CHECK(sampling_schema.at("properties").at(counter).at("type") == "integer");
+    }
+    const nlohmann::json& structured_contract = sampling_schema.at("allOf").at(0).at("then");
+    CHECK(structured_contract.at("properties").at("minimum_boundary_clearance").at("type") == "null");
+    CHECK(structured_contract.at("properties").at("minimum_center_distance").at("type") == "null");
 }
 
 TEST_CASE("initialization refuses to overwrite any planned artifact")

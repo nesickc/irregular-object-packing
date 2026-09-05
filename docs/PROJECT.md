@@ -1,6 +1,6 @@
 # C++ Project Definition
 
-Status: Approved baseline; Milestones 1 through 5 are implemented and verified; Milestone 6 compatibility, robustness, and release readiness is in progress.
+Status: Approved baseline; Milestones 1 through 5 are verified. Milestone 6 is implemented with its first hosted CI run pending. Milestone 7 is verified for its authorized first measured scope against the local parity baseline under ADR-0013.
 
 ## Purpose
 
@@ -90,6 +90,18 @@ The output path must not already exist. A successful command atomically publishe
 requires each object and container to be one connected, orientable, closed triangular
 surface; multi-component cavity and disjoint-solid semantics remain outside the
 accepted input domain.
+
+Milestone 7 preserves successful seeded origin/random initialization and adds a
+bounded structured restart only after the random candidate-attempt limit is
+exhausted. Six fixed axis orientations of the actual scaled mesh bounds are tried
+on centered container-AABB grids. Each object must pass strict actual containment,
+including surface-intersection checks, and independently reconstructed object
+bounds must remain strictly separated. Existing geometry/pair/surface work budgets
+remain cumulative. `--no-initialization-fallback` retains the historical bounded
+failure behavior; `--max-structured-candidates` controls the separate candidate
+budget. Method and reference/structured work are recorded, with sphere-clearance
+metrics null for structured layouts. This heuristic does not promise to find every
+feasible arrangement. See [ADR-0013](adr/0013-bounded-structured-initialization-and-collision-broad-phase.md).
 
 ## Behavioral Reference
 
@@ -269,7 +281,7 @@ A later visualization application will link to `irop_core` and consume `PackingR
 Deferred dependencies:
 
 - oneTBB: add only after profiling identifies useful parallel work and deterministic ownership is clear.
-- Google Benchmark: add when performance baselines are introduced.
+- Google Benchmark: unnecessary for the current standard-library benchmark harness; evaluate only if later measurement requirements justify it.
 - NLopt: evaluate only if a fallback solver is required for compatibility.
 
 Do not add a dependency for a small, safe utility that can be implemented and tested clearly with the standard library. Do not implement specialized file parsers, nonlinear solvers, computational geometry kernels, or JSON parsers casually.
@@ -334,11 +346,19 @@ Limits are configurable safety controls, not artificial claims about maximum sup
 
 The design must not contain a fixed product limit on object count. It should use suitable index types, checked conversions at dependency boundaries, and data structures whose costs are visible.
 
-The direct parity algorithm may retain expensive pairwise collision work or per-object solves initially. Record and benchmark those costs before redesigning them.
+Milestone 7 records representative initialization, collision, adaptive-engine, and
+individual-stage timing/work/memory baselines through the optional
+`irop_benchmarks` executable. Strict object-AABB separation now skips unnecessary
+exact collision and nesting checks while preserving possible contact and overlap.
+Pair enumeration remains quadratic and is bounded cumulatively across packing and
+serialized-output validation by `max_object_pair_checks`. The measured dense
+initializer fallback and collision change are documented in
+[MILESTONE_7_RESULTS.md](MILESTONE_7_RESULTS.md). They establish search recovery and
+a separated-scene collision improvement, not a general solver or packing speedup.
 
 Likely future improvements include:
 
-- Broad-phase spatial indexing before narrow collision checks.
+- Spatial indexing to reduce the remaining pair enumeration before narrow collision checks.
 - Reuse of mesh and solver workspaces.
 - Constraint sparsity and analytic derivatives where justified.
 - Controlled parallel per-object optimization.
