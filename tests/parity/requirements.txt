@@ -1,0 +1,18 @@
+# Pinned direct requirements for the Python 3.9/3.10 parity oracle.
+# Transitive packages remain resolver-selected; this is not a complete lock file.
+click==8.1.7
+imageio==2.26.1
+matplotlib==3.7.5
+numba==0.57.1
+numpy==1.24.4
+pandas==1.5.3
+pyvista==0.38.4
+rtree==1.0.1
+scipy==1.10.1
+seaborn==0.12.2
+tabulate==0.9.0
+tetgen==0.6.2
+tqdm==4.66.1
+trimesh==3.21.7
+vtk==9.2.6
+wrapt_timeout_decorator==1.4.0

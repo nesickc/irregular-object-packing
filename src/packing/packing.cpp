@@ -349,6 +349,105 @@ void require_scene_mesh_budget(const TriangleMesh& object, const std::uint64_t o
 }  // namespace
 namespace detail {
 
+PhysicalCollisionCorrectionResult correct_physical_collisions(
+    const TriangleMesh& centered_object, const TriangleMesh& container,
+    const std::span<const TriangleMesh> cat_surfaces, std::vector<Transform> candidate_transforms,
+    const double correction_volume_scale_factor, const std::uint64_t maximum_correction_passes,
+    const MeshLimits& output_mesh_limits, const SceneCollisionLimits& collision_limits,
+    SceneCollisionWork& cumulative_collision_work, std::uint64_t& cumulative_correction_passes,
+    const std::function<std::optional<PackingStatus>()>& stopped)
+{
+    PhysicalCollisionCorrectionResult result;
+    result.transforms = std::move(candidate_transforms);
+
+    const auto stop_status = [&]() -> std::optional<PackingStatus> {
+        return stopped ? stopped() : std::nullopt;
+    };
+    const auto finish = [&](const PackingStatus status, std::string diagnostic = {}) {
+        result.status = status;
+        result.diagnostic = std::move(diagnostic);
+        return std::move(result);
+    };
+    const auto validate_candidate = [&]() -> std::optional<PackingStatus> {
+        const std::vector<TriangleMesh> objects =
+            instantiate(centered_object, result.transforms, output_mesh_limits, "full-resolution correction");
+        if (const std::optional<PackingStatus> status = stop_status(); status.has_value()) {
+            return status;
+        }
+
+        SceneCollisionReport collision = validate_scene_collisions(
+            objects, container, cat_surfaces, remaining_collision_limits(cumulative_collision_work, collision_limits));
+        accumulate(cumulative_collision_work, collision.work);
+        result.collision = std::move(collision);
+        return stop_status();
+    };
+
+    if (const std::optional<PackingStatus> status = validate_candidate(); status.has_value()) {
+        return finish(*status);
+    }
+
+    while (!result.collision.physical_scene_valid()) {
+        if (result.correction_passes >= maximum_correction_passes) {
+            // DEVIATION(IROP-DEV-0004): Bound the Python
+            // collision-correction loop and return a structured
+            // outcome when it cannot converge.
+            return finish(PackingStatus::correction_limit, "packing collision-correction pass limit was exhausted");
+        }
+        if (const std::optional<PackingStatus> status = stop_status(); status.has_value()) {
+            return finish(*status);
+        }
+
+        std::vector<bool> reduce(result.transforms.size(), false);
+        for (const std::uint64_t object : result.collision.container_violation_object_ids) {
+            if (object >= result.transforms.size()) {
+                return finish(PackingStatus::internal_failure,
+                              "collision report contains an invalid container-violation object ID");
+            }
+            reduce[static_cast<std::size_t>(object)] = true;
+        }
+        for (const ObjectCollisionPair& pair : result.collision.object_collisions) {
+            if (pair.first >= result.transforms.size() || pair.second >= result.transforms.size() ||
+                pair.first == pair.second) {
+                return finish(PackingStatus::internal_failure, "collision report contains an invalid object pair");
+            }
+            reduce[static_cast<std::size_t>(pair.first)] = true;
+            reduce[static_cast<std::size_t>(pair.second)] = true;
+        }
+
+        // COMPATIBILITY(IROP-COMPAT-0002): CAT contacts remain
+        // diagnostic and are deliberately excluded from the
+        // scale-correction selection.
+        if (std::none_of(reduce.begin(), reduce.end(), [](const bool selected) {
+            return selected;
+        })) {
+            return finish(PackingStatus::internal_failure,
+                          "physically invalid collision report selected no object for correction");
+        }
+
+        std::vector<Transform> corrected = result.transforms;
+        for (std::size_t object = 0; object < corrected.size(); ++object) {
+            if (!reduce[object]) {
+                continue;
+            }
+            const double reduced = corrected[object].volume_scale * correction_volume_scale_factor;
+            if (!std::isfinite(reduced) || reduced <= 0.0) {
+                return finish(PackingStatus::numerical_failure,
+                              "collision correction produced an invalid volume scale");
+            }
+            corrected[object].volume_scale = reduced;
+        }
+        result.transforms = std::move(corrected);
+        increment(result.correction_passes);
+        increment(cumulative_correction_passes);
+
+        if (const std::optional<PackingStatus> status = validate_candidate(); status.has_value()) {
+            return finish(*status);
+        }
+    }
+
+    return finish(PackingStatus::success);
+}
+
 double barrier_volume_scale_multiplier_bound(const double current_volume_scale, const double target_volume_scale)
 {
     if (!std::isfinite(current_volume_scale) || current_volume_scale <= 0.0 || !std::isfinite(target_volume_scale) ||
@@ -548,6 +647,14 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
             if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
                 return stop_result(*status);
             }
+            // DEVIATION(IROP-DEV-0024): Python tests barrier completion only
+            // after mutation-prone optimization work. An already-complete
+            // barrier bypasses that work and proceeds to mandatory final
+            // validation. See docs/COMPATIBILITY.md.
+            if (progress.objects_at_target == object_count) {
+                increment(result.work.completed_scale_steps);
+                continue;
+            }
 
             TriangleMesh sampled_object = centered_object;
             TriangleMesh sampled_container = container;
@@ -728,91 +835,24 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                 }
                 candidate_state.transforms = std::move(accepted_transforms);
 
-                std::uint64_t correction_passes = 0;
                 // DEVIATION(IROP-DEV-0019): Sampled surfaces remain an
                 // optimization input, but physical collision correction is
                 // decided from the full-resolution object and container.
-                std::vector<TriangleMesh> candidate_objects =
-                    instantiate(centered_object, candidate_state.transforms, result.state.config.output_mesh_limits,
-                                "full-resolution correction");
-                if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
-                    return stop_result(*status);
+                detail::PhysicalCollisionCorrectionResult correction = detail::correct_physical_collisions(
+                    centered_object, container, cat_surfaces, std::move(candidate_state.transforms),
+                    config.correction_volume_scale_factor, limits.max_correction_passes_per_iteration,
+                    result.state.config.output_mesh_limits, limits.collision, result.work.collision,
+                    result.work.correction_passes, stopped);
+                if (!correction.succeeded()) {
+                    if (correction.status == PackingStatus::cancelled ||
+                        correction.status == PackingStatus::time_limit) {
+                        return stop_result(correction.status);
+                    }
+                    return finish(correction.status, std::move(correction.diagnostic));
                 }
-                SceneCollisionReport collision =
-                    validate_scene_collisions(candidate_objects, container, cat_surfaces,
-                                              remaining_collision_limits(result.work.collision, limits.collision));
-                accumulate(result.work.collision, collision.work);
-                if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
-                    return stop_result(*status);
-                }
-                while (!collision.physical_scene_valid()) {
-                    if (correction_passes >= limits.max_correction_passes_per_iteration) {
-                        // DEVIATION(IROP-DEV-0004): Bound the Python
-                        // collision-correction loop and return a structured
-                        // outcome when it cannot converge.
-                        return finish(PackingStatus::correction_limit,
-                                      "packing collision-correction pass limit was exhausted");
-                    }
-                    if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
-                        return stop_result(*status);
-                    }
-
-                    std::vector<bool> reduce(static_cast<std::size_t>(object_count), false);
-                    for (const std::uint64_t object : collision.container_violation_object_ids) {
-                        if (object >= object_count) {
-                            return finish(PackingStatus::internal_failure,
-                                          "collision report contains an invalid container-violation object ID");
-                        }
-                        reduce[static_cast<std::size_t>(object)] = true;
-                    }
-                    for (const ObjectCollisionPair& pair : collision.object_collisions) {
-                        if (pair.first >= object_count || pair.second >= object_count || pair.first == pair.second) {
-                            return finish(PackingStatus::internal_failure,
-                                          "collision report contains an invalid object pair");
-                        }
-                        reduce[static_cast<std::size_t>(pair.first)] = true;
-                        reduce[static_cast<std::size_t>(pair.second)] = true;
-                    }
-
-                    // COMPATIBILITY(IROP-COMPAT-0002): CAT contacts remain
-                    // diagnostic and are deliberately excluded from the
-                    // scale-correction selection.
-                    if (std::none_of(reduce.begin(), reduce.end(), [](const bool selected) {
-                        return selected;
-                    })) {
-                        return finish(PackingStatus::internal_failure,
-                                      "physically invalid collision report selected no object for correction");
-                    }
-                    std::vector<Transform> corrected = candidate_state.transforms;
-                    for (std::size_t object = 0; object < corrected.size(); ++object) {
-                        if (!reduce[object]) {
-                            continue;
-                        }
-                        const double reduced = corrected[object].volume_scale * config.correction_volume_scale_factor;
-                        if (!std::isfinite(reduced) || reduced <= 0.0) {
-                            return finish(PackingStatus::numerical_failure,
-                                          "collision correction produced an invalid volume scale");
-                        }
-                        corrected[object].volume_scale = reduced;
-                    }
-                    candidate_state.transforms = std::move(corrected);
-                    increment(correction_passes);
-                    increment(result.work.correction_passes);
-
-                    candidate_objects =
-                        instantiate(centered_object, candidate_state.transforms, result.state.config.output_mesh_limits,
-                                    "full-resolution correction");
-                    if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
-                        return stop_result(*status);
-                    }
-                    collision =
-                        validate_scene_collisions(candidate_objects, container, cat_surfaces,
-                                                  remaining_collision_limits(result.work.collision, limits.collision));
-                    accumulate(result.work.collision, collision.work);
-                    if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
-                        return stop_result(*status);
-                    }
-                }
+                candidate_state.transforms = std::move(correction.transforms);
+                SceneCollisionReport collision = std::move(correction.collision);
+                const std::uint64_t correction_passes = correction.correction_passes;
 
                 if (result.history.size() >= limits.max_history_records) {
                     return finish(PackingStatus::resource_exhausted, "packing history-record limit was exhausted");

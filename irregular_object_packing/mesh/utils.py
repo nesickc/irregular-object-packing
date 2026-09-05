@@ -14,7 +14,8 @@ def print_mesh_info(mesh: pv.PolyData, description="", suppress_scientific=True)
         )
 
 def pyvista_to_trimesh(mesh: pv.PolyData):
-    tri_container = mesh.extract_surface(algorithm=None).triangulate() # type: ignore
+    # DEVIATION(IROP-DEV-0025): PyVista 0.38.4 has no algorithm parameter.
+    tri_container = mesh.extract_surface().triangulate()  # type: ignore
     faces_as_array = tri_container.faces.reshape((tri_container.n_cells, 4))[:, 1:] # type: ignore
     tri_container = Trimesh(tri_container.points, faces_as_array) # type: ignore
     return tri_container

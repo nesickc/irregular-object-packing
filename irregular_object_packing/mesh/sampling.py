@@ -1,6 +1,5 @@
 import numpy as np
 import pyvista as pv
-import trimesh
 
 from irregular_object_packing.mesh.utils import pyvista_to_trimesh, trimesh_to_pyvista
 

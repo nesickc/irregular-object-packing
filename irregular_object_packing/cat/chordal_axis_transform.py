@@ -21,7 +21,6 @@ from irregular_object_packing.cat.tetra_cell import TetraCell
 from irregular_object_packing.cat.utils import (
     create_face_normal,
     get_cell_arrays,
-    n_related_objects,
 )
 
 CDT_DEFAULTS = {

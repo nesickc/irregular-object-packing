@@ -20,13 +20,10 @@ exclude = '''
 '''
 
 # Ruff
-[tool.ruff.pydocstyle]
-convention = "google"
-
-
 [tool.ruff]
 line-length = 88
 
+[tool.ruff.lint]
 select = [
   "E", # pycodestyle errors
   "W", # pycodestyle warnings
@@ -41,3 +38,5 @@ ignore = [
   "C901", # too complex
   "B905", # zip without strict keyword. Breaks on python 3.9
 ]
+[tool.ruff.lint.pydocstyle]
+convention = "google"

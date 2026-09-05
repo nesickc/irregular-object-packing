@@ -356,6 +356,9 @@ void log_error_noexcept(const char* category, const char* message) noexcept
             std::chrono::milliseconds(static_cast<std::chrono::milliseconds::rep>(maximum_local_solve_milliseconds));
         interruption_requested = 0;
         static_cast<void>(std::signal(SIGINT, handle_interruption));
+#if defined(_WIN32)
+        static_cast<void>(std::signal(SIGBREAK, handle_interruption));
+#endif
         pack_options.callbacks.cancellation_requested = []() noexcept {
             return interruption_requested != 0;
         };

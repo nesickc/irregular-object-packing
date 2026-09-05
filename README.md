@@ -33,6 +33,10 @@ the bounded end-to-end packing loop for repeated copies of one closed object mes
 inside one closed container mesh. Build it from a Visual Studio 2026 developer
 shell with a configured `VCPKG_ROOT`:
 
+For a clean checkout, prerequisites, a tracked-fixture smoke run, configuration
+semantics, and failure-specific troubleshooting, use the
+[Windows C++ quick start](/docs/WINDOWS_CPP_QUICKSTART.md).
+
 ```powershell
 cmake --preset windows-vs2026
 cmake --build --preset windows-vs2026-release
@@ -115,6 +119,10 @@ is used under AGPL-3.0-or-later, and the currently validated Ipopt/Intel binary
 bundle is approved for local builds rather than public binary redistribution.
 See [ADR-0009](/docs/adr/0009-tetgen-1-6-agpl-overlay-and-adapter.md)
 and [ADR-0010](/docs/adr/0010-ipopt-3-14-19-official-windows-binary-adapter.md).
+The [third-party notice](/THIRD_PARTY_NOTICES.md) records the exact dependency
+inventory and the [release checklist](/docs/RELEASE_CHECKLIST.md) separates the
+supported source-publication path from the still-blocked public binary and
+hosted-service paths.
 
 ## Installation
 

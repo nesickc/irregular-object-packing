@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <vector>
 
 #include "irop/error.hpp"
@@ -250,6 +251,24 @@ TEST_CASE("initialization stops at the configured placement-attempt limit")
     irop::test::require_error_category([&]() {
         static_cast<void>(irop::initialize_packing(irop::test::cube_mesh(2.0), irop::test::cube_mesh(1.0), config));
     }, irop::ErrorCategory::resource_limit);
+}
+
+TEST_CASE("initialization rejects an extreme object count before allocating transform storage")
+{
+    irop::PackingConfig config;
+    config.object_count = std::numeric_limits<std::uint64_t>::max();
+    config.max_sampling_attempts = std::numeric_limits<std::uint64_t>::max();
+    config.output_mesh_limits.max_vertices = std::numeric_limits<std::uint64_t>::max();
+    config.output_mesh_limits.max_triangles = std::numeric_limits<std::uint64_t>::max();
+
+    try {
+        static_cast<void>(irop::initialize_packing(centered_tetrahedron(), irop::test::cube_mesh(5.0), config));
+        FAIL("expected pre-allocation output-size rejection");
+    }
+    catch (const irop::Error& error) {
+        CHECK(error.category() == irop::ErrorCategory::resource_limit);
+        CHECK(std::string(error.what()) == "initialized objects exceed the configured output vertex limit");
+    }
 }
 
 TEST_CASE("initialization observes cooperative cancellation during bounded work")

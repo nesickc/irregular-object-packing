@@ -149,5 +149,6 @@ file(
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/cpp/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/cpp/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/parity/*.cpp"
 )
 irop_add_clang_format_targets(FILES ${IROP_FORMAT_FILES})

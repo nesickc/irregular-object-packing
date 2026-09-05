@@ -1,6 +1,6 @@
 # C++ Migration Implementation Progress
 
-Last updated: 2026-08-24
+Last updated: 2026-09-05
 
 This working report tracks execution of `docs/IMPLEMENTATION_PLAN.md`. The concise,
 authoritative project status remains in `docs/STATUS.md`; this file records the more
@@ -9,27 +9,38 @@ detailed implementation trail requested for the migration.
 ## Current Position
 
 - Active milestone: Milestone 6 — Compatibility, Robustness, and Release Readiness.
-- State: Milestones 1 through 5 are Verified; Milestone 6 is In Progress.
+- State: Milestones 1 through 5 are Verified; Milestone 6 is Implemented and its
+  local acceptance gates pass. The first hosted workflow run remains pending.
 - Current outcome: `irop_core` composes bounded initialization, adaptive
   resampling, TetGen, CAT, deterministic Ipopt solves, full-resolution collision
   correction, exact scale barriers, termination, and output-quantized validation.
-  Accepted local rotations are now left-composed in the same order as the
-  constraint model. Packing-local scale objectives use overflow-safe finite
-  near-barrier bounds plus independently postchecked exact-target snapping.
-  The thin `irop pack` command atomically emits versioned success artifacts or a
-  summary-only structured failure. Public headers expose only project-owned types.
-  Visual Studio Debug/Release and the Ninja clang-tidy configuration pass 163/163
-  tests.
+  The live pinned Python oracle and C++ fixture now establish representative parity
+  for initialization, dense accepted prefixes and bounded exhaustion, transforms,
+  CAT constraints, local mathematics, outcomes, metrics, and artifacts. Targeted
+  fixtures cover recovery and all physical-correction selection branches, including
+  preserved CAT-only diagnostics, while a real Windows Ctrl+Break process test
+  proves summary-only cancellation. The source-only hosted workflow, exact
+  39-package notice audit, clean-checkout guide, and release checklist are in place.
+  The supported Visual Studio Release/format path and all Visual Studio Debug,
+  Visual Studio Release, and Ninja clang-tidy test matrices pass 178/178 tests.
+  Python tests, Ruff, the live oracle, package-build validation, and the
+  representative adaptive profile pass locally. Dense-initializer search-quality
+  improvement now belongs to Milestone 7.
 - Blocking ambiguities: none. ADR-0009 records the approved TetGen AGPL source and
   integration path; ADR-0010 records the exact Ipopt binary path and public-binary
   review gate; ADR-0011 records the packing outcome/artifact contract; ADR-0012
   records the transform-consistent barrier-bounded solve correction. The
   compatibility catalog is synchronized through `IROP-COMPAT-0007` and
-  `IROP-DEV-0023`.
+  `IROP-DEV-0025`. Public binary or hosted-service distribution remains a separate
+  release-specific decision, not unfinished Milestone 6 implementation.
 
 ## Decisions Applied
 
 - Preserve the Python implementation as the behavioral reference through parity.
+- Preserve the reference's greedy bounding-sphere initialization through the
+  Milestone 6 parity comparison. Treat candidate-attempt exhaustion as bounded
+  search failure rather than geometric infeasibility, and defer structured or
+  shape-aware placement improvements until the parity baseline is recorded.
 - Keep the command-line application thin and dependency-specific VTK types inside the
   mesh I/O and geometry adapters.
 - Represent meshes and results with project-owned types at core boundaries.
@@ -75,6 +86,9 @@ detailed implementation trail requested for the migration.
 - Bound packing-local scale objectives near each barrier with fixed representable
   slack, finite saturation for extreme ratios, exact clamping, and an independently
   postchecked near-target snap.
+- Complete an already-satisfied barrier before barrier-specific dependency work
+  without mutating transforms, RNG state, or iteration history; retain mandatory
+  full-resolution and serialized-output validation.
 - Bound constraint rows, dense Jacobian entries, callback work, iterations, and
   elapsed time. Time checks are cooperative around callback chunks; an active MUMPS
   factorization and its peak allocation cannot be hard-preempted through this API.
@@ -252,13 +266,55 @@ detailed implementation trail requested for the migration.
   and tetrahedron, and rotation-enabled two-object growth.
 - [x] Re-run both exact reported commands; require exact target scales and passing
   full-resolution/output validation.
-- [x] Pass Visual Studio Debug/Release and Ninja clang-tidy builds with 163/163
+- [x] Reproduce the supplied five-object full-scale false infeasible outcome and
+  trace it to TetGen recovery degrading an already-complete initialization.
+- [x] Record `IROP-DEV-0024` and complete already-satisfied barriers before
+  sampling, TetGen/CAT construction, local solves, and recovery while retaining
+  final validation.
+- [x] Add a generated five-cylinder no-growth regression with an unusable positive
+  TetGen point budget, and re-run the exact supplied five-object command.
+- [x] Pass Visual Studio Debug/Release and Ninja clang-tidy builds with 178/178
   tests in each configuration.
-- [ ] Build the broader representative Python/C++ transform, outcome, collision,
+- [x] Build the broader representative Python/C++ transform, outcome, collision,
   and artifact parity corpus.
-- [ ] Expand hostile-input, rare recovery/correction, and process-level SIGINT
-  coverage and profile representative adaptive runs.
-- [ ] Add hosted CI/release checks and close ADR-0009/ADR-0010 distribution gates.
+- [x] Include dense full-scale initialization success/failure outcomes, accepted
+  prefixes, rejection work, and timeout/limit behavior in the parity corpus.
+- [x] Expand hostile-input and rare recovery/correction coverage, exercise
+  cooperative SIGINT handling, add a process-level Windows Ctrl+Break/SIGBREAK
+  test, and profile representative adaptive runs.
+- [x] Add source-only hosted CI and release checks, including exact dependency
+  notice staging; retain ADR-0009/ADR-0010 as separate release-specific public
+  binary/hosted-service gates.
+- [ ] Observe and retain evidence from the first hosted workflow run before marking
+  Milestone 6 Verified.
+
+## Deferred Post-Parity Improvements
+
+### Dense full-scale initialization
+
+- The C++ initializer intentionally retains the reference sequence: sample centers
+  uniformly from the full container AABB, require rotation-independent bounding
+  spheres to be strictly contained and separated, irrevocably accept each passing
+  center, and draw rotations only after every center is placed.
+- On the supplied meshes, the cylinder is approximately
+  `90.460 x 90.460 x 105.507` inside a `350 x 400 x 285` box. Ten objects occupy
+  only `16.97%` of the box volume, but the proxy radius `69.48897` requires
+  `138.97794` center spacing in every direction.
+- The seed-1918 prefix is geometrically jammed after six accepted centers: the
+  largest sampled remaining clearance is about `132`, so increasing the attempt
+  limit cannot place object seven without relocating earlier objects. A
+  constructive two-layer ten-sphere layout still satisfies the proxy, and a
+  sideways `3 x 4 x 3` grid demonstrates room for 36 actual cylinders.
+- Decision: the live Python/C++ corpus now records this dense failure path, ordinary
+  successful seeds, random draw order, accepted prefixes, rejection counts, and
+  Python timeout/restart behavior. Preserve those successful parity cases while
+  evaluating initializer improvements in Milestone 7.
+- Candidate post-parity work is a bounded structured/maximin or backtracking
+  fallback, followed by orientation-aware exact-geometry placement if justified.
+  Keep explicit safety limits, preserve existing successful seeded results, and
+  improve diagnostics so search exhaustion is not presented as infeasibility.
+- Future acceptance evidence should include generated ten- and 36-cylinder cases
+  plus regression protection for the established Python/C++ parity corpus.
 
 ## Activity Log
 
@@ -588,6 +644,43 @@ detailed implementation trail requested for the migration.
 - Visual Studio Debug, Visual Studio Release, and the Ninja clang-tidy analysis
   build each passed 163/163 tests.
 
+### 2026-08-27 - Milestone 6 already-complete barrier robustness
+
+- Reproduced the five-object full-scale command. Initialization produced a valid
+  five-object state at scale `1.0`, but the engine redundantly invoked point-union
+  TetGen; degenerate-cell recovery then reduced every scale through ten `0.99`
+  steps before an applied-transform postcheck failed.
+- Moved the all-objects-at-barrier completion check ahead of resampling and
+  TetGen/CAT/Ipopt work. The shortcut leaves transforms, RNG draw count, and
+  iteration history unchanged, counts the scale step, and still traverses the
+  common full-resolution and binary-STL-quantized final validation path.
+- Added a practical integration test with five generated cylinders in a roomy box.
+  Its positive but unusable one-point TetGen input limit makes the old ordering fail
+  deterministically and proves the corrected path performs no packing iterations,
+  resampling, TetGen recovery, CAT construction, local solves, or correction.
+- The exact supplied command now writes five objects at exact scale `1.0`, reports
+  a physically valid scene, and records zero barrier-specific work.
+- Visual Studio Debug, rebuilt Visual Studio Release, and the Ninja clang-tidy
+  analysis configuration each passed 164/164 tests.
+
+### 2026-08-28 - Milestone 6 parity and local release-readiness implemented
+
+- Added a live pinned Python 3.10 oracle and C++ corpus covering initialization
+  success/failure/work, dense accepted-prefix and timeout/limit behavior, transform
+  semantics, CAT polygons/planes/normals, local objective/gradient/Jacobian,
+  no-growth outcome metrics, and the canonical artifact set.
+- Added deterministic recovery and collision-correction seams for selective
+  object/container correction, both-object overlap correction, CAT-only diagnostic
+  preservation, convergence, and bounded limit accounting. Added real Windows
+  SIGBREAK/Ctrl+Break process cancellation with exit 130 and summary-only output.
+- Added a source-only Windows hosted workflow, pinned parity/test environments, an
+  exact dependency-notice audit and staged notice bundle, clean-checkout instructions,
+  and a release checklist that keeps public binary/hosted distribution separately
+  gated by ADR-0009 and ADR-0010.
+- Local 2026-08-28 Python/oracle/profile checks and the final 2026-09-05 supported
+  Visual Studio Release/format/CTest and exact notice audit pass. Milestone 6 remains
+  Implemented until the first hosted workflow run is observed.
+
 ## Verification Evidence
 
 - Toolchain: CMake 4.2.3; Visual Studio Community 2026 18.8.3; MSVC 19.51.36252;
@@ -614,24 +707,55 @@ detailed implementation trail requested for the migration.
   `build/windows-ninja-analysis-scoped-gl2ps-vcpkg-root` generated build rules
   invoking clang-tidy 22.1.3, built successfully in the Visual Studio developer
   environment, and passed 154/154 tests.
-- Milestone 6 Visual Studio: `cmake --build build/windows-vs2026 --config
-  Debug` and `--config Release` succeeded; both matching CTest runs passed
-  163/163 tests.
+- Milestone 6 Visual Studio: `cmake --build build/windows-vs2026-m6-final
+  --config Debug` and `--config Release` succeeded; both matching CTest runs
+  passed 178/178 tests (174 Catch2 plus four process-level cases).
 - Milestone 6 analysis: the Ninja clang-tidy configuration rebuilt all changed
-  production and test sources and passed 163/163 tests.
+  production and test sources and passed 178/178 tests.
 - Milestone 6 exact inputs: `build/manual-m6-rotation-final-20260824` succeeded
   with two exact `0.1001` scales, two solves, 78 aggregate Ipopt iterations,
   and physical validity. `build/manual-m6-fullscale-final-20260824` succeeded
   with two exact `1.0` scales, one TetGen recovery, two solves, 14 iterations,
   and physical validity.
+- Milestone 6 five-object exact input:
+  `build/manual-m6-five-object-no-growth-20260827` succeeded with five exact
+  `1.0` scales, zero packing iterations, TetGen attempts/recoveries, CAT builds,
+  local solves, or corrections, and passing physical and output-quantized
+  validation.
+- Dense initialization characterization, with no product change: the exact
+  count-10/scale-1/seed-1918 case placed 6 after one million attempts in
+  approximately 0.24 seconds and remained at 6 after ten million attempts; a
+  50-seed scan with 100,000 attempts each reached at most 8. Seed 1918 initialized
+  all 10 at volume scale `0.5` with 217 rejections, while the full-scale sphere
+  proxy admits an explicit ten-center construction. All diagnostic artifacts were
+  written only under ignored `build/manual-*` paths.
 - Focused numeric/geometry coverage includes non-commuting and gimbal-lock
   composition, near-tight exact snap, default/small/below-ULP tolerance policy,
   extreme-ratio saturation, obvious primitive fits/non-fits, full-scale
-  cylinder/tetrahedron packing, and rotation-required geometry/packing.
+  cylinder/tetrahedron packing, rotation-required geometry/packing, and an
+  already-complete five-cylinder barrier with no dependency work.
 
 - Milestone 5 JSON contracts: emitted success, resource-failure, and placements
   documents passed PowerShell `Test-Json` against the checked-in schemas; a
   mutated success category with null artifacts was rejected.
+- Milestone 6 parity (2026-08-28): the pinned live Python 3.10 oracle passed, and
+  the Release `[parity]` filter passed seven cases with 403 assertions.
+- Python reference validation (2026-08-28): the complete pytest run passed 141
+  tests with one skip, Ruff passed, and the Python package build completed. The
+  package build is validation only; it is not an approved repository source release
+  or a replacement for the exact C++ dependency inventory.
+- Process and rare-path coverage (2026-08-28): Windows Ctrl+Break/SIGBREAK produced
+  exit 130 with only a cancelled `run-summary.json`; deterministic recovery and
+  correction fixtures covered both selected physical collision forms, CAT-only
+  non-selection, convergence, and bounded exhaustion.
+- Representative adaptive profile (2026-08-28):
+  `build/manual-m6-adaptive-profile-20260828` completed in 778 ms wall/737 ms
+  engine time with two resamples, one TetGen build, one CAT build, one local solve,
+  and 13 solver iterations.
+- Final supported-preset release evidence (2026-09-05): the official scoped
+  GL2PS `1.4.2#5` graph restored, the Visual Studio Release build, format target,
+  and 178/178 CTest matrix passed, and the exact installed-tree notice audit matched
+  all 39 packages. The hosted workflow itself has not yet run.
 - Focused Milestone 3: `ctest --test-dir build/windows-vs2026-scoped-gl2ps -C
   Debug -R "TetGen|tetrahedral|CAT|diagnostic writers" --output-on-failure`
   passed 22/22 tests.
@@ -663,6 +787,15 @@ detailed implementation trail requested for the migration.
 - Initialization accepts exactly one connected closed surface component. Supporting
   nested cavity shells or disjoint solids requires an explicit domain contract rather
   than summing component magnitudes.
+- Dense full-scale initialization can exhaust its candidate bound for physically
+  feasible scenes because the Python-compatible sampler uses conservative
+  rotation-independent spheres and never relocates an accepted center. The supplied
+  count-10 case jams at 6 for seed 1918 even after ten million attempts, while ten
+  proxy spheres and at least 36 oriented cylinders have constructive layouts.
+  Its successful/failure behavior is now captured by the parity corpus; Milestone 7
+  should evaluate bounded structured/maximin placement and shape-aware validation
+  while retaining established successful seeds.
+  Raising `--max-sampling-attempts` alone is not a remedy.
 - Initialization resource failures use stable diagnostics/exit categories and publish
   no success set; a persisted structured unsuccessful result is deferred to the later
   packing-result coordinator.
@@ -676,8 +809,10 @@ detailed implementation trail requested for the migration.
   change CAT constraints and requires comparative packing evidence.
 - Exact co-spherical/coplanar point sets in very regular generated primitives can
   make point-union TetGen emit a zero-volume tetrahedron. End-to-end toy fixtures
-  use small deterministic geometric perturbations and production retains bounded
-  recovery; the current recovery warning does not expose the backend root cause.
+  that require genuine growth use small deterministic geometric perturbations and
+  production retains bounded recovery. Already-complete barriers bypass this
+  dependency work; the current recovery warning does not expose the backend root
+  cause for genuine-growth failures.
 - Project limits bound TetGen inputs and accepted outputs but cannot strictly cap the
   backend's peak memory or time. Calls are serialized because TetGen's exact-predicate
   implementation uses mutable process-global state.
@@ -701,7 +836,9 @@ detailed implementation trail requested for the migration.
   already-final unsuccessful engine outcome wins over a later interruption.
   Active VTK reads and remeshing, TetGen, MUMPS, collision queries, and
   individual file-write calls are not hard-preemptible.
-- Remaining Milestone 6 work is to build representative Python/C++ parity
-  corpora, expand hostile-input and process-level interruption coverage, add hosted
-  CI/release checks, and resolve the exact public binary licensing path before any
-  distribution.
+- Remaining Milestone 6 evidence is the first observed hosted workflow run; local
+  acceptance gates pass. After that, Milestone 7 can address measured initializer
+  and packing scalability.
+- Public binary and hosted-service distribution remain intentionally subject to the
+  release-specific ADR-0009/ADR-0010 source, notice, payload, and license review.
+  Those gates do not make the implementation milestone incomplete.

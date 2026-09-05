@@ -3,8 +3,10 @@ find_package(nlohmann_json CONFIG REQUIRED)
 
 add_executable(
     irop_tests
+    ../parity/parity_corpus_tests.cpp
     cat_tests.cpp
     collision_tests.cpp
+    correction_path_tests.cpp
     diagnostic_geometry_tests.cpp
     initialization_scene_tests.cpp
     initialization_tests.cpp
@@ -83,3 +85,25 @@ add_test(
         "${CMAKE_CURRENT_SOURCE_DIR}/packing_cli_smoke.cmake"
 )
 set_tests_properties(irop_packing_cli_smoke PROPERTIES LABELS "cli;packing;smoke")
+
+if(WIN32)
+    find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter)
+    add_test(
+        NAME irop_windows_interrupt_smoke
+        COMMAND
+            "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/windows_interrupt_smoke.py"
+            --irop
+            "$<TARGET_FILE:irop>"
+            --object
+            "${CMAKE_CURRENT_SOURCE_DIR}/../fixtures/tetra_ascii.stl"
+            --container
+            "${CMAKE_CURRENT_SOURCE_DIR}/../fixtures/cube_ascii.stl"
+            --work-dir
+            "${CMAKE_CURRENT_BINARY_DIR}/windows-interrupt-smoke"
+    )
+    set_tests_properties(
+        irop_windows_interrupt_smoke
+        PROPERTIES LABELS "cli;packing;cancellation;smoke" TIMEOUT 120
+    )
+endif()

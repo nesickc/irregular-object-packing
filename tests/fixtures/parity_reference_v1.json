@@ -1,0 +1,344 @@
+{
+  "schema_version": 1,
+  "description": "Compact deterministic Python-reference corpus for the C++ parity milestone",
+  "primitives": {
+    "centered_unit_tetrahedron": {
+      "vertices": [
+        [-0.25, -0.25, -0.25],
+        [0.75, -0.25, -0.25],
+        [-0.25, 0.75, -0.25],
+        [-0.25, -0.25, 0.75]
+      ],
+      "triangles": [[0, 2, 1], [0, 1, 3], [0, 3, 2], [1, 2, 3]]
+    },
+    "cube_half_extent_5": {
+      "vertices": [
+        [-5.0, -5.0, -5.0],
+        [5.0, -5.0, -5.0],
+        [5.0, 5.0, -5.0],
+        [-5.0, 5.0, -5.0],
+        [-5.0, -5.0, 5.0],
+        [5.0, -5.0, 5.0],
+        [5.0, 5.0, 5.0],
+        [-5.0, 5.0, 5.0]
+      ],
+      "triangles": [
+        [0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7],
+        [0, 1, 5], [0, 5, 4], [3, 7, 6], [3, 6, 2],
+        [0, 4, 7], [0, 7, 3], [1, 2, 6], [1, 6, 5]
+      ]
+    },
+    "nonmanifold_three_fan": {
+      "vertices": [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, -1.0, 0.0]],
+      "triangles": [[0, 1, 2], [1, 0, 3], [0, 1, 4]]
+    }
+  },
+  "generated_primitives": {
+    "dense_faceted_cylinder": {
+      "kind": "faceted_cylinder",
+      "radius": 45.23007392883301,
+      "half_height": 52.753719329833984,
+      "segment_count": 12
+    },
+    "dense_350x400x285_box": {
+      "kind": "box",
+      "half_extents": [175.0, 200.0, 142.5]
+    }
+  },
+  "initialization": {
+    "success_cases": [
+      {
+        "name": "seed_0_two_tetrahedra",
+        "object": "centered_unit_tetrahedron",
+        "container": "cube_half_extent_5",
+        "object_count": 2,
+        "initial_volume_scale": 0.1,
+        "seed": 0,
+        "expected": {
+          "status": "success",
+          "rejected_candidate_count": 0,
+          "random_draw_count": 12,
+          "object_bounding_radius": 0.3848602148049237,
+          "sampled_transforms": [
+            {
+              "index": 0,
+              "volume_scale": 0.1,
+              "rotation": [-0.39215111717435397, 2.4615823622636204, 2.9132790442663947],
+              "translation": [0.48813503927324753, 2.151893663724195, 1.027633760716439]
+            },
+            {
+              "index": 1,
+              "volume_scale": 0.1,
+              "rotation": [-0.732358536341042, 1.8329624730174034, 0.18155213524358263],
+              "translation": [0.4488318299689684, -0.7634520066109527, 1.4589411306665614]
+            }
+          ]
+        }
+      },
+      {
+        "name": "seed_12345_rejection_work",
+        "object": "centered_unit_tetrahedron",
+        "container": "cube_half_extent_5",
+        "object_count": 8,
+        "initial_volume_scale": 0.1,
+        "seed": 12345,
+        "expected": {
+          "status": "success",
+          "rejected_candidate_count": 6,
+          "random_draw_count": 66,
+          "object_bounding_radius": 0.3848602148049237,
+          "sampled_transforms": [
+            {
+              "index": 0,
+              "volume_scale": 0.1,
+              "rotation": [1.9489775358353327, -2.5386046226798467, -1.7658889558059756],
+              "translation": [4.296160928171478, -1.836244454182141, -3.1608118832290555]
+            },
+            {
+              "index": 7,
+              "volume_scale": 0.1,
+              "rotation": [-1.9614971355011437, -2.3509069143808645, 1.1786992059440777],
+              "translation": [2.282661803271173, 3.183500113899145, 0.0022275283444823657]
+            }
+          ]
+        }
+      }
+    ],
+    "failure_cases": [
+      {
+        "name": "nonmanifold_container",
+        "object": "centered_unit_tetrahedron",
+        "container": "nonmanifold_three_fan",
+        "object_count": 1,
+        "initial_volume_scale": 0.1,
+        "seed": 1918,
+        "expected_python_exception": "AssertionError",
+        "expected_cpp_category": "invalid_mesh"
+      }
+    ]
+  },
+  "dense_initialization": {
+    "name": "supplied_cylinder_box_proxy_seed_1918",
+    "object": "dense_faceted_cylinder",
+    "container": "dense_350x400x285_box",
+    "initial_volume_scale": 1.0,
+    "seed": 1918,
+    "expected_bounding_radius": 69.48895229271052,
+    "accepted_prefix": {
+      "object_count": 6,
+      "rejected_candidate_count": 1752,
+      "random_draw_count": 5292,
+      "transforms": [
+        {
+          "index": 0,
+          "volume_scale": 1.0,
+          "rotation": [-1.6337530761107442, 2.4577736613309726, -0.5886960889180659],
+          "translation": [78.22196424214019, 20.777178208838762, 15.459965009118093]
+        },
+        {
+          "index": 1,
+          "volume_scale": 1.0,
+          "rotation": [-1.299393087902057, -0.5483301847331998, -1.2918894160072396],
+          "translation": [-21.71248989694405, -106.41186543022245, -69.09949129389304]
+        },
+        {
+          "index": 2,
+          "volume_scale": 1.0,
+          "rotation": [2.6441506281644482, -1.4356003171208969, 2.3962613342600116],
+          "translation": [-78.50169623473562, 112.62636365343275, 9.805401805454466]
+        },
+        {
+          "index": 3,
+          "volume_scale": 1.0,
+          "rotation": [-0.9685490492755138, 0.6064600282294164, -2.7024523039373944],
+          "translation": [104.76038085724281, -122.70971214715374, 21.02101150327593]
+        },
+        {
+          "index": 4,
+          "volume_scale": 1.0,
+          "rotation": [1.8034169634829498, 2.272999758072981, 0.5985153903646565],
+          "translation": [-89.77875472586062, -45.44514501703887, 44.14513443608547]
+        },
+        {
+          "index": 5,
+          "volume_scale": 1.0,
+          "rotation": [1.0769240014761525, 1.9708193184150575, 2.7450457119475926],
+          "translation": [39.77831423572519, 130.19090903222394, -66.49355009075626]
+        }
+      ]
+    },
+    "bounded_cpp_failures": [
+      {
+        "object_count": 7,
+        "max_sampling_attempts": 100000,
+        "expected_category": "resource_limit",
+        "expected_placed_count": 6,
+        "expected_diagnostic": "initial placement exhausted 100000 candidate attempts after placing 6 of 7 objects"
+      },
+      {
+        "object_count": 10,
+        "max_sampling_attempts": 100000,
+        "expected_category": "resource_limit",
+        "expected_placed_count": 6,
+        "expected_diagnostic": "initial placement exhausted 100000 candidate attempts after placing 6 of 10 objects"
+      }
+    ],
+    "python_behavior": {
+      "compatibility_id": "IROP-DEV-0007",
+      "bounded_probe_attempts": 10000,
+      "bounded_probe_expected_accepted_count": 6,
+      "timeout_seconds_per_run": 20,
+      "timeout_loop_max_runs": 20,
+      "cpp_difference": "C++ retains the greedy policy but returns resource_limit at the configured candidate bound"
+    }
+  },
+  "transform": {
+    "name": "volume_scale_rotation_translation",
+    "transform": {
+      "volume_scale": 1.728,
+      "rotation": [0.1, -0.2, 0.3],
+      "translation": [0.2, -0.4, 0.1]
+    },
+    "input_point": [0.7, -0.2, 0.5],
+    "expected_matrix": [
+      [1.123552036301039, -0.3696196496410759, -0.2025145336093111, 0.2],
+      [0.3546242479936074, 1.140676543106476, -0.11444940690815356, -0.4],
+      [0.2277552731744249, 0.047311083330103386, 1.177237952554782, 0.1],
+      [0.0, 0.0, 0.0, 1.0]
+    ],
+    "expected_point": [0.9591530885342868, -0.43712303847984685, 0.8385854508334678]
+  },
+  "cat": {
+    "name": "two_one_one_tetrahedron",
+    "points": [[0.0, 0.0, 0.0], [36.0, 0.0, 0.0], [0.0, 36.0, 0.0], [0.0, 0.0, 36.0]],
+    "tetrahedron": [0, 1, 2, 3],
+    "owners": [0, 0, 2, 1],
+    "participant_count": 3,
+    "expected": {
+      "polygons_by_participant": {
+        "0": [
+          [[0.0, 12.0, 12.0], [12.0, 12.0, 12.0], [18.0, 18.0, 0.0], [0.0, 18.0, 0.0]],
+          [[0.0, 12.0, 12.0], [12.0, 12.0, 12.0], [18.0, 0.0, 18.0], [0.0, 0.0, 18.0]]
+        ],
+        "1": [
+          [[0.0, 12.0, 12.0], [12.0, 12.0, 12.0], [18.0, 0.0, 18.0], [0.0, 0.0, 18.0]],
+          [[0.0, 12.0, 12.0], [12.0, 12.0, 12.0], [0.0, 18.0, 18.0]]
+        ],
+        "2": [
+          [[0.0, 12.0, 12.0], [12.0, 12.0, 12.0], [18.0, 18.0, 0.0], [0.0, 18.0, 0.0]],
+          [[0.0, 12.0, 12.0], [12.0, 12.0, 12.0], [0.0, 18.0, 18.0]]
+        ]
+      },
+      "constraints_by_participant": {
+        "0": [
+          {
+            "source_point": [0.0, 0.0, 0.0],
+            "plane_point": [0.0, 12.0, 12.0],
+            "inward_unit_normal": [0.0, -0.8944271909999159, -0.4472135954999579]
+          },
+          {
+            "source_point": [0.0, 0.0, 0.0],
+            "plane_point": [0.0, 12.0, 12.0],
+            "inward_unit_normal": [0.0, -0.4472135954999579, -0.8944271909999159]
+          },
+          {
+            "source_point": [36.0, 0.0, 0.0],
+            "plane_point": [0.0, 12.0, 12.0],
+            "inward_unit_normal": [0.0, -0.8944271909999159, -0.4472135954999579]
+          },
+          {
+            "source_point": [36.0, 0.0, 0.0],
+            "plane_point": [0.0, 12.0, 12.0],
+            "inward_unit_normal": [0.0, -0.4472135954999579, -0.8944271909999159]
+          }
+        ],
+        "1": [
+          {
+            "source_point": [0.0, 0.0, 36.0],
+            "plane_point": [0.0, 12.0, 12.0],
+            "inward_unit_normal": [0.0, 0.4472135954999579, 0.8944271909999159]
+          },
+          {
+            "source_point": [0.0, 0.0, 36.0],
+            "plane_point": [0.0, 12.0, 12.0],
+            "inward_unit_normal": [0.0, -0.7071067811865476, 0.7071067811865476]
+          }
+        ],
+        "2": [
+          {
+            "source_point": [0.0, 36.0, 0.0],
+            "plane_point": [0.0, 12.0, 12.0],
+            "inward_unit_normal": [0.0, 0.8944271909999159, 0.4472135954999579]
+          },
+          {
+            "source_point": [0.0, 36.0, 0.0],
+            "plane_point": [0.0, 12.0, 12.0],
+            "inward_unit_normal": [0.0, 0.7071067811865476, -0.7071067811865476]
+          }
+        ]
+      },
+      "constraints_per_participant": [4, 2, 2],
+      "work": {
+        "points_examined": 4,
+        "tetrahedra_examined": 1,
+        "relevant_tetrahedra": 1,
+        "skipped_single_participant_tetrahedra": 0,
+        "polygons_generated": 6,
+        "polygon_vertices_generated": 22,
+        "constraints_generated": 8
+      }
+    }
+  },
+  "local_constraint": {
+    "name": "translated_rotated_scaled_plane",
+    "object_center": [2.0, -1.0, 3.0],
+    "current_vertex": [2.7, -1.2, 3.5],
+    "plane_point": [2.1, -0.7, 2.6],
+    "inward_unit_normal": [0.36, -0.48, 0.8],
+    "padding": 0.05,
+    "step": {
+      "volume_scale_multiplier": 1.728,
+      "rotation_delta": [0.1, -0.2, 0.3],
+      "translation_delta": [0.2, -0.4, 0.1]
+    },
+    "expected_objective": -1.728,
+    "expected_objective_gradient": [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "expected_constraint": 1.603982531009444,
+    "expected_gradient": [0.170135519099044, 0.136605304896829, -0.341431708527381, -0.408564261347921, 0.36, -0.48, 0.8]
+  },
+  "no_growth_terminal": {
+    "name": "one_tetrahedron_at_initial_barrier",
+    "reference_scope": "Python Optimizer.setup() supplies the feasible no-growth terminal transform; Python has no canonical outcome or artifact contract",
+    "object": "centered_unit_tetrahedron",
+    "container": "cube_half_extent_5",
+    "object_count": 1,
+    "initial_volume_scale": 0.1,
+    "final_volume_scale": 0.1,
+    "seed": 1918,
+    "expected": {
+      "python_setup_transform": {
+        "volume_scale": 0.1,
+        "rotation": [0.0, 0.0, 0.0],
+        "translation": [0.0, 0.0, 0.0]
+      },
+      "cpp_status": "success",
+      "final_feasible": true,
+      "completed_scale_steps": 1,
+      "iterations": 0,
+      "tetrahedralization_attempts": 0,
+      "cat_builds": 0,
+      "local_solves": 0,
+      "metrics": {
+        "object_count": 1,
+        "objects_at_final_target": 1,
+        "minimum_volume_scale": 0.1,
+        "maximum_volume_scale": 0.1,
+        "mean_volume_scale": 0.1,
+        "packed_object_volume": 0.016666666666666666,
+        "packing_fraction": 0.000016666666666666667
+      },
+      "artifacts": ["container.stl", "packed-objects.stl", "placements.json", "run-summary.json"],
+      "packed_triangle_count": 4
+    }
+  }
+}

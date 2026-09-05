@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -147,6 +148,26 @@ void validate_packing_algorithm_config(double initial_volume_scale, const Packin
                                        const PackingEngineLimits& limits);
 
 namespace detail {
+
+struct PhysicalCollisionCorrectionResult {
+    PackingStatus status = PackingStatus::success;
+    std::vector<Transform> transforms;
+    SceneCollisionReport collision;
+    std::uint64_t correction_passes = 0;
+    std::string diagnostic;
+
+    [[nodiscard]] bool succeeded() const noexcept { return status == PackingStatus::success; }
+};
+
+// Internal correction seam exposed for deterministic orchestration tests; not
+// a stable API. Work references are updated after every completed validation or
+// correction pass so an interrupted or failed caller retains partial evidence.
+[[nodiscard]] PhysicalCollisionCorrectionResult correct_physical_collisions(
+    const TriangleMesh& centered_object, const TriangleMesh& container, std::span<const TriangleMesh> cat_surfaces,
+    std::vector<Transform> candidate_transforms, double correction_volume_scale_factor,
+    std::uint64_t maximum_correction_passes, const MeshLimits& output_mesh_limits,
+    const SceneCollisionLimits& collision_limits, SceneCollisionWork& cumulative_collision_work,
+    std::uint64_t& cumulative_correction_passes, const std::function<std::optional<PackingStatus>()>& stopped = {});
 
 // Internal numeric policy exposed for focused tests; not a stable API.
 [[nodiscard]] double barrier_volume_scale_multiplier_bound(double current_volume_scale, double target_volume_scale);

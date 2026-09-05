@@ -38,6 +38,21 @@ void require_success_at_target(const irop::PackingResult& result, const double t
     }
 }
 
+void require_same_transforms(const std::vector<irop::Transform>& actual, const std::vector<irop::Transform>& expected)
+{
+    REQUIRE(actual.size() == expected.size());
+    for (std::size_t index = 0; index < actual.size(); ++index) {
+        CAPTURE(index);
+        CHECK(actual[index].volume_scale == expected[index].volume_scale);
+        CHECK(actual[index].rotation.x == expected[index].rotation.x);
+        CHECK(actual[index].rotation.y == expected[index].rotation.y);
+        CHECK(actual[index].rotation.z == expected[index].rotation.z);
+        CHECK(actual[index].translation.x == expected[index].translation.x);
+        CHECK(actual[index].translation.y == expected[index].translation.y);
+        CHECK(actual[index].translation.z == expected[index].translation.z);
+    }
+}
+
 [[nodiscard]] irop::TriangleMesh packing_cylinder(const bool full_scale_fixture)
 {
     constexpr std::size_t segment_count = 12;
@@ -211,6 +226,60 @@ TEST_CASE("two generated full-size cylinders reach the barrier with bounded loca
     CHECK(result.work.local_solves <= 8);
 }
 
+TEST_CASE("TetGen degeneracy recovery is bounded and observable", "[practical-packing][packing][integration][recovery]")
+{
+    const irop::TriangleMesh object = centered(irop::test::cylinder_mesh(0.9, 1.055, 12));
+    const irop::TriangleMesh container = irop::test::box_mesh(3.5, 4.0, 2.85);
+
+    irop::PackingConfig initialization;
+    initialization.object_count = 2;
+    initialization.initial_volume_scale = 0.999;
+    initialization.seed = 1918;
+    irop::PackingState state = irop::initialize_packing(object, container, initialization);
+    const std::vector<irop::Transform> initial_transforms = state.transforms;
+
+    irop::PackingAlgorithmConfig algorithm;
+    algorithm.final_volume_scale = 1.0;
+    algorithm.scale_step_count = 1;
+    algorithm.max_iterations_per_scale_step = 3;
+    algorithm.maximum_rotation_delta_radians = 0.0;
+    algorithm.adaptive_sampling = false;
+
+    std::vector<irop::PackingProgressPhase> phases;
+    irop::PackingCallbacks callbacks;
+    callbacks.progress = [&phases](const irop::PackingProgress& progress) {
+        phases.push_back(progress.phase);
+    };
+
+    const irop::PackingResult result = irop::run_packing(object, container, std::move(state), algorithm, {}, callbacks);
+
+    INFO(result.diagnostic);
+    CHECK(result.status == irop::PackingStatus::dependency_failure);
+    CHECK(result.work.tetrahedralization_attempts == 3);
+    CHECK(result.work.tetrahedralization_recoveries == 2);
+    CHECK(result.work.local_solves == 0);
+    const double expected_scale = initialization.initial_volume_scale *
+                                  algorithm.tetrahedralization_recovery_scale_factor *
+                                  algorithm.tetrahedralization_recovery_scale_factor;
+    REQUIRE(result.state.transforms.size() == initial_transforms.size());
+    for (std::size_t index = 0; index < result.state.transforms.size(); ++index) {
+        const irop::Transform& transform = result.state.transforms[index];
+        const irop::Transform& initial = initial_transforms[index];
+        CHECK(transform.volume_scale == Approx(expected_scale).epsilon(1.0e-15));
+        CHECK(transform.rotation.x == initial.rotation.x);
+        CHECK(transform.rotation.y == initial.rotation.y);
+        CHECK(transform.rotation.z == initial.rotation.z);
+        CHECK(transform.translation.x == initial.translation.x);
+        CHECK(transform.translation.y == initial.translation.y);
+        CHECK(transform.translation.z == initial.translation.z);
+    }
+    REQUIRE(phases.size() == 4);
+    CHECK(phases[0] == irop::PackingProgressPhase::scale_step_started);
+    CHECK(phases[1] == irop::PackingProgressPhase::tetrahedralization_recovery);
+    CHECK(phases[2] == irop::PackingProgressPhase::tetrahedralization_recovery);
+    CHECK(phases[3] == irop::PackingProgressPhase::finished);
+}
+
 TEST_CASE("two generated full-size tetrahedra reach the barrier with bounded local work",
           "[practical-packing][packing][integration]")
 {
@@ -220,6 +289,56 @@ TEST_CASE("two generated full-size tetrahedra reach the barrier with bounded loc
     CHECK(result.work.completed_scale_steps == 1);
     CHECK(result.work.local_solves >= 2);
     CHECK(result.work.local_solves <= 8);
+}
+
+TEST_CASE("five generated full-size cylinders already at the barrier bypass packing iterations",
+          "[practical-packing][packing][integration][no-growth]")
+{
+    const irop::TriangleMesh object = centered(irop::test::cylinder_mesh(0.9, 1.055, 12));
+    const irop::TriangleMesh container = irop::test::box_mesh(6.0, 6.0, 6.0);
+
+    irop::PackingConfig initialization;
+    initialization.object_count = 5;
+    initialization.initial_volume_scale = 1.0;
+    initialization.seed = 1918;
+    irop::PackingState state = irop::initialize_packing(object, container, initialization);
+    const std::vector<irop::Transform> initial_transforms = state.transforms;
+    const std::uint64_t initial_draw_count = state.random_state.draw_count();
+
+    irop::PackingAlgorithmConfig algorithm;
+    algorithm.final_volume_scale = 1.0;
+    algorithm.scale_step_count = 1;
+    algorithm.adaptive_sampling = false;
+
+    irop::PackingEngineLimits limits;
+    // This valid but insufficient budget makes any accidental TetGen call fail.
+    limits.tetrahedralization.max_input_points = 1;
+
+    std::vector<irop::PackingProgressPhase> phases;
+    irop::PackingCallbacks callbacks;
+    callbacks.progress = [&phases](const irop::PackingProgress& progress) {
+        phases.push_back(progress.phase);
+    };
+
+    const irop::PackingResult result =
+        irop::run_packing(object, container, std::move(state), algorithm, limits, callbacks);
+
+    require_success_at_target(result, 1.0);
+    require_same_transforms(result.state.transforms, initial_transforms);
+    CHECK(result.state.random_state.draw_count() == initial_draw_count);
+    CHECK(result.work.completed_scale_steps == 1);
+    CHECK(result.work.iterations == 0);
+    CHECK(result.work.resampling_operations == 0);
+    CHECK(result.work.tetrahedralization_attempts == 0);
+    CHECK(result.work.tetrahedralization_recoveries == 0);
+    CHECK(result.work.cat_builds == 0);
+    CHECK(result.work.local_solves == 0);
+    CHECK(result.work.correction_passes == 0);
+    CHECK(result.final_validation.work.object_pairs_examined == 10);
+    CHECK(result.history.empty());
+    REQUIRE(phases.size() == 2);
+    CHECK(phases[0] == irop::PackingProgressPhase::scale_step_started);
+    CHECK(phases[1] == irop::PackingProgressPhase::finished);
 }
 
 TEST_CASE("generated rod packing can use rotation to reach its known feasible orientation",
