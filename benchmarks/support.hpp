@@ -2,14 +2,18 @@
 
 #include <intrin.h>
 
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -18,6 +22,7 @@
 
 // Psapi requires Windows declarations before it is included.
 #include <Psapi.h>
+#include <bcrypt.h>
 
 #include "irop/model/triangle_mesh.hpp"
 
@@ -25,6 +30,107 @@ namespace irop::benchmark {
 
 using Json = nlohmann::json;
 using Clock = std::chrono::steady_clock;
+
+[[nodiscard]] inline std::filesystem::path path_from_utf8(const std::string_view value)
+{
+    std::u8string bytes;
+    bytes.reserve(value.size());
+    for (const char character : value) {
+        bytes.push_back(static_cast<char8_t>(static_cast<unsigned char>(character)));
+    }
+    return std::filesystem::path(bytes);
+}
+
+[[nodiscard]] inline std::string path_utf8(const std::filesystem::path& path)
+{
+    const auto bytes = path.u8string();
+    return { bytes.begin(), bytes.end() };
+}
+
+inline void write_report(const std::filesystem::path& path, const std::string& contents)
+{
+    constexpr std::size_t maximum_report_bytes = 32ULL * 1024ULL * 1024ULL;
+    if (contents.size() > maximum_report_bytes) {
+        throw std::runtime_error("benchmark report exceeds its bounded output size");
+    }
+    struct File {
+        HANDLE handle = INVALID_HANDLE_VALUE;
+        ~File()
+        {
+            if (handle != INVALID_HANDLE_VALUE) {
+                static_cast<void>(CloseHandle(handle));
+            }
+        }
+    } file;
+    file.handle = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file.handle == INVALID_HANDLE_VALUE) {
+        throw std::runtime_error("failed to exclusively create the new benchmark report");
+    }
+    DWORD written = 0;
+    if (WriteFile(file.handle, contents.data(), static_cast<DWORD>(contents.size()), &written, nullptr) == 0 ||
+        written != contents.size()) {
+        throw std::runtime_error("failed to write benchmark report");
+    }
+}
+
+// Use the platform SHA256 implementation and stream bounded inputs. Hashing is
+// measured separately from the packing service and warms filesystem caches.
+[[nodiscard]] inline Json input_metadata(const std::filesystem::path& path, const std::uint64_t maximum_bytes)
+{
+    const auto resolved = std::filesystem::canonical(path);
+    const auto bytes = std::filesystem::file_size(resolved);
+    if (bytes > maximum_bytes) {
+        throw std::invalid_argument("benchmark input exceeds the mesh byte limit before hashing");
+    }
+    struct Hash {
+        BCRYPT_HASH_HANDLE handle = nullptr;
+        ~Hash()
+        {
+            if (handle != nullptr) {
+                static_cast<void>(BCryptDestroyHash(handle));
+            }
+        }
+    } hash;
+    if (BCryptCreateHash(BCRYPT_SHA256_ALG_HANDLE, &hash.handle, nullptr, 0, nullptr, 0, 0) != 0) {
+        throw std::runtime_error("failed to create the benchmark SHA256 hash");
+    }
+    std::ifstream input(resolved, std::ios::binary);
+    if (!input) {
+        throw std::runtime_error("failed to open benchmark input for hashing");
+    }
+    std::array<unsigned char, 64 * 1024> buffer {};
+    std::uint64_t consumed = 0;
+    while (input) {
+        input.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
+        const auto count = static_cast<std::uint64_t>(input.gcount());
+        if (count > maximum_bytes - consumed) {
+            throw std::invalid_argument("benchmark input grew beyond the mesh byte limit during hashing");
+        }
+        consumed += count;
+        if (BCryptHashData(hash.handle, buffer.data(), static_cast<ULONG>(count), 0) != 0) {
+            throw std::runtime_error("failed to hash benchmark input");
+        }
+    }
+    if (!input.eof() || consumed != bytes) {
+        throw std::runtime_error("benchmark input changed size or could not be fully read during hashing");
+    }
+    std::array<unsigned char, 32> digest {};
+    if (BCryptFinishHash(hash.handle, digest.data(), static_cast<ULONG>(digest.size()), 0) != 0) {
+        throw std::runtime_error("failed to finish the benchmark SHA256 hash");
+    }
+    constexpr std::string_view digits = "0123456789abcdef";
+    std::string encoded;
+    encoded.reserve(digest.size() * 2);
+    for (const unsigned char byte : digest) {
+        encoded.push_back(digits[byte >> 4U]);
+        encoded.push_back(digits[byte & 0x0fU]);
+    }
+    return {
+        { "resolved_path", path_utf8(resolved) },
+        { "size_bytes",    bytes               },
+        { "sha256",        encoded             }
+    };
+}
 
 [[nodiscard]] inline double process_cpu_milliseconds()
 {

@@ -58,6 +58,7 @@ set(
     src/initialization/initialize_scene.cpp
     src/inspection/inspect_stl.cpp
     src/io/run_scene.cpp
+    src/io/local_solve_replay.cpp
     src/io/stl_io.cpp
     src/io/diagnostic_geometry.cpp
     src/model/mesh_validation.cpp
@@ -80,6 +81,7 @@ set(
     include/irop/initialization/initialize_scene.hpp
     include/irop/inspection/inspect_stl.hpp
     include/irop/io/run_scene.hpp
+    include/irop/io/local_solve_replay.hpp
     include/irop/io/stl_io.hpp
     include/irop/io/diagnostic_geometry.hpp
     include/irop/model/mesh_validation.hpp

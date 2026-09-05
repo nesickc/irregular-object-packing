@@ -3,7 +3,7 @@ if(NOT WIN32)
 endif()
 
 set(IROP_UI_VTK_TARGETS VTK::CommonCore VTK::CommonDataModel VTK::RenderingCore VTK::RenderingOpenGL2 VTK::RenderingUI VTK::InteractionStyle VTK::IOImage)
-add_executable(irop_studio WIN32 main.cpp job.cpp job.hpp viewport.cpp viewport.hpp studio.manifest)
+add_executable(irop_studio WIN32 main.cpp job.cpp job.hpp run_directory.cpp run_directory.hpp viewport.cpp viewport.hpp studio.manifest)
 target_compile_features(irop_studio PRIVATE cxx_std_20)
 set_target_properties(irop_studio PROPERTIES CXX_EXTENSIONS OFF)
 target_compile_definitions(irop_studio PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE _WIN32_WINNT=0x0A00)

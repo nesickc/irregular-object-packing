@@ -45,12 +45,42 @@ Startup arguments can prefill the two mesh fields or open an existing result:
    limit. Toggle adaptive sampling and structured initialization fallback as
    needed. Volume scale is the volume ratio: `0.125` gives half the linear size.
    All meshes must use consistent coordinate units; Studio performs no conversion.
-3. Choose a new output folder. The browse button selects a parent and proposes
-   a new child folder. Existing run folders are never overwritten.
-4. Select **Run packing**. Progress reports the current barrier, iteration and
-   objects at the target. The saved outcome, diagnostics and artifact location
+3. Choose a **Runs folder** once, or keep the default
+   `%LOCALAPPDATA%\IROP\Runs`. Studio remembers this parent across launches and
+   shows the next child name: `run-000001`, `run-000002`, etc. Every Run allocates
+   a fresh child automatically. Existing run folders are never overwritten.
+4. Select **Run packing**. Progress distinguishes input preparation, bounded
+   initialization, the current barrier/iteration and the current object solve.
+   Local iteration/time limits are shown separately from the engine time budget.
+   The saved outcome, diagnostics and artifact location
    appear when the run ends. Successful runs publish the same STL/JSON artifacts
-   as `irop pack`; unsuccessful engine runs publish only their summary.
+   as `irop pack`; unsuccessful engine runs publish their summary without packed
+   geometry. An opted-in captured failure can also publish `failed-local-solve.json`.
+
+Select **Run packing** again without editing any output path. A cancelled or
+failed attempt also consumes its number, even if it fails before creating an
+artifact directory; gaps are expected. Two Studio instances using the same Runs
+folder receive different names. **Open result folder** opens the latest published
+or opened result's actual location, separately from the next-run destination.
+
+Enable **Capture solver diagnostics** before a diagnostic run to retain a bounded
+failing local-problem snapshot (`failed-local-solve.json`) and solver trace for replay. Studio requests up to
+64 local-solve records and 128 trace records per solve. This is off by default;
+packing settings and solver behavior are unchanged by collection.
+
+The remembered parent uses bounded per-user settings in
+`%LOCALAPPDATA%\IROP\Studio`. An optional `--settings-dir ABSOLUTE_DIRECTORY`
+overrides this location and puts the default Runs folder inside that directory;
+this is useful for isolated test sessions. Malformed settings fall back to the
+default with a visible message. Unavailable preference storage does not block
+packing: a newly selected Runs folder remains active for the current session,
+with a settings warning until it can be remembered. Run uses the active parent
+directly and does not rewrite preferences. Unsafe settings links/directories are
+left untouched. Automatic numbering stores a small private
+`.irop-run-sequence` ledger beside results; retain it to preserve numbers consumed
+by unpublished attempts. Allocation scans at most 100,000 entries, retries at most
+100 occupied candidates, and accepts up to 100,000 recorded attempts per Runs
+folder. If a limit is reached or the ledger is damaged, choose another Runs folder.
 
 Only one preview, load or packing job runs at a time. Geometry preparation and
 packing run on one worker; rendering and controls remain on the window thread.
@@ -63,6 +93,40 @@ returns. The time-limit setting bounds engine elapsed work; initialization has
 its own bounded candidate and geometry budgets. Pre-engine cancellation creates
 no run directory. Engine cancellation can publish a summary-only cancelled run;
 an outcome already committed before a late cancellation remains authoritative.
+
+## A verified full-size run for the supplied meshes
+
+For `rc/input_models/ulamok_2kg_simplified.stl` inside
+`rc/containers/10_kg_np.stl`, these settings produced a validated result on
+2026-09-05:
+
+| Setting | Value |
+| --- | --- |
+| Copies / seed | 10 / 1918 |
+| Initial / target volume scale | 1.0 / 1.0 |
+| Scale steps / time limit | 1 / 300 seconds |
+| Adaptive mesh sampling | Off |
+| Structured initialization fallback | On |
+
+Choose a Runs folder and select **Run packing**. All ten objects remain at
+their original size, occupy 16.97% of the container volume, and pass full-resolution
+and serialized-output physical validation. The structured initializer already
+reaches the target, so no growth solves are needed. This is a verified placement
+for these inputs, not evidence that every mesh or growth configuration converges.
+
+The same count and seed with initial scale `0.1`, target `1.0`, nine steps,
+adaptive sampling on and fallback off reproducibly reaches a local Ipopt
+iteration limit. Initialization succeeds, but a per-object solve exhausts its
+1,000-iteration allowance while still approaching the first `0.2` barrier.
+Increasing Studio's overall timeout does not increase this separate local limit.
+Disabling adaptive sampling alone also failed in the diagnostic run. Enabling
+fallback alone cannot change a run whose random initialization already succeeded.
+
+The displayed 2.64% is the last committed partial-size state, not the final target
+occupancy. **Recorded physical validation: not recorded** means this unsuccessful
+run never reached final validation; the summary-only output intentionally has no
+packed STL. Reliable `0.1` to `1.0` growth for this case remains unresolved. See
+[status and reproduction evidence](STATUS.md#supplied-ten-object-growth-diagnosis).
 
 ## Inspect geometry and saved runs
 
@@ -107,7 +171,11 @@ ctest --preset windows-vs2026-release
 
 The separate smoke driver opens real windows and exercises preview, genuine
 `.1 -> .2` growth, reopening the result, cancellation, closing during active work,
-and a malformed saved summary. Use a fresh output directory for each run:
+a malformed saved summary, rerunning after success/cancellation/input failure,
+remembering the Runs folder and next number across a new process, and rerunning
+successfully while preference storage is unusable. It supplies
+isolated settings directories beneath its work directory, so the smoke never
+changes your normal Studio preferences. Use a fresh work directory for each run:
 
 ```powershell
 cmake `

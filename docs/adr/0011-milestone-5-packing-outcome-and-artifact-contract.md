@@ -71,9 +71,13 @@ invalid geometry as a successful packing result.
 - A successful `irop pack` atomically publishes a new directory containing
   `packed-objects.stl`, `container.stl`, `placements.json`, and
   `run-summary.json`, plus optional individual object STLs.
-- An expected unsuccessful algorithm run atomically publishes only
+- An expected unsuccessful algorithm run normally atomically publishes only
   `run-summary.json`, with a non-success category and null geometry/placement
-  output paths. Input, usage, and output-path failures publish no run directory.
+  output paths. The explicitly enabled diagnostic exception in
+  [ADR-0015](0015-repeatable-runs-and-bounded-diagnostics.md) may also publish the
+  fixed `failed-local-solve.json` numeric local-problem snapshot. It contains no
+  packed geometry or source paths, and its presence is recorded in an optional
+  summary output field. Input, usage, and output-path failures publish no run directory.
 - Cancellation before a valid packing state or engine result exists exits 130
   without a run directory. Cancellation once an engine result exists is an
   expected unsuccessful algorithm outcome and publishes only its summary.
@@ -84,6 +88,23 @@ invalid geometry as a successful packing result.
 - Use process exit 0 for success, 4 for resource/time exhaustion, 6 for another
   structured unsuccessful packing outcome, and 130 for cancellation. Existing
   usage/input/output/internal exit categories remain unchanged.
+
+## Tranche 1 extension
+
+On 2026-09-05, ADR-0015 extends this contract for repeatable runs and diagnosis.
+The service reserves its private staging transaction before input preparation;
+known-unusable destinations fail before expensive work, while final publication
+still checks for a competing destination. Pre-engine failures remove staging and
+publish no final run directory. Parent creation during preflight is permitted.
+
+Only explicitly requested failed-local-problem capture extends the unsuccessful
+artifact set. It never publishes a partial scene, placements or success marker.
+A diagnostic write failure records omission and preserves the authoritative
+failure summary. Historical version-one summaries remain valid; diagnostic,
+snapshot-path and additional timing fields are optional. Snapshot parsing uses its
+own bounded numeric schema, and saved-run viewers do not automatically follow it.
+The extension is verified by opt-in/default publication tests, exact failed-problem
+replay and schema validation; STATUS records the complete tranche 1 evidence.
 
 ## Consequences
 

@@ -19,6 +19,14 @@
 
 namespace irop {
 
+struct PackingDiagnosticsOptions {
+    bool capture_failed_local_problem = false;
+    std::uint64_t max_local_solve_records = 0;
+    std::uint64_t max_trace_records_per_solve = 0;
+    std::uint64_t max_failed_snapshot_constraints = 100'000;
+    std::uint64_t max_recovery_records = 32;
+};
+
 struct PackingAlgorithmConfig {
     double final_volume_scale = 1.0;
     std::uint64_t scale_step_count = 9;
@@ -31,6 +39,7 @@ struct PackingAlgorithmConfig {
     double local_solve_tolerance = maximum_local_solve_tolerance;
     SurfaceSamplingPolicy sampling;
     bool adaptive_sampling = true;
+    PackingDiagnosticsOptions diagnostics;
 };
 
 struct PackingEngineLimits {
@@ -72,8 +81,11 @@ enum class PackingStatus {
 [[nodiscard]] const char* to_string(PackingStatus status) noexcept;
 
 enum class PackingProgressPhase {
+    input_preparation,
+    initialization_started,
     scale_step_started,
     tetrahedralization_recovery,
+    local_solve_started,
     iteration_completed,
     finished,
 };
@@ -88,6 +100,11 @@ struct PackingProgress {
     double target_volume_scale = 0.0;
     std::uint64_t objects_at_target = 0;
     std::uint64_t object_count = 0;
+    std::optional<std::uint64_t> object_id;
+    std::optional<std::uint64_t> initialization_attempt_limit;
+    std::uint64_t local_iteration_limit = 0;
+    std::chrono::milliseconds local_time_limit {};
+    std::chrono::milliseconds engine_time_limit {};
 };
 
 struct PackingCallbacks {
@@ -108,6 +125,48 @@ struct PackingIterationRecord {
     std::uint64_t correction_passes = 0;
 };
 
+struct PackingStageTimings {
+    std::chrono::microseconds resampling {};
+    std::chrono::microseconds transform {};
+    std::chrono::microseconds tetrahedralization {};
+    std::chrono::microseconds cat {};
+    std::chrono::microseconds local_solve {};
+    std::chrono::microseconds correction {};
+    std::chrono::microseconds final_validation {};
+};
+
+struct PackingLocalSolveRecord {
+    std::uint64_t object_id = 0;
+    std::uint64_t scale_step = 0;
+    std::uint64_t iteration = 0;
+    double target_volume_scale = 0.0;
+    LocalSolveStatus status = LocalSolveStatus::invalid_input;
+    LocalSolveLimits limits;
+    LocalSolveWork work;
+    std::string reason;
+    std::vector<LocalSolveTraceRecord> trace;
+    std::uint64_t trace_records_dropped = 0;
+};
+
+struct PackingRecoveryRecord {
+    std::uint64_t scale_step = 0;
+    std::uint64_t iteration = 0;
+    double target_volume_scale = 0.0;
+    TetrahedralizationStatus status = TetrahedralizationStatus::invalid_input;
+    std::string reason;
+    bool recovery_applied = false;
+};
+
+struct PackingDiagnostics {
+    std::optional<PackingLocalSolveRecord> failure;
+    std::optional<LocalSolveSnapshot> failed_local_problem;
+    bool failed_snapshot_omitted = false;
+    std::vector<PackingLocalSolveRecord> local_solve_records;
+    std::uint64_t local_solve_records_dropped = 0;
+    std::vector<PackingRecoveryRecord> recovery_records;
+    std::uint64_t recovery_records_dropped = 0;
+};
+
 struct PackingWork {
     std::uint64_t completed_scale_steps = 0;
     std::uint64_t iterations = 0;
@@ -122,6 +181,7 @@ struct PackingWork {
     LocalSolveWork local_solve;
     SceneCollisionWork collision;
     std::chrono::milliseconds elapsed_time {};
+    PackingStageTimings stage_timings;
 };
 
 struct PackingResult {
@@ -130,6 +190,7 @@ struct PackingResult {
     PackingStatus status = PackingStatus::invalid_input;
     PackingState state;
     PackingWork work;
+    PackingDiagnostics diagnostics;
     std::vector<PackingIterationRecord> history;
     SceneCollisionReport final_validation;
     bool final_validation_performed = false;

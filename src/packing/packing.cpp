@@ -21,6 +21,27 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
+class StageTimer final {
+public:
+    explicit StageTimer(std::chrono::microseconds& destination) : destination_(destination) {}
+    ~StageTimer() { destination_ += std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start_); }
+    StageTimer(const StageTimer&) = delete;
+    StageTimer& operator=(const StageTimer&) = delete;
+
+private:
+    std::chrono::microseconds& destination_;
+    Clock::time_point start_ = Clock::now();
+};
+
+template <typename Operation>
+auto measure_stage(std::chrono::microseconds& destination, Operation&& operation)
+{
+    const StageTimer timer(destination);
+    return std::forward<Operation>(operation)();
+}
+
+[[nodiscard]] std::string bounded_reason(const std::string& reason) { return reason.substr(0, 2'048); }
+
 constexpr double reference_rotation_bound_factor = 0.9;
 constexpr std::uint64_t maximum_exact_binary64_integer = 9'007'199'254'740'992ULL;
 
@@ -477,6 +498,14 @@ double barrier_volume_scale_multiplier_bound(const double current_volume_scale, 
 void validate_packing_algorithm_config(const double initial_scale, const PackingAlgorithmConfig& config,
                                        const PackingEngineLimits& limits)
 {
+    if (config.diagnostics.max_local_solve_records > 4'096 || config.diagnostics.max_trace_records_per_solve > 4'096 ||
+        config.diagnostics.max_failed_snapshot_constraints > 100'000 || config.diagnostics.max_recovery_records > 256 ||
+        (config.diagnostics.max_trace_records_per_solve > 0 &&
+         config.diagnostics.max_local_solve_records > 8'192 / config.diagnostics.max_trace_records_per_solve)) {
+        throw Error(ErrorCategory::invalid_configuration,
+                    "packing diagnostic collection limits exceed their hard ceilings");
+    }
+
     if (!std::isfinite(initial_scale) || initial_scale <= 0.0 || initial_scale > 1.0 ||
         !std::isfinite(config.final_volume_scale) || config.final_volume_scale < initial_scale ||
         config.final_volume_scale > 1.0 || config.scale_step_count == 0 ||
@@ -559,10 +588,16 @@ const char* to_string(const PackingStatus status) noexcept
 const char* to_string(const PackingProgressPhase phase) noexcept
 {
     switch (phase) {
+    case PackingProgressPhase::input_preparation:
+        return "input_preparation";
+    case PackingProgressPhase::initialization_started:
+        return "initialization_started";
     case PackingProgressPhase::scale_step_started:
         return "scale_step_started";
     case PackingProgressPhase::tetrahedralization_recovery:
         return "tetrahedralization_recovery";
+    case PackingProgressPhase::local_solve_started:
+        return "local_solve_started";
     case PackingProgressPhase::iteration_completed:
         return "iteration_completed";
     case PackingProgressPhase::finished:
@@ -580,6 +615,9 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
     PackingProgress progress;
     progress.scale_step_count = config.scale_step_count;
     progress.object_count = static_cast<std::uint64_t>(result.state.transforms.size());
+    progress.engine_time_limit = limits.max_elapsed_time;
+    progress.local_iteration_limit = limits.local_solve.max_iterations;
+    progress.local_time_limit = limits.local_solve.max_elapsed_time;
 
     auto update_elapsed = [&]() noexcept {
         result.work.elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start_time);
@@ -589,6 +627,7 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
         result.diagnostic = std::move(diagnostic);
         update_elapsed();
         progress.phase = PackingProgressPhase::finished;
+        progress.object_id.reset();
         progress.objects_at_target = object_count_at_target(result.state.transforms, progress.target_volume_scale);
         if (callbacks.progress) {
             callbacks.progress(progress);
@@ -641,6 +680,7 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
             }
 
             progress.phase = PackingProgressPhase::scale_step_started;
+            progress.object_id.reset();
             progress.scale_step = scale_step;
             progress.iteration = 0;
             progress.target_volume_scale = target_scale;
@@ -664,8 +704,9 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                 const SurfaceResamplingLimits resampling_limits = effective_resampling_limits(limits);
                 const std::uint64_t object_target = target_surface_triangle_count(
                     static_cast<std::uint64_t>(centered_object.triangles.size()), target_scale, config.sampling);
-                SurfaceResamplingResult object_result =
-                    resample_closed_surface(centered_object, object_target, resampling_limits);
+                SurfaceResamplingResult object_result = measure_stage(result.work.stage_timings.resampling, [&] {
+                    return resample_closed_surface(centered_object, object_target, resampling_limits);
+                });
                 increment(result.work.resampling_operations);
                 sampled_object = std::move(object_result.mesh);
                 if (object_result.actual_triangle_count != sampled_object.triangles.size()) {
@@ -678,8 +719,9 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
 
                 const std::uint64_t container_target = target_container_triangle_count(
                     sampled_object, container, 4, config.sampling.minimum_triangle_count);
-                SurfaceResamplingResult container_result =
-                    resample_closed_surface(container, container_target, resampling_limits);
+                SurfaceResamplingResult container_result = measure_stage(result.work.stage_timings.resampling, [&] {
+                    return resample_closed_surface(container, container_target, resampling_limits);
+                });
                 increment(result.work.resampling_operations);
                 sampled_container = std::move(container_result.mesh);
                 if (container_result.actual_triangle_count != sampled_container.triangles.size()) {
@@ -700,8 +742,10 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                     return stop_result(*status);
                 }
 
-                std::vector<TriangleMesh> participants = instantiate(
-                    sampled_object, result.state.transforms, limits.intermediate_mesh_limits, "sampled packing");
+                std::vector<TriangleMesh> participants = measure_stage(result.work.stage_timings.transform, [&] {
+                    return instantiate(sampled_object, result.state.transforms, limits.intermediate_mesh_limits,
+                                       "sampled packing");
+                });
                 participants.push_back(sampled_container);
                 if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
                     return stop_result(*status);
@@ -709,8 +753,27 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
 
                 increment(result.work.tetrahedralization_attempts);
                 TetrahedralizationResult tetrahedralization =
-                    tetrahedralize_surfaces(participants, limits.tetrahedralization);
+                    measure_stage(result.work.stage_timings.tetrahedralization, [&] {
+                    return tetrahedralize_surfaces(participants, limits.tetrahedralization);
+                });
                 accumulate(result.work.tetrahedralization, tetrahedralization.work);
+                std::optional<std::size_t> recovery_record_index;
+                if (!tetrahedralization.succeeded()) {
+                    try {
+                        if (result.diagnostics.recovery_records.size() < config.diagnostics.max_recovery_records) {
+                            result.diagnostics.recovery_records.push_back(
+                                { scale_step, iteration, target_scale, tetrahedralization.status,
+                                  bounded_reason(tetrahedralization.diagnostic), false });
+                            recovery_record_index = result.diagnostics.recovery_records.size() - 1;
+                        }
+                        else {
+                            increment(result.diagnostics.recovery_records_dropped);
+                        }
+                    }
+                    catch (...) {
+                        increment(result.diagnostics.recovery_records_dropped);
+                    }
+                }
                 if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
                     return stop_result(*status);
                 }
@@ -724,7 +787,11 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                             recovered_state(result.state, config.tetrahedralization_recovery_scale_factor);
                         result.state = std::move(recovered);
                         increment(result.work.tetrahedralization_recoveries);
+                        if (recovery_record_index.has_value()) {
+                            result.diagnostics.recovery_records[*recovery_record_index].recovery_applied = true;
+                        }
                         progress.phase = PackingProgressPhase::tetrahedralization_recovery;
+                        progress.object_id.reset();
                         progress.objects_at_target = object_count_at_target(result.state.transforms, target_scale);
                         emit_progress();
                         progress.phase = PackingProgressPhase::scale_step_started;
@@ -739,7 +806,9 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                 }
 
                 increment(result.work.cat_builds);
-                CatConstructionResult cat = build_cat(tetrahedralization.mesh, limits.cat);
+                CatConstructionResult cat = measure_stage(result.work.stage_timings.cat, [&] {
+                    return build_cat(tetrahedralization.mesh, limits.cat);
+                });
                 accumulate(result.work.cat, cat.work);
                 if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
                     return stop_result(*status);
@@ -748,8 +817,9 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                     return finish(status_for(cat.status),
                                   nested_diagnostic("CAT construction", to_string(cat.status), cat.diagnostic));
                 }
-                const std::vector<TriangleMesh> cat_surfaces =
-                    make_cat_surfaces(cat, object_count, limits.intermediate_mesh_limits);
+                const std::vector<TriangleMesh> cat_surfaces = measure_stage(result.work.stage_timings.cat, [&] {
+                    return make_cat_surfaces(cat, object_count, limits.intermediate_mesh_limits);
+                });
                 if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
                     return stop_result(*status);
                 }
@@ -818,16 +888,72 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                     request.maximum_result_volume_scale = target_scale;
                     request.tolerance = config.local_solve_tolerance;
 
+                    progress.phase = PackingProgressPhase::local_solve_started;
+                    progress.object_id = object;
+                    emit_progress();
+                    if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
+                        return stop_result(*status);
+                    }
+                    const LocalSolveDiagnosticsOptions local_diagnostics {
+                        .max_trace_records = config.diagnostics.max_trace_records_per_solve,
+                        .max_failed_snapshot_constraints = config.diagnostics.capture_failed_local_problem
+                                                               ? config.diagnostics.max_failed_snapshot_constraints
+                                                               : 0
+                    };
                     increment(result.work.local_solves);
-                    LocalSolveResult local =
-                        solve_local_transform(tetrahedralization.mesh, cat, request, workspace, limits.local_solve);
+                    LocalSolveResult local = measure_stage(result.work.stage_timings.local_solve, [&] {
+                        return solve_local_transform(tetrahedralization.mesh, cat, request, workspace,
+                                                     limits.local_solve, local_diagnostics);
+                    });
                     accumulate(result.work.local_solve, local.work);
+                    if (!local.succeeded() || config.diagnostics.max_local_solve_records > 0) {
+                        try {
+                            PackingLocalSolveRecord record { object,
+                                                             scale_step,
+                                                             iteration,
+                                                             target_scale,
+                                                             local.status,
+                                                             limits.local_solve,
+                                                             local.work,
+                                                             bounded_reason(local.diagnostic),
+                                                             std::move(local.trace),
+                                                             local.trace_records_dropped };
+                            if (!local.succeeded()) {
+                                result.diagnostics.failure = record;
+                                result.diagnostics.failed_local_problem = std::move(local.failed_snapshot);
+                                result.diagnostics.failed_snapshot_omitted = local.snapshot_omitted;
+                            }
+                            if (config.diagnostics.max_local_solve_records > 0) {
+                                if (result.diagnostics.local_solve_records.size() <
+                                    config.diagnostics.max_local_solve_records) {
+                                    result.diagnostics.local_solve_records.push_back(std::move(record));
+                                }
+                                else {
+                                    increment(result.diagnostics.local_solve_records_dropped);
+                                }
+                            }
+                        }
+                        catch (...) {
+                            increment(result.diagnostics.local_solve_records_dropped);
+                            result.diagnostics.failed_snapshot_omitted =
+                                config.diagnostics.capture_failed_local_problem;
+                        }
+                    }
                     if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
                         return stop_result(*status);
                     }
                     if (!local.succeeded()) {
-                        return finish(status_for(local.status),
-                                      nested_diagnostic("local solve", to_string(local.status), local.diagnostic));
+                        return finish(
+                            status_for(local.status),
+                            "object " + std::to_string(object + 1) + " (id " + std::to_string(object) +
+                                "), scale step " + std::to_string(scale_step + 1) + "/" +
+                                std::to_string(config.scale_step_count) + ", engine iteration " +
+                                std::to_string(iteration + 1) + ", barrier " + std::to_string(target_scale) + ": " +
+                                nested_diagnostic("local solve", to_string(local.status),
+                                                  bounded_reason(local.diagnostic)) +
+                                " [local limits: " + std::to_string(limits.local_solve.max_iterations) +
+                                " iterations, " + std::to_string(limits.local_solve.max_elapsed_time.count()) +
+                                " ms; engine limit: " + std::to_string(limits.max_elapsed_time.count()) + " ms]");
                     }
                     if (!local.accepted_transform.has_value()) {
                         return finish(PackingStatus::internal_failure,
@@ -840,11 +966,14 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                 // DEVIATION(IROP-DEV-0019): Sampled surfaces remain an
                 // optimization input, but physical collision correction is
                 // decided from the full-resolution object and container.
-                detail::PhysicalCollisionCorrectionResult correction = detail::correct_physical_collisions(
-                    centered_object, container, cat_surfaces, std::move(candidate_state.transforms),
-                    config.correction_volume_scale_factor, limits.max_correction_passes_per_iteration,
-                    result.state.config.output_mesh_limits, limits.collision, result.work.collision,
-                    result.work.correction_passes, stopped);
+                detail::PhysicalCollisionCorrectionResult correction =
+                    measure_stage(result.work.stage_timings.correction, [&] {
+                    return detail::correct_physical_collisions(
+                        centered_object, container, cat_surfaces, std::move(candidate_state.transforms),
+                        config.correction_volume_scale_factor, limits.max_correction_passes_per_iteration,
+                        result.state.config.output_mesh_limits, limits.collision, result.work.collision,
+                        result.work.correction_passes, stopped);
+                });
                 if (!correction.succeeded()) {
                     if (correction.status == PackingStatus::cancelled ||
                         correction.status == PackingStatus::time_limit) {
@@ -879,6 +1008,7 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                 result.state = std::move(candidate_state);
 
                 progress.phase = PackingProgressPhase::iteration_completed;
+                progress.object_id.reset();
                 progress.objects_at_target = objects_at_target;
                 emit_progress();
                 if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
@@ -904,13 +1034,17 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
             return stop_result(*status);
         }
 
-        const std::vector<TriangleMesh> final_objects = instantiate(
-            centered_object, result.state.transforms, result.state.config.output_mesh_limits, "full-resolution output");
+        const std::vector<TriangleMesh> final_objects = measure_stage(result.work.stage_timings.transform, [&] {
+            return instantiate(centered_object, result.state.transforms, result.state.config.output_mesh_limits,
+                               "full-resolution output");
+        });
         if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
             return stop_result(*status);
         }
-        SceneCollisionReport final_validation = validate_scene_collisions(
-            final_objects, container, {}, remaining_collision_limits(result.work.collision, limits.collision));
+        SceneCollisionReport final_validation = measure_stage(result.work.stage_timings.final_validation, [&] {
+            return validate_scene_collisions(final_objects, container, {},
+                                             remaining_collision_limits(result.work.collision, limits.collision));
+        });
         accumulate(result.work.collision, final_validation.work);
         result.final_validation = std::move(final_validation);
         result.final_validation_performed = true;

@@ -1,6 +1,6 @@
 # C++ Project Definition
 
-Status: Approved baseline; Milestones 1 through 5 are verified. Milestone 6 is implemented with its first hosted CI run pending. Milestone 7 is verified for its authorized first measured scope against the local parity baseline under ADR-0013. Milestone 8 native Windows visualization is verified under ADR-0014 with Debug/Release/Ninja, actual desktop workflow and option-off CLI evidence; the account-dependent symlink test is explicitly skipped.
+Status: Approved baseline; Milestones 1 through 5 are verified. Milestone 6 is implemented with its first hosted CI run pending. Milestone 7 is verified for its authorized first measured scope against the local parity baseline under ADR-0013. Milestone 8 native Windows visualization is verified under ADR-0014 with Debug/Release/Ninja, actual desktop workflow and option-off CLI evidence; the account-dependent symlink test is explicitly skipped. Improvement tranche 1 is Verified under ADR-0015 with 220-test Debug/Release/Ninja matrices (one documented skip), repeated-run desktop checks, exact failure replay and representative real-STL baselines.
 
 ## Purpose
 
@@ -53,9 +53,14 @@ A successful run atomically publishes a new output directory containing:
 - `run-summary.json`: resolved configuration, seed, timings, solver outcome, packing metrics, warnings, and dependency versions.
 - Optional individual object STL files when explicitly requested.
 
-The output path must not already exist. Expected unsuccessful packing outcomes
-atomically publish only `run-summary.json`; its non-success category is paired
-with null geometry/placement paths and no individual STLs. The summary records
+The CLI output path must not already exist. The service checks the destination
+before preparing inputs and retains the final atomic no-overwrite check. Expected
+unsuccessful packing outcomes normally publish only `run-summary.json`; its
+non-success category is paired with null geometry/placement paths and no individual
+STLs. With opt-in diagnostic capture, a failed run may also publish the fixed
+`failed-local-solve.json` numeric replay artifact under
+[ADR-0015](adr/0015-repeatable-runs-and-bounded-diagnostics.md). It is not packed
+geometry and saved-run viewing never loads it automatically. The summary records
 whether final physical validation was not run, passed, or failed. Success is
 gated against the exact float32 coordinates written to the binary STL artifacts,
 not only the in-memory geometry. Cancellation during input preparation or
@@ -271,8 +276,13 @@ Milestone 8 implements the optional C++20 `irop_studio` application under
 `IROP_BUILD_UI=ON`; the option is off by default. Native Win32 controls select
 object/container STLs, preview the centered object at its initial volume scale,
 configure count, initial/final volume scale, scale steps, seed, timeout, adaptive
-sampling and structured fallback, and choose a new output directory. Preview is
-source preparation, not an initialized placement. The packing timeout applies to
+sampling and structured fallback. Tranche 1 replaces per-run output entry with a
+remembered **Runs folder**, defaulting to `%LOCALAPPDATA%\IROP\Runs`, and a fresh
+numbered child for every Run. Exclusive reservations and a bounded durable sequence
+ledger avoid occupied names and preserve progress across cancellation/restart.
+The proposed next name is separate from the actual result path and **Open result
+folder** action. CLI destinations remain explicit and exact. Preview is source
+preparation, not an initialized placement. The packing timeout applies to
 the engine; input preparation and initialization retain their own resource bounds.
 
 A single background worker performs preview preparation, invokes `pack_scene`, or
@@ -298,6 +308,16 @@ limits control input resource use. Defaults permit a 16 MiB summary, depth 32,
 250,000 JSON nodes, and two display meshes sharing 128 MiB, three million vertices
 and one million triangles. These display limits are separate from packing limits.
 Recorded original input paths and individual STL paths are never followed.
+
+The optional **Capture solver diagnostics** control enables bounded per-object
+records, numerical traces and one failed local-problem snapshot. Progress identifies
+input preparation, initialization attempts, local solve limits and overall engine
+time separately. Default runs still retain failure location and backend reason;
+detailed traces are opt-in. Numeric snapshot parsing is bounded, and the reusable
+prepared-local-problem API supports `irop replay-local-solve` without original
+meshes or earlier RNG/solver work. Replay evaluates one local problem and does not
+certify a complete packing. ADR-0015 defines this diagnostic boundary; final
+tranche 1 verification is recorded in STATUS.
 
 Loaded geometry is structurally validated for display. Saved physical validation
 is displayed as a recorded result; opening it does not recertify the packing, and
@@ -398,6 +418,17 @@ serialized-output validation by `max_object_pair_checks`. The measured dense
 initializer fallback and collision change are documented in
 [MILESTONE_7_RESULTS.md](MILESTONE_7_RESULTS.md). They establish search recovery and
 a separated-scene collision improvement, not a general solver or packing speedup.
+
+Tranche 1 extends `irop_benchmarks` with configurable real-STL multi-object
+`pack_scene` execution and the same saved-result loader as Studio. It separates
+application preparation, initialization, engine substages, output validation,
+export and loading; records bounded per-object solve context, input/source SHA256,
+settings/compiler/dependencies/machine, process CPU and lifetime peak memory; and
+retains failures alongside successes. The bounded harness accepts counts through
+1,000 while production mesh arithmetic and work budgets remain authoritative.
+This creates a measurement foundation; it does not demonstrate 100/300/1,000-object
+growth throughput. See [benchmark usage](../benchmarks/README.md) and the ordered
+[improvement plan](IMPROVEMENT_PLAN.md) for validation gates.
 
 Likely future improvements include:
 

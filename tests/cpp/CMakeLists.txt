@@ -8,6 +8,7 @@ add_executable(
     collision_tests.cpp
     correction_path_tests.cpp
     diagnostic_geometry_tests.cpp
+    diagnostics_tests.cpp
     initialization_scene_tests.cpp
     initialization_tests.cpp
     structured_initialization_tests.cpp
@@ -26,7 +27,8 @@ add_executable(
     transform_tests.cpp
 )
 if(IROP_BUILD_UI)
-    target_sources(irop_tests PRIVATE studio_job_tests.cpp ../../app/irop_studio/job.cpp)
+    target_sources(irop_tests PRIVATE studio_job_tests.cpp studio_run_directory_tests.cpp ../../app/irop_studio/job.cpp ../../app/irop_studio/run_directory.cpp)
+    target_link_libraries(irop_tests PRIVATE shell32 ole32 uuid advapi32)
     target_include_directories(irop_tests PRIVATE "${PROJECT_SOURCE_DIR}/app/irop_studio")
 endif()
 target_compile_features(irop_tests PRIVATE cxx_std_20)

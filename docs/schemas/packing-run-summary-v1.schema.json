@@ -71,7 +71,23 @@
       "properties": {
         "initialization_seconds": { "$ref": "#/$defs/nonnegative_number" },
         "packing_seconds": { "$ref": "#/$defs/nonnegative_number" },
-        "artifact_preparation_seconds": { "$ref": "#/$defs/nonnegative_number" }
+        "artifact_preparation_seconds": { "$ref": "#/$defs/nonnegative_number" },
+        "input_preparation_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "placement_initialization_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "output_validation_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "export_seconds": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "outputs": {
@@ -92,6 +108,12 @@
         "individual_object_stls": {
           "type": "array",
           "items": { "$ref": "#/$defs/path" }
+        },
+        "failed_local_solve_json": {
+          "enum": [
+            null,
+            "failed-local-solve.json"
+          ]
         }
       }
     },
@@ -112,6 +134,9 @@
       "type": "array",
       "maxItems": 256,
       "items": { "type": "string", "maxLength": 1024 }
+    },
+    "diagnostics": {
+      "$ref": "#/$defs/diagnostics"
     }
   },
   "allOf": [
@@ -320,7 +345,35 @@
         "initialization_limits": { "$ref": "#/$defs/initialization_limits" },
         "input_limits": { "$ref": "#/$defs/input_limits" },
         "output_limits": { "$ref": "#/$defs/count_limits" },
-        "engine_limits": { "$ref": "#/$defs/engine_limits" }
+        "engine_limits": { "$ref": "#/$defs/engine_limits" },
+        "diagnostics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capture_failed_local_problem",
+            "max_local_solve_records",
+            "max_trace_records_per_solve",
+            "max_failed_snapshot_constraints",
+            "max_recovery_records"
+          ],
+          "properties": {
+            "capture_failed_local_problem": {
+              "type": "boolean"
+            },
+            "max_local_solve_records": {
+              "$ref": "#/$defs/nonnegative_integer"
+            },
+            "max_trace_records_per_solve": {
+              "$ref": "#/$defs/nonnegative_integer"
+            },
+            "max_failed_snapshot_constraints": {
+              "$ref": "#/$defs/nonnegative_integer"
+            },
+            "max_recovery_records": {
+              "$ref": "#/$defs/nonnegative_integer"
+            }
+          }
+        }
       }
     },
     "initialization_limits": {
@@ -603,7 +656,43 @@
         "cat": { "$ref": "#/$defs/cat_work" },
         "local_solve": { "$ref": "#/$defs/local_solve_work" },
         "collision": { "$ref": "#/$defs/collision_work" },
-        "elapsed_milliseconds": { "$ref": "#/$defs/nonnegative_integer" }
+        "elapsed_milliseconds": { "$ref": "#/$defs/nonnegative_integer" },
+        "stage_microseconds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "resampling",
+            "transform",
+            "tetrahedralization",
+            "cat",
+            "local_solve",
+            "correction",
+            "final_validation"
+          ],
+          "properties": {
+            "resampling": {
+              "$ref": "#/$defs/nonnegative_integer"
+            },
+            "transform": {
+              "$ref": "#/$defs/nonnegative_integer"
+            },
+            "tetrahedralization": {
+              "$ref": "#/$defs/nonnegative_integer"
+            },
+            "cat": {
+              "$ref": "#/$defs/nonnegative_integer"
+            },
+            "local_solve": {
+              "$ref": "#/$defs/nonnegative_integer"
+            },
+            "correction": {
+              "$ref": "#/$defs/nonnegative_integer"
+            },
+            "final_validation": {
+              "$ref": "#/$defs/nonnegative_integer"
+            }
+          }
+        }
       }
     },
     "history_record": {
@@ -694,6 +783,183 @@
         "mean_volume_scale": { "$ref": "#/$defs/nullable_number" },
         "packed_object_volume": { "$ref": "#/$defs/nullable_number" },
         "packing_fraction": { "$ref": "#/$defs/nullable_number" }
+      }
+    },
+    "local_trace_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "iteration",
+        "restoration_phase",
+        "objective",
+        "primal_infeasibility",
+        "dual_infeasibility",
+        "barrier_parameter"
+      ],
+      "properties": {
+        "iteration": {
+          "$ref": "#/$defs/nonnegative_integer"
+        },
+        "restoration_phase": {
+          "type": "boolean"
+        },
+        "objective": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "primal_infeasibility": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "dual_infeasibility": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "barrier_parameter": {
+          "$ref": "#/$defs/nullable_number"
+        }
+      }
+    },
+    "local_solve_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "object_id",
+        "scale_step",
+        "iteration",
+        "target_volume_scale",
+        "status",
+        "reason",
+        "limits",
+        "work",
+        "trace",
+        "trace_records_dropped"
+      ],
+      "properties": {
+        "object_id": {
+          "$ref": "#/$defs/nonnegative_integer"
+        },
+        "scale_step": {
+          "$ref": "#/$defs/nonnegative_integer"
+        },
+        "iteration": {
+          "$ref": "#/$defs/nonnegative_integer"
+        },
+        "target_volume_scale": {
+          "$ref": "#/$defs/positive_number"
+        },
+        "status": {
+          "enum": [
+            "success",
+            "acceptable",
+            "invalid_input",
+            "resource_exhausted",
+            "infeasible",
+            "iteration_limit",
+            "time_limit",
+            "numerical_failure",
+            "postcheck_failed",
+            "dependency_failure",
+            "internal_failure"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "limits": {
+          "$ref": "#/$defs/local_solve_limits"
+        },
+        "work": {
+          "$ref": "#/$defs/local_solve_work"
+        },
+        "trace": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "$ref": "#/$defs/local_trace_record"
+          }
+        },
+        "trace_records_dropped": {
+          "$ref": "#/$defs/nonnegative_integer"
+        }
+      }
+    },
+    "recovery_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scale_step",
+        "iteration",
+        "target_volume_scale",
+        "status",
+        "reason",
+        "recovery_applied"
+      ],
+      "properties": {
+        "scale_step": {
+          "$ref": "#/$defs/nonnegative_integer"
+        },
+        "iteration": {
+          "$ref": "#/$defs/nonnegative_integer"
+        },
+        "target_volume_scale": {
+          "$ref": "#/$defs/positive_number"
+        },
+        "status": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "recovery_applied": {
+          "type": "boolean"
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "failure",
+        "failed_snapshot_omitted",
+        "local_solve_records",
+        "local_solve_records_dropped",
+        "recovery_records",
+        "recovery_records_dropped"
+      ],
+      "properties": {
+        "failure": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/local_solve_record"
+            }
+          ]
+        },
+        "failed_snapshot_omitted": {
+          "type": "boolean"
+        },
+        "local_solve_records": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "$ref": "#/$defs/local_solve_record"
+          }
+        },
+        "local_solve_records_dropped": {
+          "$ref": "#/$defs/nonnegative_integer"
+        },
+        "recovery_records": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "$ref": "#/$defs/recovery_record"
+          }
+        },
+        "recovery_records_dropped": {
+          "$ref": "#/$defs/nonnegative_integer"
+        }
       }
     }
   }

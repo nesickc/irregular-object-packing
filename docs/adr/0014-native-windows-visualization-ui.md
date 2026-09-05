@@ -109,6 +109,50 @@ implementation discovers an actual behavioral deviation. Public binary and
 hosted-service distribution remain subject to ADR-0009/0010 release review;
 implementing the UI does not approve distribution.
 
+## Tranche 1 extension: automatic run destinations
+
+The maintainer activated this extension on 2026-09-05. The UI selects a remembered
+Runs parent, defaulting through Windows `FOLDERID_LocalAppData` to `IROP/Runs`,
+and allocates a new `run-000001`-style child on every Run. This application policy
+does not change the CLI's explicit exact-output path or ADR-0011 publication.
+The proposed next name is advisory; allocation always checks again. The result
+panel and Open result folder action retain the actual published/opened location.
+
+The application-private allocator holds an exclusive sibling reservation file,
+created with `CREATE_NEW` and `FILE_FLAG_DELETE_ON_CLOSE`; it never precreates the
+final output directory. The same OS handle removes only its own reservation on
+normal completion, cancellation, or process termination. The canonical parent is
+held without delete sharing for the attempt. Numbered files, directories, links
+and abandoned reservation entries are skipped; existing artifacts are untouched.
+A per-parent sequence file is opened without sharing during allocation, and a
+fixed-width sequence record is appended and flushed before the attempt starts.
+This durable ledger consumes numbers for pre-publication errors/cancellation even
+after restart; gaps are intentional. Partial/invalid ledger records fail closed.
+
+Scanning is bounded to 100,000 directory entries, allocation to 100 candidates,
+sequence-lock contention to 100 five-millisecond waits, the ledger to 100,000
+records (1 MB), and run numbers to 999,999,999. Sequence/settings file handles
+reject reparse points, directories and multiply linked files. Known-unusable
+parents are rejected before input preparation. The core's final atomic no-overwrite
+publication remains authoritative if the destination becomes unavailable later.
+
+The remembered parent uses a versioned bounded UTF-16 settings record (64 KiB)
+under `LocalAppData/IROP/Studio`; a unique temporary file and atomic replacement
+persist a complete path. Concurrent preference changes are last-writer-wins.
+Malformed settings fall back to the stable default with a visible warning.
+Persistence is best effort: selecting a valid parent activates it for the current
+session even if saving preferences fails. The warning remains visible beside the
+next name; Run uses the active parent without rewriting settings. Unsafe linked
+or directory metadata is preserved, so failed persistence cannot block otherwise
+valid packing or silently replace those entries.
+`--settings-dir` injects an isolated settings/default-runs root; desktop smoke
+always supplies a directory under its workspace, never the real user's settings.
+
+A Capture solver diagnostics checkbox opts into the core's bounded snapshot/trace
+support (64 local-solve records, 128 trace records per solve). Input preparation,
+initialization attempts and per-object local limits are identified in progress,
+separately from the overall engine time budget. Collection does not change the
+packing algorithm or solver settings.
 ## Alternatives Considered
 
 ### Add a web frontend or another desktop framework

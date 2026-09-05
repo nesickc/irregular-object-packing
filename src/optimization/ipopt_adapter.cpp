@@ -47,6 +47,8 @@ struct CallbackContext {
     LocalSolveWork* work = nullptr;
     const std::chrono::steady_clock::time_point* start_time = nullptr;
     CallbackStopReason stop_reason = CallbackStopReason::none;
+    LocalSolveResult* result = nullptr;
+    std::uint64_t trace_limit = 0;
 };
 
 class IpoptProblemOwner final {
@@ -344,9 +346,10 @@ bool evaluate_hessian_callback(const ipindex n, ipnumber*, const bool, const ipn
     return true;
 }
 
-bool intermediate_callback(const ipindex, const ipindex iteration, const ipnumber, const ipnumber, const ipnumber,
-                           const ipnumber, const ipnumber, const ipnumber, const ipnumber, const ipnumber,
-                           const ipindex, void* const user_data) noexcept
+bool intermediate_callback(const ipindex algorithm_mode, const ipindex iteration, const ipnumber objective,
+                           const ipnumber primal_infeasibility, const ipnumber dual_infeasibility,
+                           const ipnumber barrier_parameter, const ipnumber, const ipnumber, const ipnumber,
+                           const ipnumber, const ipindex, void* const user_data) noexcept
 {
     CallbackContext* const context = callback_context(user_data);
     if (context == nullptr || context->work == nullptr || context->limits == nullptr || iteration < 0) {
@@ -356,6 +359,39 @@ bool intermediate_callback(const ipindex, const ipindex iteration, const ipnumbe
         return false;
     }
     context->work->iterations = std::max(context->work->iterations, static_cast<std::uint64_t>(iteration));
+    if (context->result != nullptr && context->trace_limit > 0) {
+        auto& result = *context->result;
+        if (std::isfinite(objective) && std::isfinite(primal_infeasibility) && std::isfinite(dual_infeasibility) &&
+            std::isfinite(barrier_parameter)) {
+            const LocalSolveTraceRecord record { static_cast<std::uint64_t>(iteration),
+                                                 algorithm_mode != 0,
+                                                 objective,
+                                                 primal_infeasibility,
+                                                 dual_infeasibility,
+                                                 barrier_parameter };
+            // Capacity is reserved outside the dependency callback. Keep the
+            // initial prefix and final available sample when collection fills.
+            try {
+                if (result.trace.size() < context->trace_limit) {
+                    result.trace.push_back(record);
+                }
+                else {
+                    result.trace.back() = record;
+                    increment_saturated(result.trace_records_dropped);
+                }
+            }
+            catch (...) {
+                // Diagnostic storage must never escape the C callback or stop
+                // a numerical solve. Preserve collected samples and disable
+                // further collection if the reserved-storage invariant fails.
+                increment_saturated(result.trace_records_dropped);
+                context->trace_limit = 0;
+            }
+        }
+        else {
+            increment_saturated(result.trace_records_dropped);
+        }
+    }
     return !elapsed_limit_reached(*context);
 }
 
@@ -523,15 +559,31 @@ void set_diagnostic_best_effort(LocalSolveResult& result, const char* const diag
 
 }  // namespace
 
-LocalSolveResult solve_local_transform(const TetrahedralMesh& mesh, const CatConstructionResult& cat,
-                                       const LocalSolveRequest& request, LocalSolveWorkspace& workspace,
-                                       const LocalSolveLimits& limits) noexcept
+LocalSolveResult solve_local_transform_impl(const TetrahedralMesh* const mesh, const CatConstructionResult* const cat,
+                                            const std::span<const LocalPlaneConstraint> prepared_constraints,
+                                            const LocalSolveRequest& request, LocalSolveWorkspace& workspace,
+                                            const LocalSolveLimits& limits,
+                                            const LocalSolveDiagnosticsOptions& diagnostics) noexcept
 {
     const auto start_time = std::chrono::steady_clock::now();
     LocalSolveResult result;
-    auto finish = [&result, &start_time]() noexcept -> LocalSolveResult {
+    bool prepared_valid = false;
+    auto finish = [&]() noexcept -> LocalSolveResult {
         result.work.elapsed_time =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time);
+        if (!result.succeeded() && diagnostics.max_failed_snapshot_constraints > 0) {
+            result.snapshot_omitted = true;
+            if (prepared_valid && workspace.constraints_.size() <= diagnostics.max_failed_snapshot_constraints &&
+                workspace.constraints_.size() <= 100'000) {
+                try {
+                    result.failed_snapshot = LocalSolveSnapshot { request, limits, workspace.constraints_ };
+                    result.snapshot_omitted = false;
+                }
+                catch (...) {
+                    // Optional diagnostic allocation must not replace the solver outcome.
+                }
+            }
+        }
         return std::move(result);
     };
 
@@ -539,14 +591,19 @@ LocalSolveResult solve_local_transform(const TetrahedralMesh& mesh, const CatCon
         // DEVIATION(IROP-DEV-0016): Reject singular, malformed, and
         // non-finite local problems instead of passing unsafe data to a
         // numerical dependency.
-        if (!cat.succeeded()) {
+        if (diagnostics.max_trace_records > 4'096 || diagnostics.max_failed_snapshot_constraints > 100'000) {
+            result.status = LocalSolveStatus::invalid_input;
+            result.diagnostic = "local solve diagnostic collection limit exceeds its hard ceiling";
+            return finish();
+        }
+        if (cat != nullptr && !cat->succeeded()) {
             result.status = LocalSolveStatus::invalid_input;
             result.diagnostic = "local solve requires a successful CAT result";
             return finish();
         }
-        if (mesh.points.size() != mesh.point_owners.size() || mesh.participant_count < 2 ||
-            request.participant >= mesh.participant_count - 1 ||
-            static_cast<std::uint64_t>(request.participant) >= cat.participant_ranges.size()) {
+        if (mesh != nullptr && (cat == nullptr || mesh->points.size() != mesh->point_owners.size() ||
+                                mesh->participant_count < 2 || request.participant >= mesh->participant_count - 1 ||
+                                static_cast<std::uint64_t>(request.participant) >= cat->participant_ranges.size())) {
             result.status = LocalSolveStatus::invalid_input;
             result.diagnostic = "local solve participant or tetrahedral mesh ownership is invalid";
             return finish();
@@ -593,12 +650,16 @@ LocalSolveResult solve_local_transform(const TetrahedralMesh& mesh, const CatCon
             return finish();
         }
 
-        const CatParticipantRange& participant_range = cat.participant_ranges[request.participant];
-        if (participant_range.constraint_begin > cat.constraints.size() ||
-            participant_range.constraint_count > cat.constraints.size() - participant_range.constraint_begin) {
-            result.status = LocalSolveStatus::invalid_input;
-            result.diagnostic = "local solve CAT participant constraint range is invalid";
-            return finish();
+        CatParticipantRange participant_range { .constraint_begin = 0,
+                                                .constraint_count = prepared_constraints.size() };
+        if (cat != nullptr) {
+            participant_range = cat->participant_ranges[request.participant];
+            if (participant_range.constraint_begin > cat->constraints.size() ||
+                participant_range.constraint_count > cat->constraints.size() - participant_range.constraint_begin) {
+                result.status = LocalSolveStatus::invalid_input;
+                result.diagnostic = "local solve CAT participant constraint range is invalid";
+                return finish();
+            }
         }
         if (participant_range.constraint_count == 0) {
             result.status = LocalSolveStatus::invalid_input;
@@ -621,23 +682,34 @@ LocalSolveResult solve_local_transform(const TetrahedralMesh& mesh, const CatCon
 
         workspace.constraints_.clear();
         workspace.constraints_.reserve(static_cast<std::size_t>(participant_range.constraint_count));
-        const std::uint64_t constraint_end = participant_range.constraint_begin + participant_range.constraint_count;
-        for (std::uint64_t index = participant_range.constraint_begin; index < constraint_end; ++index) {
-            const CatPlaneConstraint& source = cat.constraints[static_cast<std::size_t>(index)];
-            if (source.owner != request.participant || source.source_point >= mesh.points.size()) {
+        for (std::uint64_t offset = 0; offset < participant_range.constraint_count; ++offset) {
+            LocalPlaneConstraint constraint;
+            if (cat != nullptr && mesh != nullptr) {
+                const CatPlaneConstraint& source =
+                    cat->constraints[static_cast<std::size_t>(participant_range.constraint_begin + offset)];
+                if (source.owner != request.participant || source.source_point >= mesh->points.size()) {
+                    result.status = LocalSolveStatus::invalid_input;
+                    result.diagnostic = "local solve CAT constraint ownership or source point is invalid";
+                    return finish();
+                }
+                const std::size_t source_index = static_cast<std::size_t>(source.source_point);
+                if (mesh->point_owners[source_index] != request.participant) {
+                    result.status = LocalSolveStatus::invalid_input;
+                    result.diagnostic = "local solve CAT constraint source ownership is invalid";
+                    return finish();
+                }
+                constraint = { mesh->points[source_index], source.plane_point, source.inward_unit_normal };
+            }
+            else {
+                constraint = prepared_constraints[static_cast<std::size_t>(offset)];
+            }
+            if (!is_finite(constraint.current_vertex) || !is_finite(constraint.plane_point) ||
+                !has_unit_normal(constraint.inward_unit_normal)) {
                 result.status = LocalSolveStatus::invalid_input;
-                result.diagnostic = "local solve CAT constraint ownership or source point is invalid";
+                result.diagnostic = "local solve constraint geometry is malformed or non-finite";
                 return finish();
             }
-            const std::size_t source_index = static_cast<std::size_t>(source.source_point);
-            if (mesh.point_owners[source_index] != request.participant || !is_finite(mesh.points[source_index]) ||
-                !is_finite(source.plane_point) || !has_unit_normal(source.inward_unit_normal)) {
-                result.status = LocalSolveStatus::invalid_input;
-                result.diagnostic = "local solve CAT constraint geometry is malformed or non-finite";
-                return finish();
-            }
-            workspace.constraints_.push_back(
-                { mesh.points[source_index], source.plane_point, source.inward_unit_normal });
+            workspace.constraints_.push_back(constraint);
         }
         result.work.constraints_prepared = participant_range.constraint_count;
         workspace.first_constraint_buffer_.resize(workspace.constraints_.size());
@@ -675,11 +747,22 @@ LocalSolveResult solve_local_transform(const TetrahedralMesh& mesh, const CatCon
             return finish();
         }
 
+        prepared_valid = true;
         CallbackContext context {
             workspace.constraints_, request.current_transform.translation,
             request.padding,        &limits,
             &result.work,           &start_time,
         };
+        context.result = &result;
+        if (diagnostics.max_trace_records > 0) {
+            try {
+                result.trace.reserve(static_cast<std::size_t>(diagnostics.max_trace_records));
+                context.trace_limit = diagnostics.max_trace_records;
+            }
+            catch (...) {
+                increment_saturated(result.trace_records_dropped);
+            }
+        }
         StatusTranslation translation;
         if (all_variables_fixed(workspace.variable_lower_bounds_, workspace.variable_upper_bounds_)) {
             const std::uint64_t row_count = static_cast<std::uint64_t>(workspace.constraints_.size());
@@ -896,6 +979,22 @@ LocalSolveResult solve_local_transform(const TetrahedralMesh& mesh, const CatCon
         set_diagnostic_best_effort(result, "unexpected local solve failure");
         return finish();
     }
+}
+
+LocalSolveResult solve_local_transform(const TetrahedralMesh& mesh, const CatConstructionResult& cat,
+                                       const LocalSolveRequest& request, LocalSolveWorkspace& workspace,
+                                       const LocalSolveLimits& limits,
+                                       const LocalSolveDiagnosticsOptions& diagnostics) noexcept
+{
+    return solve_local_transform_impl(&mesh, &cat, {}, request, workspace, limits, diagnostics);
+}
+
+LocalSolveResult solve_prepared_local_transform(const std::span<const LocalPlaneConstraint> constraints,
+                                                const LocalSolveRequest& request, LocalSolveWorkspace& workspace,
+                                                const LocalSolveLimits& limits,
+                                                const LocalSolveDiagnosticsOptions& diagnostics) noexcept
+{
+    return solve_local_transform_impl(nullptr, nullptr, constraints, request, workspace, limits, diagnostics);
 }
 
 }  // namespace irop

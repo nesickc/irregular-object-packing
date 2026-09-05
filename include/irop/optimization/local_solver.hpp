@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -94,12 +95,37 @@ struct LocalSolveWork {
     std::optional<double> minimum_applied_constraint;
 };
 
+struct LocalSolveTraceRecord {
+    std::uint64_t iteration = 0;
+    bool restoration_phase = false;
+    double objective = 0.0;
+    double primal_infeasibility = 0.0;
+    double dual_infeasibility = 0.0;
+    double barrier_parameter = 0.0;
+};
+
+struct LocalSolveDiagnosticsOptions {
+    // Zero disables collection. Hard ceilings protect project-controlled memory.
+    std::uint64_t max_trace_records = 0;
+    std::uint64_t max_failed_snapshot_constraints = 0;
+};
+
+struct LocalSolveSnapshot {
+    LocalSolveRequest request;
+    LocalSolveLimits limits;
+    std::vector<LocalPlaneConstraint> constraints;
+};
+
 struct LocalSolveResult {
     LocalSolveStatus status = LocalSolveStatus::invalid_input;
     std::optional<LocalTransformStep> candidate_step;
     std::optional<Transform> accepted_transform;
     LocalSolveWork work;
     std::string diagnostic;
+    std::vector<LocalSolveTraceRecord> trace;
+    std::uint64_t trace_records_dropped = 0;
+    std::optional<LocalSolveSnapshot> failed_snapshot;
+    bool snapshot_omitted = false;
 
     [[nodiscard]] bool succeeded() const noexcept
     {
@@ -120,9 +146,10 @@ public:
     [[nodiscard]] std::size_t constraint_capacity() const noexcept;
 
 private:
-    friend LocalSolveResult solve_local_transform(const TetrahedralMesh&, const CatConstructionResult&,
-                                                  const LocalSolveRequest&, LocalSolveWorkspace&,
-                                                  const LocalSolveLimits&) noexcept;
+    friend LocalSolveResult solve_local_transform_impl(const TetrahedralMesh*, const CatConstructionResult*,
+                                                       std::span<const LocalPlaneConstraint>, const LocalSolveRequest&,
+                                                       LocalSolveWorkspace&, const LocalSolveLimits&,
+                                                       const LocalSolveDiagnosticsOptions&) noexcept;
 
     std::vector<LocalPlaneConstraint> constraints_;
     std::vector<double> first_constraint_buffer_;
@@ -153,6 +180,13 @@ private:
 // participant is the container and is not a valid request participant.
 [[nodiscard]] LocalSolveResult solve_local_transform(const TetrahedralMesh& mesh, const CatConstructionResult& cat,
                                                      const LocalSolveRequest& request, LocalSolveWorkspace& workspace,
-                                                     const LocalSolveLimits& limits = {}) noexcept;
+                                                     const LocalSolveLimits& limits = {},
+                                                     const LocalSolveDiagnosticsOptions& diagnostics = {}) noexcept;
+
+// Replays a standalone prepared local problem through the same bounds, geometry,
+// dependency and accepted-transform validation as the CAT-backed entry point.
+[[nodiscard]] LocalSolveResult solve_prepared_local_transform(
+    std::span<const LocalPlaneConstraint> constraints, const LocalSolveRequest& request, LocalSolveWorkspace& workspace,
+    const LocalSolveLimits& limits = {}, const LocalSolveDiagnosticsOptions& diagnostics = {}) noexcept;
 
 }  // namespace irop

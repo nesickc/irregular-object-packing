@@ -4,11 +4,11 @@ Last updated: 2026-09-05
 
 ## Current Summary
 
-Milestones 1 through 5 are verified. The C++20 library and thin CLI now provide hardened STL inspection, deterministic bounded initialization, project-owned TetGen/CAT/Ipopt boundaries, strict collision and containment validation, and a bounded end-to-end packing coordinator. `irop pack` composes exact scale barriers, optional adaptive VTK resampling, deterministic per-object local solves, bounded correction/termination, and atomic success or summary-only failure publication. Already-satisfied barriers complete before sampling or dependency work while retaining mandatory full-resolution and serialized-output validation. Success is gated on the exact float32-coordinate meshes written to binary STL. Public APIs remain free of Ipopt, TetGen, VTK, and Eigen types. GL2PS `1.4.2#5` remains resolved from the package-scoped official vcpkg registry without changing the reviewed default dependency baseline. Milestone 6 is implemented and its local acceptance gates pass: a live pinned Python 3.10 oracle and the C++ parity corpus cover initialization, dense-search exhaustion, transforms, CAT, local mathematics, outcomes, metrics, and artifacts; rare correction/recovery and real Windows Ctrl+Break cancellation paths are exercised; and source-release notice/CI tooling is checked in. The first hosted workflow run has not yet been observed, so Milestone 6 remains `Implemented` rather than `Verified`.
+Milestones 1 through 5 are verified. The C++20 library and thin CLI now provide hardened STL inspection, deterministic bounded initialization, project-owned TetGen/CAT/Ipopt boundaries, strict collision and containment validation, and a bounded end-to-end packing coordinator. `irop pack` composes exact scale barriers, optional adaptive VTK resampling, deterministic per-object local solves, bounded correction/termination, and atomic success or summary-only failure publication by default; explicit diagnostic capture may add one numeric failed-solve snapshot. Already-satisfied barriers complete before sampling or dependency work while retaining mandatory full-resolution and serialized-output validation. Success is gated on the exact float32-coordinate meshes written to binary STL. Public APIs remain free of Ipopt, TetGen, VTK, and Eigen types. GL2PS `1.4.2#5` remains resolved from the package-scoped official vcpkg registry without changing the reviewed default dependency baseline. Milestone 6 is implemented and its local acceptance gates pass: a live pinned Python 3.10 oracle and the C++ parity corpus cover initialization, dense-search exhaustion, transforms, CAT, local mathematics, outcomes, metrics, and artifacts; rare correction/recovery and real Windows Ctrl+Break cancellation paths are exercised; and source-release notice/CI tooling is checked in. The first hosted workflow run has not yet been observed, so Milestone 6 remains `Implemented` rather than `Verified`.
 
 Current milestone: Milestone 8 — Basic Visualization UI is Verified under ADR-0014. Native Debug/Release and Ninja clang-tidy builds, affected test suites, real desktop workflows and the default option-off CLI build pass, with one documented account-dependent symlink test skipped in each matrix. Milestone 7 remains Verified for its authorized first measured scope; Milestone 6 hosted CI acceptance remains pending.
 
-Next outcome: observe the first hosted workflow run and retain its Milestone 6 acceptance evidence. Milestones 7 and 8 have completed their authorized local scope; further UI or scaling work needs a selected scope. Public binary or hosted-service distribution remains a release-specific decision under ADR-0009 and ADR-0010.
+Next outcome: the requested [improvement plan](IMPROVEMENT_PLAN.md) prioritizes automatic run folders and diagnostics, reliable full-size growth, measured 100-300-object workloads, then 1,000 objects. Tranche 1 is Verified under ADR-0015. Tranches 2-4 remain planned; the next engineering gate is reliable genuine growth for the supplied ten-object case. Hosted CI acceptance remains a parallel Milestone 6 item; public distribution remains separate under ADR-0009/0010.
 
 ## Status Vocabulary
 
@@ -52,12 +52,12 @@ Next outcome: observe the first hosted workflow run and retain its Milestone 6 a
 | Nonlinear optimization | Verified | Private Ipopt 3.14.19 C adapter selects MUMPS, disables ambient option files, evaluates the seven-variable incremental problem with an exact dense Jacobian, left-composes accepted rotations in constraint-model order, translates every backend outcome, bounds project-controlled work, and publishes only independently postchecked transforms |
 | Packing engine | Verified | Exact barriers with overflow-safe finite local scale caps and independently checked near-target snaps, pre-work completion of already-satisfied barriers without transform/RNG/history mutation, adaptive resampling, TetGen/CAT rebuilding, deterministic transactional per-object solves, run-owned RNG continuation, bounded recovery/correction/termination, history/work metrics, and mandatory full-resolution final validation pass representative integration coverage |
 | Collision correction | Verified | Deterministic fixtures prove selective object/container reduction to convergence, bounded correction-limit accounting, reduction of both members of an object/object overlap, and zero correction for CAT-only contact under COMPAT-0002; full-resolution and output-quantized validation still gate success |
-| Result serialization | Verified | Atomic artifacts and summary-only packing failures remain intact. Version-one schemas retain historical documents and accept the added initializer/collision configuration and work fields; structured policy requires method/work data and null sphere-clearance guarantees. Full-scale 36-cylinder artifact round trips and cumulative output-budget regressions pass in all three 192-test configurations |
-| C++ tests | Verified | Milestone 8 adds eight saved-run loader and three worker cases. Debug, Release and Ninja each complete 203 total with 202 passed, one skipped and no failures; focused coverage completes 11 cases with 10 passed, one skipped and 186 assertions. The account cannot create the file symlink required by the canonical-escape test; this branch remains unexercised here |
-| CI and static analysis | Implemented | The source-only Windows workflow enables optional UI and benchmark targets alongside C++/Python/parity/notice gates. Headless loader/worker tests join CTest; the real desktop/OpenGL smoke is a separate local gate. Milestone 8 local Debug/Release/Ninja gates pass with zero clang-tidy diagnostics; workflow YAML and PowerShell configuration-script parsing pass. The first hosted workflow run remains pending |
-| Benchmarks | Verified | Opt-in irop_benchmarks and a serial Windows runner record cold-process wall/CPU time, peak memory, source/environment/configuration metadata, stage work, and placements. The 11-case/66-report before/after matrix is retained in benchmarks/results/windows-20260905.json and analyzed in docs/MILESTONE_7_RESULTS.md; the separated 100-object case falls from 144.0279 to 1.1271 ms, without a material memory reduction |
+| Result serialization | Verified | Success artifacts retain their physical and serialized-output acceptance gates. Failures remain summary-only by default; explicit capture may add failed-local-solve.json under ADR-0015. Optional version-one diagnostics/timing fields preserve historical records. Captured real-input summary/snapshot and all six benchmark summaries validate against their schemas; snapshot replay needs no source meshes. |
+| C++ tests | Verified | Tranche 1 Debug, Release and Ninja each complete 220 tests with 219 passed, one skipped and no failures. Added coverage includes bounded diagnostics/replay/publication, destination preflight and concurrent/restart/Unicode/denied-permission run allocation. The saved-artifact symlink test remains skipped because this account cannot create file symlinks. |
+| CI and static analysis | Implemented | The source-only Windows workflow enables optional UI and benchmark targets alongside C++/Python/parity/notice gates. Tranche 1 local Debug/Release/Ninja builds and 220-test matrices pass (one account-dependent skip); final Ninja clang-tidy has zero diagnostics and the formatter passes. The real desktop/OpenGL smoke is separate from headless CTest. First hosted workflow acceptance remains pending. |
+| Benchmarks | Verified | The earlier Milestone 7 results remain in benchmarks/results/windows-20260905.json. Tranche 1 extends the opt-in harness to real-STL packing/export/loading through count 1,000 with source/input hashes, stage time/work and peak memory. Three actual ten-object direct runs validate and load; three genuine-growth failures are retained and halt the count ladder. This verifies the harness, not 100/300/1,000-object throughput. |
 | Saved-run loading | Verified | Project-owned load_run_scene reads the display contract of local version-one pack/initialize summaries and fixed sibling artifacts, with bounded JSON/aggregate mesh input, canonical checks, cancellation and structural validation. Recorded source/individual-STL paths are not followed and recorded physical validation is not recertified. Debug/Release/Ninja hostile-input/relocation/worker tests pass except the documented symlink privilege skip |
-| Visualization UI | Verified | Opt-in native Win32 irop_studio provides STL pickers/preview, packing controls, progress/cancel, camera views and visibility/wireframe. One background worker handles preparation/loading/packing; VTK and controls remain on the UI thread, and close waits for terminal worker ownership. Six desktop smoke cases pass in both Debug and Release; native camera/control/resize events, actual 36-object rendering and unsuccessful-summary display pass. Inspected whole-window captures show usable controls without clipping |
+| Visualization UI | Verified | Studio now remembers a Runs parent and reserves a fresh numbered child for every dispatch, including retries and restarts; Open result folder and an independent completed-result path are available. Preference-save failures retain a usable session parent with a warning. Eleven actual desktop cases pass in Debug and Release, with inspected captures. One worker owns background preparation/loading/packing; VTK and controls remain on the UI thread. |
 
 ## Known Compatibility Work
 
@@ -150,11 +150,127 @@ explicit environment limitations above. See the [Studio quickstart](STUDIO_QUICK
 for build, workflow and smoke commands, and
 [ADR-0014](adr/0014-native-windows-visualization-ui.md) for the boundaries.
 
+## Supplied ten-object growth diagnosis
+
+On 2026-09-05, the user's Studio run with `ulamok_2kg_simplified.stl`,
+`10_kg_np.stl`, ten copies, seed 1918, initial/target volume scales `0.1`/`1.0`,
+nine steps, adaptive sampling on, fallback off and a 300-second engine timeout
+failed after 20.64 seconds. Random initialization accepted all ten in 23 attempts.
+The nineteenth local solve exhausted its 1,000-iteration cap during the second
+engine iteration at the first `0.2` barrier. The 2.64% occupancy describes the last
+committed partial state; final physical validation never ran. The summary does
+not identify the underlying numerical reason for nonconvergence.
+
+The current Release executable reproduced the same outcome, 19 solves, 4,499
+aggregate Ipopt iterations and identical metrics in 22.29 seconds; evidence is
+`build/diagnose-user-ten-original-20260905/run-summary.json`. Disabling adaptive
+sampling alone, with a 60-second diagnostic engine cap, still reached the local
+iteration limit after four solves and 49.50 seconds in
+`build/diagnose-user-ten-noadaptive-20260905/run-summary.json`.
+
+The same meshes/count/seed with initial and target scale both `1.0`, one step,
+adaptive sampling off and structured fallback on succeeded in
+`build/diagnose-user-ten-fullsize-20260905/run-summary.json`. Initialization took
+0.224 seconds; every object has exact full size, occupancy is 16.97%, both physical
+validation gates pass, and all four artifacts are published. It performs zero
+local solves. The [Studio guide](STUDIO_QUICKSTART.md) records the usable settings.
+This workaround leaves genuine `0.1` to `1.0` growth robustness unresolved; the
+verified milestone fixtures do not establish convergence for this configuration.
+This investigation changed documentation only, with no solver or acceptance
+policy changes and no claim of a new full-suite run.
+
+## Tranche 1: Repeatable runs and bounded diagnostics
+
+Verified on 2026-09-05 under [ADR-0015](adr/0015-repeatable-runs-and-bounded-diagnostics.md).
+Studio defaults to `%LOCALAPPDATA%\IROP\Runs`, remembers a chosen parent and
+allocates `run-000001`, `run-000002`, etc. Exclusive reservations and a bounded
+sequence ledger preserve names across concurrent instances, cancellation, failures
+and restart. Actual completed output remains separately visible. Unusable settings
+produce a warning while the session parent remains usable; unsafe metadata is
+preserved. The CLI retains its exact requested destination and now prepares private
+staging before input loading, with authoritative no-overwrite publication afterward.
+
+Failure summaries identify the object, barrier, engine iteration and local/global
+limits. Bounded TetGen records preserve backend causes; optional local records and
+numerical traces report dropped samples. Explicit capture can publish one bounded
+`failed-local-solve.json` sibling. Numeric-only replay uses the same validated
+adapter and does not certify a complete packing. Solver defaults, RNG draws,
+accepted transforms and physical/output-validation gates are unchanged; no new
+Python compatibility deviation is introduced.
+
+Verification evidence:
+
+- Supported Visual Studio Debug/Release and Ninja analysis configurations build
+  with UI and benchmarks enabled. Each full CTest run has **219 passed, one skipped,
+  zero failures out of 220**. Logs are `build/t1-debug-ctest-final.log`,
+  `build/t1-release-ctest-final.log` and `build/t1-ninja-ctest.log`.
+  Final analysis (`build/t1-ninja-build-final-pass.log`) has no clang-tidy diagnostics;
+  `irop-format-check` and `git diff --check` pass. The existing saved-artifact
+  symlink test still needs a suitably privileged account.
+- All **11 actual desktop smoke cases** pass in each of
+  `build/studio-tranche1-release-verified` and
+  `build/studio-tranche1-debug-verified`. They cover rerun after success, cancellation
+  and input failure, restart persistence, and two successful runs despite unusable
+  settings. Inspected window captures show the next number, settings warning and
+  actual completed path. Native file-picker interaction remains a manual gate.
+- The exact supplied ten-object `.1 -> 1.0` configuration is retained at
+  `build/tranche1-real10-capture-20260905/run-summary.json`. It still performs
+  19 solves and 4,499 aggregate Ipopt iterations, then fails on object 9 (ID 8),
+  engine iteration 2, scale step 1 at the `0.2` barrier. Its metrics and all
+  non-time local-solve work match the earlier reproduction. The 173,172-byte
+  snapshot has 1,012 constraints. Replay independently reaches the same
+  1,000-iteration limit in about 4.3 seconds; all 128 retained trace samples match
+  exactly (`build/t1-real10-replay.log`). The captured summary and snapshot pass
+  Draft 2020-12 schema validation. Test coverage also deletes original meshes
+  before replay and verifies default summary-only publication.
+- Real-STL benchmark reports are retained in `build/tranche1-benchmark-real10-direct`
+  and `build/tranche1-benchmark-real10-growth`, three independent processes each.
+  Direct full-size placement validates, exports and loads **3/3**, with median
+  measured total 241.4 ms and zero local solves. Original genuine growth fails
+  **3/3** with median measured total 21.86 s, including 21.74 s in local solves;
+  final physical/output validation never runs. Failure summaries load as diagnostics
+  with no geometry. The requested `[10, 100]` ladder stops after the ten-object
+  failures. All six canonical summaries validate. Reports retain source/input
+  SHA256, resolved settings, machine/dependencies, stage timings and process memory.
+  These are baseline measurements, not a speedup or larger-object acceptance claim.
+
+The exact capture/replay commands and benchmark reproduction are below; all output
+paths must be fresh. Measurements use separate processes with hash-warmed file
+caches. Application/engine stages are nested, not additive totals, and stage CPU
+is unavailable where reported as null.
+
+```powershell
+./build/windows-vs2026/Release/irop.exe pack `
+  --object rc/input_models/ulamok_2kg_simplified.stl `
+  --container rc/containers/10_kg_np.stl --count 10 --seed 1918 `
+  --initial-volume-scale 0.1 --final-volume-scale 1 --scale-steps 9 `
+  --no-initialization-fallback --max-elapsed-milliseconds 300000 `
+  --capture-failed-local-solve --local-solve-records 64 `
+  --local-solve-trace-records 128 --output build/tranche1-reproduce
+./build/windows-vs2026/Release/irop.exe replay-local-solve `
+  build/tranche1-reproduce/failed-local-solve.json --trace-records 128
+./benchmarks/run-stl-windows.ps1 `
+  -Executable build/windows-vs2026/benchmarks/Release/irop_benchmarks.exe `
+  -Object rc/input_models/ulamok_2kg_simplified.stl `
+  -Container rc/containers/10_kg_np.stl -Counts 10,100 -Repeats 3 `
+  -DisableInitializationFallback -OutputDirectory build/tranche1-baseline
+```
+
+The supplied growth case remains unresolved. Tranche 2 should use this isolated
+problem to evaluate initialization, conditioning and bounded recovery hypotheses.
+The harness accepts count 1,000 under production limits; successful complete
+100/300/1,000-object growth remains the acceptance work of later tranches.
+
 ## Immediate Next Work
 
-1. Run the checked-in workflow on GitHub and retain the first hosted green-run evidence; only then change Milestone 6 from `Implemented` to `Verified`.
-2. Exercise the saved-run symlink-escape regression on an account that can create file symlinks; use the retained UI/benchmark evidence to select any further work.
-3. If a public binary or hosted service is proposed, conduct the separate release-specific ADR-0009/ADR-0010 license, source, notice, and payload review before distribution.
+The [reviewed improvement plan](IMPROVEMENT_PLAN.md) records issue triage, four
+related tranches and acceptance evidence. The user selected 100-300 objects first,
+then 1,000. Tranche 1 is Verified; tranches 2-4 remain planned.
+
+1. Resolve the supplied ten-object genuine-growth failure using its captured local problem and trace. Full-size structured initialization remains a workaround and does not satisfy the growth gate.
+2. Profile and optimize complete successful 100/300-object workloads, then extend to 1,000; preserve physical/output validation and distinguish fixed-density scaling from denser packing.
+3. In parallel, observe the first hosted green workflow before marking Milestone 6 Verified, exercise the file-symlink test on a suitable account, and finish manual file-picker acceptance.
+4. If public distribution is proposed, conduct its separate ADR-0009/0010 review. Larger architecture and unrelated UI features remain conditional or deferred in the plan.
 
 ## Update Rules
 
@@ -173,6 +289,7 @@ When updating status:
 
 | Date | Change | Verification |
 | --- | --- | --- |
+| 2026-09-05 | Verified improvement tranche 1 under ADR-0015: repeatable numbered Studio runs, early destination preflight, bounded failure diagnostics/snapshot replay and real-STL benchmark foundation | Debug/Release/Ninja each 219 passed, one skipped of 220; clean analysis/format; 11 desktop cases per Debug/Release; exact supplied failure and all 128 replay samples match; schemas pass; three real direct successes and three retained growth failures with stage/provenance records. Growth convergence remains tranche 2 |
 | 2026-09-05 | Verified Milestone 8 native Studio, bounded saved-run loading, worker lifetime/cancellation, native interaction smoke and UI-enabled CI under ADR-0014 | Debug/Release/Ninja each have 202 passed/one skipped out of 203; zero clang-tidy diagnostics and format pass; focused 10 passed/one skipped and 186 assertions; six desktop smoke cases in Debug/Release, native interactions, inspected real 36-object rendering, unsuccessful saved diagnostics and fresh option-off CLI build |
 | 2026-09-05 | Activated Milestone 8 at the maintainer's request: accepted ADR-0014 and concrete native Win32/private-VTK UI, single-worker cancellation/lifetime, safe local saved-run loading and verification scope | Documentation/architecture scope recorded; implementation and verification were pending at activation and are completed in the entry above; Milestone 6 hosted CI remains independent |
 | 2026-09-05 | Verified the authorized Milestone 7 measured scope under ADR-0013 and DEV-0026/0027: deterministic structured fallback, independent physical proofs, conservative collision AABB filtering, cumulative pair budgets, compatible summary extensions, and opt-in benchmark/CI tooling | Debug, Release and Ninja clang-tidy each pass 192/192; analysis has zero diagnostics; focused 19 cases/746 assertions and the live Python parity oracle pass; 11-case before/after matrix retains 66 reports; actual ten/36-object full-scale STL runs succeed |

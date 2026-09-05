@@ -38,6 +38,7 @@
 #include "irop/error.hpp"
 #include "irop/geometry/mesh_geometry.hpp"
 #include "irop/geometry/transform.hpp"
+#include "irop/io/local_solve_replay.hpp"
 #include "irop/io/stl_io.hpp"
 #include "irop/model/mesh_validation.hpp"
 #include "irop/packing/initialization.hpp"
@@ -404,6 +405,12 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
         { "tetrahedralization_recovery_scale_factor",    algorithm.tetrahedralization_recovery_scale_factor            },
         { "local_solve_tolerance",                       algorithm.local_solve_tolerance                               },
         { "adaptive_sampling",                           algorithm.adaptive_sampling                                   },
+        { "diagnostics",
+         { { "capture_failed_local_problem", algorithm.diagnostics.capture_failed_local_problem },
+            { "max_local_solve_records", algorithm.diagnostics.max_local_solve_records },
+            { "max_trace_records_per_solve", algorithm.diagnostics.max_trace_records_per_solve },
+            { "max_failed_snapshot_constraints", algorithm.diagnostics.max_failed_snapshot_constraints },
+            { "max_recovery_records", algorithm.diagnostics.max_recovery_records } }                                   },
         { "sampling",
          {
               { "alpha", algorithm.sampling.alpha },
@@ -511,6 +518,66 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
     };
 }
 
+[[nodiscard]] nlohmann::json local_record_json(const PackingLocalSolveRecord& record)
+{
+    nlohmann::json trace = nlohmann::json::array();
+    for (const auto& row : record.trace) {
+        trace.push_back({
+            { "iteration",            row.iteration                                   },
+            { "restoration_phase",    row.restoration_phase                           },
+            { "objective",            finite_number_or_null(row.objective)            },
+            { "primal_infeasibility", finite_number_or_null(row.primal_infeasibility) },
+            { "dual_infeasibility",   finite_number_or_null(row.dual_infeasibility)   },
+            { "barrier_parameter",    finite_number_or_null(row.barrier_parameter)    }
+        });
+    }
+    return {
+        { "object_id", record.object_id },
+        { "scale_step", record.scale_step },
+        { "iteration", record.iteration },
+        { "target_volume_scale", record.target_volume_scale },
+        { "status", to_string(record.status) },
+        { "reason", bounded_text(record.reason, maximum_diagnostic_bytes) },
+        { "limits",
+         { { "max_constraints", record.limits.max_constraints },
+            { "max_dense_jacobian_entries", record.limits.max_dense_jacobian_entries },
+            { "max_constraint_rows_evaluated", record.limits.max_constraint_rows_evaluated },
+            { "max_jacobian_entries_evaluated", record.limits.max_jacobian_entries_evaluated },
+            { "max_iterations", record.limits.max_iterations },
+            { "max_elapsed_milliseconds", record.limits.max_elapsed_time.count() } } },
+        { "work", local_solve_work_json(record.work) },
+        { "trace", std::move(trace) },
+        { "trace_records_dropped", record.trace_records_dropped }
+    };
+}
+
+[[nodiscard]] nlohmann::json diagnostics_json(const PackingDiagnostics& diagnostics)
+{
+    nlohmann::json records = nlohmann::json::array();
+    for (const auto& record : diagnostics.local_solve_records) {
+        records.push_back(local_record_json(record));
+    }
+    nlohmann::json recoveries = nlohmann::json::array();
+    for (const auto& record : diagnostics.recovery_records) {
+        recoveries.push_back({
+            { "scale_step", record.scale_step },
+            { "iteration", record.iteration },
+            { "target_volume_scale", record.target_volume_scale },
+            { "status", to_string(record.status) },
+            { "reason", bounded_text(record.reason, maximum_diagnostic_bytes) },
+            { "recovery_applied", record.recovery_applied }
+        });
+    }
+    return {
+        { "failure",                     diagnostics.failure ? local_record_json(*diagnostics.failure) : nlohmann::json(nullptr) },
+        { "failed_snapshot_omitted",     diagnostics.failed_snapshot_omitted                                                     },
+        { "local_solve_records",         std::move(records)                                                                      },
+        { "local_solve_records_dropped", diagnostics.local_solve_records_dropped                                                 },
+        { "recovery_records",            std::move(recoveries)                                                                   },
+        { "recovery_records_dropped",    diagnostics.recovery_records_dropped                                                    }
+    };
+}
+
 [[nodiscard]] nlohmann::json collision_work_json(const SceneCollisionWork& work)
 {
     return {
@@ -536,6 +603,14 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
         { "local_solve",                   local_solve_work_json(work.local_solve)               },
         { "collision",                     collision_work_json(work.collision)                   },
         { "elapsed_milliseconds",          work.elapsed_time.count()                             },
+        { "stage_microseconds",
+         { { "resampling", work.stage_timings.resampling.count() },
+            { "transform", work.stage_timings.transform.count() },
+            { "tetrahedralization", work.stage_timings.tetrahedralization.count() },
+            { "cat", work.stage_timings.cat.count() },
+            { "local_solve", work.stage_timings.local_solve.count() },
+            { "correction", work.stage_timings.correction.count() },
+            { "final_validation", work.stage_timings.final_validation.count() } }                },
     };
 }
 
@@ -672,8 +747,10 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
          result.container_output_path.has_value() ? nlohmann::json("container.stl") : nlohmann::json(nullptr)    },
         { "placements_json",
          result.placements_path.has_value() ? nlohmann::json("placements.json") : nlohmann::json(nullptr)        },
-        { "run_summary_json",       "run-summary.json"                                                           },
-        { "individual_object_stls", std::move(individual_paths)                                                  },
+        { "failed_local_solve_json",
+         result.failed_local_solve_path ? nlohmann::json("failed-local-solve.json") : nlohmann::json(nullptr)    },
+        { "run_summary_json",        "run-summary.json"                                                          },
+        { "individual_object_stls",  std::move(individual_paths)                                                 },
     };
 }
 
@@ -743,6 +820,7 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
               { "surface_intersection_triangle_pairs", result.packing.state.surface_intersection_triangle_pairs },
           } },
         { "work", packing_work_json(result.packing.work) },
+        { "diagnostics", diagnostics_json(result.packing.diagnostics) },
         { "history", history_json(result.packing.history) },
         { "validation", validation_json(result.packing) },
         { "metrics", metrics_json(result.packing, options.algorithm) },
@@ -750,6 +828,10 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
          {
               { "initialization_seconds", initialization_seconds },
               { "packing_seconds", packing_seconds },
+              { "input_preparation_seconds", result.timings.preparation_seconds },
+              { "placement_initialization_seconds", result.timings.initialization_seconds },
+              { "output_validation_seconds", result.timings.output_validation_seconds },
+              { "export_seconds", result.timings.export_seconds },
               { "artifact_preparation_seconds", artifact_preparation_seconds },
           } },
         { "outputs", outputs_json(result) },
@@ -780,6 +862,30 @@ PackSceneResult pack_scene(const std::filesystem::path& object_path, const std::
     };
     throw_if_preparation_cancelled();
 
+    // Check the destination and reserve private staging before expensive input
+    // preparation. RAII removes staging on every pre-engine failure; the final
+    // directory remains absent until atomic publication.
+    const auto application_started = std::chrono::steady_clock::now();
+    OutputDirectoryTransaction output_transaction(output_directory);
+    const std::filesystem::path& output = output_transaction.final_directory();
+    const std::filesystem::path& staging = output_transaction.staging_directory();
+    throw_if_preparation_cancelled();
+
+    const auto report_preparation = [&](const PackingProgressPhase phase) {
+        if (options.callbacks.progress) {
+            options.callbacks.progress(PackingProgress {
+                .phase = phase,
+                .scale_step_count = options.algorithm.scale_step_count,
+                .target_volume_scale = options.algorithm.final_volume_scale,
+                .object_count = options.initialization.object_count,
+                .initialization_attempt_limit = options.initialization.max_sampling_attempts,
+                .local_iteration_limit = options.limits.local_solve.max_iterations,
+                .local_time_limit = options.limits.local_solve.max_elapsed_time,
+                .engine_time_limit = options.limits.max_elapsed_time,
+            });
+        }
+    };
+    report_preparation(PackingProgressPhase::input_preparation);
     const auto initialization_started = std::chrono::steady_clock::now();
     const std::filesystem::path resolved_object = resolve_input_path(object_path);
     throw_if_preparation_cancelled();
@@ -795,6 +901,9 @@ PackSceneResult pack_scene(const std::filesystem::path& object_path, const std::
     throw_if_preparation_cancelled();
     const MeshStatistics container_statistics = validate_and_measure_mesh(container.mesh, options.input_limits);
     throw_if_preparation_cancelled();
+    report_preparation(PackingProgressPhase::initialization_started);
+    throw_if_preparation_cancelled();
+    const auto placement_started = std::chrono::steady_clock::now();
     PackingState state = initialize_packing(centered_object.mesh, container.mesh, options.initialization,
                                             options.callbacks.cancellation_requested);
     throw_if_preparation_cancelled();
@@ -816,10 +925,6 @@ PackSceneResult pack_scene(const std::filesystem::path& object_path, const std::
         packing.diagnostic = "packing was cancelled before artifact preparation";
     }
 
-    OutputDirectoryTransaction output_transaction(output_directory);
-    const std::filesystem::path& output = output_transaction.final_directory();
-    const std::filesystem::path& staging = output_transaction.staging_directory();
-
     std::optional<std::filesystem::path> packed_objects_path;
     std::optional<std::filesystem::path> container_output_path;
     std::optional<std::filesystem::path> placements_path;
@@ -831,6 +936,11 @@ PackSceneResult pack_scene(const std::filesystem::path& object_path, const std::
 
     PackSceneResult result {
         .packing = std::move(packing),
+        .timings = {
+            .preparation_seconds = std::chrono::duration<double>(placement_started - initialization_started).count(),
+            .initialization_seconds = std::chrono::duration<double>(packing_started - placement_started).count(),
+            .packing_seconds = packing_seconds,
+        },
         .resolved_object_path = resolved_object,
         .resolved_container_path = resolved_container,
         .packed_objects_path = std::move(packed_objects_path),
@@ -863,6 +973,7 @@ PackSceneResult pack_scene(const std::filesystem::path& object_path, const std::
         return true;
     };
 
+    const auto artifact_started = std::chrono::steady_clock::now();
     std::vector<TriangleMesh> objects;
     TriangleMesh combined;
     TriangleMesh output_container;
@@ -871,6 +982,7 @@ PackSceneResult pack_scene(const std::filesystem::path& object_path, const std::
         static_cast<void>(observe_cancellation());
     }
     if (result.packing.succeeded()) {
+        const auto validation_started = std::chrono::steady_clock::now();
         try {
             result.packing.final_validation = {};
             result.packing.final_validation_performed = false;
@@ -934,6 +1046,8 @@ PackSceneResult pack_scene(const std::filesystem::path& object_path, const std::
             downgrade_success(PackingStatus::internal_failure,
                               "binary-STL output validation failed with an unknown exception");
         }
+        result.timings.output_validation_seconds =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - validation_started).count();
     }
     if (result.packing.succeeded()) {
         combined = combine_meshes(objects, result.packing.state.config.output_mesh_limits);
@@ -978,6 +1092,22 @@ PackSceneResult pack_scene(const std::filesystem::path& object_path, const std::
         static_cast<void>(observe_cancellation());
     }
     static_cast<void>(observe_cancellation());
+    if (result.packing.diagnostics.failed_local_problem) {
+        try {
+            write_local_solve_snapshot(staging / "failed-local-solve.json",
+                                       *result.packing.diagnostics.failed_local_problem);
+            result.failed_local_solve_path = output / "failed-local-solve.json";
+        }
+        catch (const std::exception&) {
+            // Optional diagnostics must not discard the authoritative failure summary.
+            remove_file_noexcept(staging / "failed-local-solve.json");
+            result.packing.diagnostics.failed_snapshot_omitted = true;
+            result.packing.warnings.emplace_back("failed local-solve snapshot could not be written; summary retained");
+        }
+    }
+    result.timings.export_seconds =
+        std::max(0.0, std::chrono::duration<double>(std::chrono::steady_clock::now() - artifact_started).count() -
+                          result.timings.output_validation_seconds);
     double artifact_preparation_seconds =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - publication_started).count();
     write_new_text_file(staging / "run-summary.json",
@@ -995,6 +1125,8 @@ PackSceneResult pack_scene(const std::filesystem::path& object_path, const std::
                                 '\n');
     }
     output_transaction.commit();
+    result.timings.total_seconds =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - application_started).count();
     return result;
 }
 

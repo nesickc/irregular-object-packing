@@ -61,11 +61,14 @@ packing attempt, increase `--count` and `--final-volume-scale`, use several
 `--scale-steps`, and enable adaptive sampling after the full-resolution path
 works for your meshes.
 
-The output directory must not already exist. A successful run atomically writes
+The output directory must not already exist. It is checked before loading inputs;
+final atomic publication also rejects a destination claimed during computation.
+A successful run atomically writes
 `packed-objects.stl`, `container.stl`, `placements.json`, and
 `run-summary.json`; add `--individual-stls` for one STL per object. Expected
-algorithm failures write only an unsuccessful `run-summary.json`, so an
-intermediate scene cannot be mistaken for a packed result. Press Ctrl+C for a
+algorithm failures normally write only an unsuccessful `run-summary.json`. Opt-in
+failed-solve capture may also write the numeric `failed-local-solve.json` diagnostic;
+it never publishes intermediate packed geometry or placements. Press Ctrl+C for a
 clean cancellation. Before an engine result exists—including during input
 preparation or initialization—it exits 130 without creating the output
 directory. Cancellation reported by the engine or observed after engine success
@@ -84,7 +87,24 @@ The summary records the selected initialization method and separate work counts.
 Measured results and limitations are in [Milestone 7 results](/docs/MILESTONE_7_RESULTS.md).
 
 Configuration is currently supplied through CLI flags; JSON files are result
-formats, not yet configuration inputs.
+formats, not yet packing configuration inputs. To investigate a local solver
+failure, add `--capture-failed-local-solve --local-solve-records 64
+--local-solve-trace-records 128` to a `pack` invocation, then replay its captured
+problem with:
+
+```powershell
+irop.exe replay-local-solve artifacts/my-packing/failed-local-solve.json
+```
+
+Capture is optional and bounded. Failure summaries identify the object, barrier,
+iteration and local limit, while retained TetGen recovery records preserve the
+backend reason. Replay runs one local problem and does not certify a complete
+packing. Tranche 1 is verified; build/test, desktop and real-input evidence
+is recorded in [STATUS](/docs/STATUS.md). The [improvement plan](/docs/IMPROVEMENT_PLAN.md)
+keeps convergence work and measured 100-300/1,000-object scaling as subsequent
+tranches. The real-STL [benchmark harness](/benchmarks/README.md) now records
+end-to-end stages, input/source hashes, work, outcomes and saved-run loading;
+its count range through 1,000 is not a throughput guarantee.
 
 For automation, `pack` returns 0 on success, 2 for CLI usage, 3 for invalid
 input/configuration, 4 on a resource/time limit, 5 for output I/O, 6 for another
@@ -164,6 +184,12 @@ pack/initialize results in an interactive 3D viewport. Enable the existing VTK
 rendering modules with `cmake --preset windows-vs2026 -DIROP_BUILD_UI=ON`, then build
 `irop_studio` using the Release preset. Run
 `build/windows-vs2026/app/irop_studio/Release/irop_studio.exe`.
+
+Choose a **Runs folder** once; Studio remembers it and creates a fresh
+`run-000001`, `run-000002`, etc. on every Run. Failed/cancelled attempts consume
+numbers too. **Open result folder** uses the actual latest result location.
+**Capture solver diagnostics** opts into bounded traces and a failing local
+problem snapshot. These run-management changes preserve the core packing settings.
 
 See the [Studio guide](docs/STUDIO_QUICKSTART.md) for controls, saved-result
 semantics, display limits, and the separate Windows/OpenGL smoke procedure.

@@ -18,14 +18,27 @@ struct PackOptions {
     PackingCallbacks callbacks;
 };
 
+struct PackSceneTimings {
+    double preparation_seconds = 0.0;
+    double initialization_seconds = 0.0;
+    double packing_seconds = 0.0;
+    double output_validation_seconds = 0.0;
+    // Mesh/artifact preparation excluding output validation. Summary formatting
+    // and final directory publication are included only in total_seconds.
+    double export_seconds = 0.0;
+    double total_seconds = 0.0;
+};
+
 struct PackSceneResult {
     PackingResult packing;
+    PackSceneTimings timings;
     std::filesystem::path resolved_object_path;
     std::filesystem::path resolved_container_path;
     std::optional<std::filesystem::path> packed_objects_path;
     std::optional<std::filesystem::path> container_output_path;
     std::optional<std::filesystem::path> placements_path;
     std::filesystem::path run_summary_path;
+    std::optional<std::filesystem::path> failed_local_solve_path;
     std::vector<std::filesystem::path> individual_object_paths;
     MeshStatistics centered_object_statistics;
     MeshStatistics container_statistics;

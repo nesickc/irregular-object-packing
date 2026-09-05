@@ -8,6 +8,7 @@
 
 #include "irop/error.hpp"
 #include "irop/geometry/collision.hpp"
+#include "irop/io/local_solve_replay.hpp"
 #include "irop/io/stl_io.hpp"
 #include "irop/packing/pack_scene.hpp"
 #include "support/test_support.hpp"
@@ -410,6 +411,52 @@ TEST_CASE("packing refuses to overwrite an existing output directory")
     CHECK_FALSE(has_pack_staging_directory(temporary.path()));
 }
 
+TEST_CASE("packing checks an unusable destination before loading inputs", "[pack-scene][output-preflight]")
+{
+    irop::test::TempDirectory temporary;
+    const std::filesystem::path output = temporary.path() / "existing";
+    REQUIRE(std::filesystem::create_directory(output));
+    irop::test::require_error_category([&]() {
+        static_cast<void>(irop::pack_scene(temporary.path() / "missing-object.stl",
+                                           temporary.path() / "missing-container.stl", output, no_growth_options()));
+    }, irop::ErrorCategory::output_io);
+    CHECK(std::filesystem::is_empty(output));
+    CHECK_FALSE(has_pack_staging_directory(temporary.path()));
+
+    const auto parent_file = temporary.path() / "file-parent";
+    {
+        std::ofstream file(parent_file);
+        file << "keep";
+    }
+    irop::test::require_error_category([&]() {
+        static_cast<void>(irop::pack_scene(temporary.path() / "missing-object.stl",
+                                           temporary.path() / "missing-container.stl", parent_file / "run",
+                                           no_growth_options()));
+    }, irop::ErrorCategory::output_io);
+    CHECK(std::filesystem::file_size(parent_file) == 4);
+}
+
+TEST_CASE("packing rejects a destination claimed during computation", "[pack-scene][output-preflight]")
+{
+    irop::test::TempDirectory temporary;
+    const SceneInputs inputs = write_scene_inputs(temporary.path());
+    const auto output = temporary.path() / "claimed";
+    auto options = no_growth_options();
+    options.callbacks.progress = [&](const irop::PackingProgress& progress) {
+        if (progress.phase == irop::PackingProgressPhase::finished) {
+            REQUIRE(std::filesystem::create_directory(output));
+            std::ofstream marker(output / "keep.txt");
+            marker << "another writer";
+        }
+    };
+    irop::test::require_error_category([&]() {
+        static_cast<void>(irop::pack_scene(inputs.object, inputs.container, output, options));
+    }, irop::ErrorCategory::output_io);
+    CHECK(std::filesystem::is_regular_file(output / "keep.txt"));
+    CHECK_FALSE(std::filesystem::exists(output / "run-summary.json"));
+    CHECK_FALSE(has_pack_staging_directory(temporary.path()));
+}
+
 TEST_CASE("checked-in packing schemas fix the version-one result contracts")
 {
     const std::filesystem::path schema_directory = IROP_TEST_SCHEMA_DIR;
@@ -466,6 +513,61 @@ TEST_CASE("checked-in packing schemas fix the version-one result contracts")
               .at("packed_objects_stl")
               .at("const")
               .is_null());
+}
+
+TEST_CASE("packing failure snapshot is opt-in and replays without source meshes", "[pack-scene][diagnostics]")
+{
+    irop::test::TempDirectory temporary;
+    const SceneInputs inputs = write_scene_inputs(temporary.path());
+    const auto output = temporary.path() / "failed-local-solve";
+    auto options = no_growth_options();
+    options.algorithm.final_volume_scale = 0.2;
+    options.limits.local_solve.max_iterations = 1;
+    bool capture = false;
+    SECTION("default failure publishes only the summary") {}
+    SECTION("explicit capture publishes an independent local problem")
+    {
+        capture = true;
+        options.algorithm.diagnostics.capture_failed_local_problem = true;
+    }
+    const auto result = irop::pack_scene(inputs.object, inputs.container, output, options);
+    REQUIRE(result.packing.status == irop::PackingStatus::iteration_limit);
+    CHECK_FALSE(result.packed_objects_path.has_value());
+    CHECK_FALSE(result.placements_path.has_value());
+    CHECK(result.individual_object_paths.empty());
+    CHECK_FALSE(has_pack_staging_directory(temporary.path()));
+    const auto summary = read_json(result.run_summary_path);
+    CHECK(summary.at("outcome").at("category") == "iteration_limit");
+    CHECK(summary.at("validation").at("status") == "not_run");
+    CHECK(summary.at("outputs").at("packed_objects_stl").is_null());
+    CHECK(summary.at("outputs").at("placements_json").is_null());
+    std::size_t published_count = 0;
+    for (const auto& entry : std::filesystem::directory_iterator(output)) {
+        CHECK(entry.is_regular_file());
+        ++published_count;
+    }
+    if (!capture) {
+        CHECK(published_count == 1);
+        CHECK_FALSE(result.failed_local_solve_path.has_value());
+        CHECK(summary.at("outputs").at("failed_local_solve_json").is_null());
+        CHECK_FALSE(std::filesystem::exists(output / "failed-local-solve.json"));
+        return;
+    }
+    CHECK(published_count == 2);
+    REQUIRE(result.failed_local_solve_path.has_value());
+    CHECK(*result.failed_local_solve_path == output / "failed-local-solve.json");
+    CHECK(summary.at("outputs").at("failed_local_solve_json") == "failed-local-solve.json");
+    REQUIRE(std::filesystem::remove(inputs.object));
+    REQUIRE(std::filesystem::remove(inputs.container));
+    const auto snapshot = irop::read_local_solve_snapshot(*result.failed_local_solve_path);
+    CHECK(snapshot.request.participant == 0);
+    CHECK(snapshot.limits.max_iterations == 1);
+    irop::LocalSolveWorkspace workspace;
+    const auto replay =
+        irop::solve_prepared_local_transform(snapshot.constraints, snapshot.request, workspace, snapshot.limits);
+    CHECK(replay.status == irop::LocalSolveStatus::iteration_limit);
+    CHECK(replay.work.iterations == result.packing.work.local_solve.iterations);
+    CHECK_FALSE(replay.accepted_transform.has_value());
 }
 
 }  // namespace

@@ -21,6 +21,7 @@
 
 #include "irop/error.hpp"
 #include "job.hpp"
+#include "run_directory.hpp"
 #include "viewport.hpp"
 
 namespace {
@@ -42,6 +43,10 @@ enum ControlId {
     seconds,
     adaptive,
     fallback,
+    capture_diagnostics,
+    next_output,
+    result_folder,
+    result_location,
     browse_object,
     browse_container,
     browse_output,
@@ -139,9 +144,7 @@ std::optional<std::filesystem::path> choose_path(HWND owner, bool folder, bool s
     dialog->GetOptions(&options);
     dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST |
                        (folder ? FOS_PICKFOLDERS : FOS_FILEMUSTEXIST));
-    dialog->SetTitle(folder    ? L"Choose a parent folder for a new run"
-                     : summary ? L"Open run-summary.json"
-                               : L"Choose an STL mesh");
+    dialog->SetTitle(folder ? L"Choose the Runs folder" : summary ? L"Open run-summary.json" : L"Choose an STL mesh");
     const COMDLG_FILTERSPEC filter { summary ? L"Run summary (JSON)" : L"Triangle mesh (STL)",
                                      summary ? L"*.json" : L"*.stl" };
     if (!folder) {
@@ -168,18 +171,12 @@ std::optional<std::filesystem::path> choose_path(HWND owner, bool folder, bool s
     return result;
 }
 
-std::wstring new_run_name()
-{
-    return L"irop-run-" + std::to_wstring(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                              std::chrono::system_clock::now().time_since_epoch())
-                                              .count());
-}
-
 struct Startup {
     std::filesystem::path object;
     std::filesystem::path container;
     std::filesystem::path summary;
     std::filesystem::path smoke_directory;
+    std::filesystem::path settings_directory;
     std::wstring smoke_action = L"open";
 };
 
@@ -213,6 +210,9 @@ Startup parse_startup()
         else if (flag == L"--smoke-test") {
             result.smoke_directory = value;
         }
+        else if (flag == L"--settings-dir") {
+            result.settings_directory = value;
+        }
         else if (flag == L"--smoke-action") {
             result.smoke_action = value;
         }
@@ -220,12 +220,15 @@ Startup parse_startup()
             throw std::runtime_error("Studio options: --open SUMMARY, --object STL, --container STL.");
         }
     }
+    if (!result.smoke_directory.empty() && result.settings_directory.empty()) {
+        result.settings_directory = std::filesystem::absolute(result.smoke_directory).native() + L"-settings";
+    }
     return result;
 }
 
 class Studio final {
 public:
-    explicit Studio(Startup startup) : startup_(std::move(startup)) {}
+    explicit Studio(Startup startup) : startup_(std::move(startup)), run_directories_(startup_.settings_directory) {}
     ~Studio()
     {
         viewport_.reset();
@@ -279,7 +282,10 @@ private:
     HFONT title_font_ = nullptr;
     UINT dpi_ = 96;
     std::unique_ptr<irop::studio::Viewport> viewport_;
+    irop::studio::RunDirectories run_directories_;
+    std::optional<irop::studio::RunReservation> run_reservation_;
     irop::studio::Job job_;
+    std::filesystem::path displayed_result_folder_;
     std::vector<HWND> settings_;
     std::wstring status_ = L"Ready to explore";
     std::wstring details_ =
@@ -289,6 +295,7 @@ private:
     bool smoke_started_ = false;
     bool smoke_finishing_ = false;
     unsigned smoke_ticks_ = 0;
+    unsigned smoke_completions_ = 0;
     JobKind current_kind_ = JobKind::preview;
 
     int px(int value) const noexcept { return MulDiv(value, static_cast<int>(dpi_), 96); }
@@ -378,12 +385,19 @@ private:
             true);
         SendMessageW(control(adaptive), BM_SETCHECK, BST_CHECKED, 0);
         SendMessageW(control(fallback), BM_SETCHECK, BST_CHECKED, 0);
-        section(L"03   OUTPUT", 630);
-        label(L"New output folder", 24, 663);
-        edit(output_path, (std::filesystem::current_path() / L"runs" / new_run_name()).c_str(), 24, 686, 238);
+        add(L"BUTTON", L"Capture solver diagnostics", WS_TABSTOP | BS_AUTOCHECKBOX, capture_diagnostics, 24, 605, 288,
+            25, true);
+        section(L"03   OUTPUT", 635);
+        label(L"Runs folder", 24, 663);
+        edit(output_path, run_directories_.parent().c_str(), 24, 686, 238);
+        SendMessageW(control(output_path), EM_SETREADONLY, TRUE, 0);
         button(browse_output, L"...", 270, 686, 42, true);
-        button(run_button, L"Run packing", 24, 735, 186, true);
-        button(cancel_button, L"Cancel", 220, 735, 92);
+        add(L"STATIC", L"", SS_LEFT | SS_PATHELLIPSIS, next_output, 24, 719, 288, 22);
+        button(run_button, L"Run packing", 24, 751, 186, true);
+        button(cancel_button, L"Cancel", 220, 751, 92);
+        button(result_folder, L"Open result folder", 24, 791, 288);
+        EnableWindow(control(result_folder), FALSE);
+        refresh_next_output();
         EnableWindow(control(cancel_button), FALSE);
         button(open_button, L"Open saved run...", 350, 96, 160, true);
         button(fit_button, L"Fit", 526, 96, 52);
@@ -399,9 +413,23 @@ private:
         SendMessageW(status, WM_SETFONT, reinterpret_cast<WPARAM>(heading_font_), TRUE);
         add(L"EDIT", details_.c_str(), ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL, details_text, 350, 720,
             790, 78);
+        add(L"EDIT", L"No saved result selected.", ES_READONLY | ES_AUTOHSCROLL, result_location, 350, 806, 790, 26);
         viewport_ = std::make_unique<irop::studio::Viewport>(hwnd_);
         layout();
         SetTimer(hwnd_, poll_timer, 100, nullptr);
+        if (!run_directories_.settings_warning().empty()) {
+            show_status(L"Runs folder preference unavailable", wide(run_directories_.settings_warning()));
+        }
+    }
+    void refresh_next_output()
+    {
+        try {
+            set(next_output, L"Next: " + run_directories_.next_directory().filename().native() +
+                                 (run_directories_.settings_warning().empty() ? L"" : L" | Settings warning"));
+        }
+        catch (const std::exception& error) {
+            set(next_output, wide(error.what()));
+        }
     }
     void layout()
     {
@@ -411,11 +439,12 @@ private:
         RECT area {};
         GetClientRect(hwnd_, &area);
         const int width = std::max(1, static_cast<int>(area.right) - px(374));
-        const int footer = static_cast<int>(area.bottom) - px(142);
+        const int footer = static_cast<int>(area.bottom) - px(174);
         viewport_->resize(px(350), px(142), width, std::max(px(180), footer - px(166)));
         MoveWindow(control(progress_bar), px(350), footer, width, px(4), TRUE);
         MoveWindow(control(status_title), px(350), footer + px(15), width, px(26), TRUE);
         MoveWindow(control(details_text), px(350), footer + px(46), width, px(76), TRUE);
+        MoveWindow(control(result_location), px(350), footer + px(132), width, px(26), TRUE);
         InvalidateRect(hwnd_, nullptr, TRUE);
     }
     void show_status(const std::wstring& title, const std::wstring& details)
@@ -439,7 +468,6 @@ private:
         result.kind = kind;
         result.object_path = text_of(control(object_path));
         result.container_path = text_of(control(container_path));
-        result.output_directory = text_of(control(output_path));
         auto& options = result.options;
         options.initialization.object_count = number_of<std::uint64_t>(control(object_count), "copy count");
         options.initialization.seed = number_of<std::uint32_t>(control(seed), "random seed");
@@ -449,6 +477,11 @@ private:
         options.algorithm.final_volume_scale = number_of<double>(control(final_scale), "target volume scale");
         options.algorithm.scale_step_count = number_of<std::uint64_t>(control(steps), "scale step count");
         options.algorithm.adaptive_sampling = SendMessageW(control(adaptive), BM_GETCHECK, 0, 0) == BST_CHECKED;
+        if (SendMessageW(control(capture_diagnostics), BM_GETCHECK, 0, 0) == BST_CHECKED) {
+            options.algorithm.diagnostics.capture_failed_local_problem = true;
+            options.algorithm.diagnostics.max_trace_records_per_solve = 128;
+            options.algorithm.diagnostics.max_local_solve_records = 64;
+        }
         const auto duration = number_of<std::uint64_t>(control(seconds), "time limit");
         if (duration == 0 || duration > static_cast<std::uint64_t>(std::chrono::milliseconds::max().count()) / 1000) {
             throw std::runtime_error("Time limit must be positive and representable in milliseconds.");
@@ -461,15 +494,25 @@ private:
         if (result.object_path.empty() || result.container_path.empty()) {
             throw std::runtime_error("Choose both an object mesh and a container mesh.");
         }
-        if (kind == JobKind::pack && result.output_directory.empty()) {
-            throw std::runtime_error("Choose a new output folder.");
-        }
+
         return result;
     }
     void start(irop::studio::JobRequest selected)
     {
+        if (selected.kind == JobKind::pack) {
+            auto reservation = run_directories_.reserve();
+            selected.output_directory = reservation.output_directory();
+            run_reservation_ = std::move(reservation);
+            refresh_next_output();
+        }
         current_kind_ = selected.kind;
-        job_.start(std::move(selected));
+        try {
+            job_.start(std::move(selected));
+        }
+        catch (...) {
+            run_reservation_.reset();
+            throw;
+        }
         viewport_->clear();
         busy(true);
         show_status(current_kind_ == JobKind::pack ? L"Packing in progress" : L"Loading geometry",
@@ -507,6 +550,13 @@ private:
         else if (id == wireframe) {
             viewport_->set_objects_wireframe(SendMessageW(control(id), BM_GETCHECK, 0, 0) == BST_CHECKED);
         }
+        else if (id == result_folder && !displayed_result_folder_.empty()) {
+            const auto opened = reinterpret_cast<INT_PTR>(
+                ShellExecuteW(hwnd_, L"explore", displayed_result_folder_.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+            if (opened <= 32) {
+                throw std::runtime_error("Windows could not open the result folder.");
+            }
+        }
         else if (!job_.active()) {
             if (id == browse_object || id == browse_container || id == browse_output || id == open_button) {
                 const auto chosen = choose_path(hwnd_, id == browse_output, id == open_button);
@@ -515,7 +565,13 @@ private:
                         open(*chosen);
                     }
                     else if (id == browse_output) {
-                        set(output_path, (*chosen / new_run_name()).native());
+                        run_directories_.select_parent(*chosen);
+                        set(output_path, run_directories_.parent().native());
+                        refresh_next_output();
+                        if (!run_directories_.settings_warning().empty()) {
+                            show_status(L"Runs folder selected for this session",
+                                        wide(run_directories_.settings_warning()));
+                        }
                     }
                     else {
                         set(id == browse_object ? object_path : container_path, chosen->native());
@@ -532,6 +588,14 @@ private:
     }
     void display(const irop::LoadedRunScene& scene)
     {
+        if (!scene.summary_path.empty()) {
+            displayed_result_folder_ = scene.summary_path.parent_path();
+            set(result_location, L"Result: " + scene.summary_path.native());
+            const int length = GetWindowTextLengthW(control(result_location));
+            SendMessageW(control(result_location), EM_SETSEL, static_cast<WPARAM>(length), length);
+            SendMessageW(control(result_location), EM_SCROLLCARET, 0, 0);
+            EnableWindow(control(result_folder), TRUE);
+        }
         if (scene.objects && scene.container) {
             viewport_->show_scene(*scene.objects, *scene.container);
         }
@@ -555,7 +619,6 @@ private:
             if (!scene.diagnostic.empty()) {
                 details << L"\r\n" << wide(scene.diagnostic);
             }
-            details << L"\r\n" << scene.summary_path.native();
             for (const auto& warning : scene.warnings) {
                 details << L"\r\n" << wide(warning);
             }
@@ -644,6 +707,33 @@ private:
         if (startup_.smoke_directory.empty()) {
             return;
         }
+        ++smoke_completions_;
+        if (smoke_completions_ == 1 &&
+            (startup_.smoke_action == L"rerun" || startup_.smoke_action == L"cancel-rerun" ||
+             startup_.smoke_action == L"failure-rerun" || startup_.smoke_action == L"settings-fallback")) {
+            if (startup_.smoke_action == L"settings-fallback" &&
+                (run_directories_.settings_warning().empty() || !completion.scene || !completion.scene->success)) {
+                throw std::runtime_error("Packing did not continue with a visible preference warning.");
+            }
+            if (startup_.smoke_action == L"rerun" && (!completion.scene || !completion.scene->success)) {
+                throw std::runtime_error("The first repeated packing run did not succeed.");
+            }
+            if (startup_.smoke_action == L"cancel-rerun" && !completion.cancelled &&
+                (!completion.scene || completion.scene->status != "cancelled")) {
+                throw std::runtime_error("The first repeated packing run did not preserve cancellation.");
+            }
+            if (startup_.smoke_action == L"failure-rerun" && (completion.scene || completion.diagnostic.empty())) {
+                throw std::runtime_error("The first repeated packing run did not report its input failure.");
+            }
+            if (startup_.smoke_action == L"failure-rerun") {
+                set(object_path, startup_.object.native());
+            }
+            if (startup_.smoke_action == L"cancel-rerun") {
+                set(object_count, L"1");
+            }
+            command(run_button);
+            return;
+        }
         if (completion.scene && completion.scene->objects) {
             const HWND rendering_child = FindWindowExW(hwnd_, nullptr, L"vtkOpenGL", nullptr);
             if (!rendering_child) {
@@ -705,6 +795,8 @@ private:
     void poll()
     {
         if (auto completed = job_.take_completion()) {
+            run_reservation_.reset();
+            refresh_next_output();
             busy(false);
             if (completed->scene) {
                 display(*completed->scene);
@@ -726,7 +818,16 @@ private:
         if (job_.active() && !closing_ && IsWindowEnabled(control(cancel_button))) {
             if (auto progress = job_.progress()) {
                 std::wostringstream text;
-                if (progress->phase == irop::PackingProgressPhase::finished) {
+                if (progress->phase == irop::PackingProgressPhase::input_preparation) {
+                    text << L"Reading and preparing the input meshes...";
+                }
+                else if (progress->phase == irop::PackingProgressPhase::initialization_started) {
+                    text << L"Generating initial placements for " << progress->object_count << L" objects"
+                         << L"\r\nRandom candidate attempt limit: "
+                         << progress->initialization_attempt_limit.value_or(0)
+                         << L". Geometry and fallback work have separate limits.";
+                }
+                else if (progress->phase == irop::PackingProgressPhase::finished) {
                     text << L"Writing the run result...";
                 }
                 else {
@@ -734,6 +835,13 @@ private:
                          << L"  |  iteration " << progress->iteration + 1 << L"\r\n"
                          << progress->objects_at_target << L" / " << progress->object_count
                          << L" objects at volume scale " << progress->target_volume_scale;
+                    if (progress->object_id) {
+                        text << L"\r\nSolving object " << *progress->object_id + 1 << L" / " << progress->object_count
+                             << L" | local limit " << progress->local_iteration_limit << L" iterations, "
+                             << std::chrono::duration<double>(progress->local_time_limit).count() << L" seconds"
+                             << L" | engine budget "
+                             << std::chrono::duration<double>(progress->engine_time_limit).count() << L" seconds";
+                    }
                     if (progress->phase == irop::PackingProgressPhase::tetrahedralization_recovery) {
                         text << L"\r\nRecovering tetrahedralization...";
                     }
@@ -754,14 +862,29 @@ private:
                 open(startup_.summary);
             }
             else {
-                set(output_path, (startup_.smoke_directory / L"run").native());
-                set(object_count, L"1");
+                if (startup_.smoke_action != L"restart") {
+                    const auto parent = std::filesystem::absolute(startup_.smoke_directory / L"runs");
+                    run_directories_.select_parent(parent);
+                    set(output_path, parent.native());
+                    refresh_next_output();
+                }
+                if (startup_.smoke_action == L"failure-rerun") {
+                    set(object_path, (startup_.smoke_directory / L"missing.stl").native());
+                }
+                // Keep cancellation exercises active long enough for the UI
+                // click to precede commit; a tiny one-object run can finish
+                // while the initial viewport clear repaints on a fast machine.
+                const bool cancelling = startup_.smoke_action == L"cancel" ||
+                                        startup_.smoke_action == L"close-active" ||
+                                        startup_.smoke_action == L"cancel-rerun";
+                set(object_count, cancelling ? L"100" : L"1");
                 set(initial_scale, L"0.1");
                 set(final_scale, L"0.2");
                 set(steps, L"1");
                 SendMessageW(control(adaptive), BM_SETCHECK, BST_UNCHECKED, 0);
                 command(startup_.smoke_action == L"preview" ? preview_button : run_button);
-                if (startup_.smoke_action == L"cancel" || startup_.smoke_action == L"close-active") {
+                if (startup_.smoke_action == L"cancel" || startup_.smoke_action == L"close-active" ||
+                    startup_.smoke_action == L"cancel-rerun") {
                     command(cancel_button);
                     if (startup_.smoke_action == L"close-active") {
                         close();
@@ -853,7 +976,7 @@ private:
                 return 0;
             case WM_GETMINMAXINFO: {
                 auto* bounds = reinterpret_cast<MINMAXINFO*>(data);
-                bounds->ptMinTrackSize = { app->px(1080), app->px(855) };
+                bounds->ptMinTrackSize = { app->px(1080), app->px(890) };
                 return 0;
             }
             case WM_PAINT:

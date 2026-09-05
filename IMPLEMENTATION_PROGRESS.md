@@ -14,12 +14,12 @@ detailed implementation trail requested for the migration.
   its local parity/release-readiness gates pass, while the first hosted workflow
   run is pending. The user authorized Milestone 7 against that local baseline
   under ADR-0013, followed by the Milestone 8 native Windows UI under ADR-0014.
-- Current outcome: Milestone 8 is Verified. Optional `irop_studio` wraps the
+- Latest milestone outcome: Milestone 8 is Verified. Optional `irop_studio` wraps the
   existing reusable core with native input/configuration controls, preview,
   background packing/loading, progress/cancel and safe close lifetime, camera
   controls, and bounded reopening of saved version-one runs. Packing algorithms
   and compatibility policies remain unchanged.
-- Current evidence: native Debug/Release/Ninja builds succeed; each full CTest
+- Milestone 8 baseline evidence: native Debug/Release/Ninja builds succeed; each full CTest
   run has 202 passed, one skipped and no failures out of 203 tests. Ninja
   clang-tidy emits zero diagnostics, and formatting and diff checks pass. Focused
   loader/worker coverage has 10 passed, one skipped and 186 assertions across
@@ -31,14 +31,77 @@ detailed implementation trail requested for the migration.
   permission to create file symlinks; manual file-picker dialog interaction was
   not automated.
 
+- Latest improvement: tranche 1 is Verified under ADR-0015 with the current
+  acceptance evidence in STATUS. Numbered Studio runs, early destination checks,
+  bounded solver/recovery diagnostics, replay and real-STL stage measurements
+  are present. The new Debug/Release/Ninja matrices each pass 219 tests with one
+  skip out of 220; 11 desktop cases pass in both Debug and Release. Capture/replay,
+  schemas and six real-input baseline reports also pass their respective gates.
 - Blocking ambiguities: none. ADR-0009/0010 retain the approved dependency paths
   and separate public-distribution review. ADR-0011 defines packing artifacts;
   ADR-0012 defines transform/barrier corrections; ADR-0013 defines the verified
   measured initializer/collision scope; ADR-0014 defines the UI/worker/loading
-  boundaries. Compatibility remains synchronized through `IROP-COMPAT-0007`
+  boundaries; ADR-0015 extends run management and optional failure diagnostics.
+  Compatibility remains synchronized through `IROP-COMPAT-0007`
   and `IROP-DEV-0027`.
 
+## Improvement Work After Milestone 8
+
+On 2026-09-05, the maintainer requested an issue review and phased improvement
+plan, prioritizing more objects and automatic output directories. The selected
+scale target is 100-300 first, then 1,000. The resulting
+[improvement plan](docs/IMPROVEMENT_PLAN.md) separates resolved historical defects,
+current product failures, measured performance evidence, hypotheses and deferred
+capabilities.
+
+The selected tranches are repeatable runs/diagnostics, reliable genuine growth,
+100-300-object performance, and extension to 1,000. The original planning-only
+update changed no code. The maintainer then authorized tranche 1: the implementation
+now allocates a fresh numbered child for every Studio Run and checks the packing
+destination before input preparation. Integrated acceptance is Verified in STATUS;
+the remaining three tranches are still planned.
+
+The exact supplied ten-object growth failure and the full-size structured
+workaround remain recorded in STATUS. Large successful direct placements and the
+separated collision benchmark do not establish many-object growth throughput.
+Acceptance therefore separates true growth, direct placement, fixed-density
+scaling and dense search quality. Hosted CI and environment-dependent checks
+remain parallel work. The new tranche 1 evidence is recorded separately from
+historical milestone results in STATUS.
+
+Tranche 1 implementation checklist:
+
+- [x] Remember the Studio Runs parent with bounded settings; reserve numbered
+  destinations exclusively and consume numbers across errors/cancellation/restart.
+- [x] Keep the actual result path separate and provide Open result folder.
+- [x] Reserve private packing staging before preparation and preserve final
+  atomic no-overwrite publication and pre-engine no-result behavior.
+- [x] Add bounded object/barrier/iteration/limit/backend failure context, TetGen
+  recovery records, optional local solve traces and one numeric failure snapshot.
+- [x] Replay a bounded prepared local problem through the existing validated
+  solver adapter; add optional summary fields and the snapshot schema.
+- [x] Instrument application and engine stages; extend the harness to real STL
+  multi-object growth, saved-run loading, input/source hashes and count 1,000
+  with production mesh/work checks.
+- [x] Complete integrated Debug/Release/Ninja, formatter, hostile-input,
+  repeated-run desktop, failure replay and representative benchmark acceptance.
+  STATUS records 219 passed/one skipped out of 220 per matrix, 11 desktop cases
+  per configuration, exact replay and three-success/three-failure real baselines.
+
 ## Decisions Applied
+
+- Keep Studio automatic naming at the application boundary; CLI output identity
+  remains explicit. An early staging preflight complements final publication.
+- Preserve unsuccessful summary-only output by default. Explicit capture may add
+  `failed-local-solve.json` under ADR-0015, with no packed geometry or placements.
+  Snapshot omission does not erase the authoritative failure summary, and saved
+  viewing never opens snapshots automatically.
+- Bound diagnostic history, numeric traces and replay resources; retain dropped
+  counts and original failure/recovery reasons. Use the same prepared validation
+  and solver adapter for captured replay without changing accepted transforms.
+- Preserve legacy combined initialization timing and add separate preparation,
+  placement, engine substage, output-validation and export timers. Benchmark
+  process CPU/memory and saved-run loading have explicit measurement boundaries.
 
 - Keep the optional native Windows UI over reusable project-owned core APIs.
   Link existing VTK rendering privately to `irop_studio`, with no new vcpkg
@@ -823,6 +886,36 @@ detailed implementation trail requested for the migration.
 - Packing algorithms and compatibility markers are unchanged. Milestone 7 stays
   Verified and Milestone 6's first hosted CI run remains independently pending.
 
+### 2026-09-05 — Improvement tranche 1 implemented and verified
+
+- Replaced the Studio per-run path workflow with a remembered Runs parent,
+  numbered children, exclusive reservations and a bounded durable sequence ledger.
+  Failed/cancelled attempts consume numbers without creating false result folders.
+  The actual published/opened location remains separate from the proposed next run.
+- Moved packing output transaction preparation before input loading. Known unusable
+  destinations now fail before expensive work; final publication still rejects a
+  competing destination. Input/pre-engine cancellation still publishes no run.
+- Added per-object failure location/limit/backend reason, bounded TetGen recovery
+  history, opt-in solver trace and a captured prepared local problem. Replay uses
+  the same validation and solver path. Optional diagnostics extend version-one
+  summaries, and only explicit capture adds the numeric failure-snapshot sibling.
+- Added application/engine stage measurements and configurable real-STL benchmark
+  packing/export/loading. Reports record input/source hashes, settings, versions,
+  machine, per-object work and process memory; the runner retains failed outcomes.
+  The harness accepts counts through 1,000 under checked production limits, without
+  claiming practical growth throughput at 100, 300 or 1,000.
+- ADR-0015 records the extension, ADR-0011 qualifies the optional failure artifact,
+  and ADR-0014 describes Studio allocation/settings. The improvement plan, project
+  definition, benchmark guide and user guides reflect implemented behavior.
+- Integrated Debug/Release/Ninja builds and tests pass: 219 passed, one skipped
+  out of 220 per matrix, with clean final analysis and formatting. Eleven desktop
+  cases pass per Debug/Release, including two runs through a settings-save failure.
+- The supplied failure snapshot replays the same 1,000-iteration limit and all
+  128 retained trace samples. Schema validation passes. Three direct real-input
+  runs validate/export/load; three genuine-growth failures are retained. STATUS
+  records paths, commands and stage baselines. The ten-object growth defect remains
+  unresolved and is the next tranche, not a success claimed by this verification.
+
 ## Verification Evidence
 
 - Toolchain: CMake 4.2.3; Visual Studio Community 2026 18.8.3; MSVC 19.51.36252;
@@ -972,6 +1065,16 @@ detailed implementation trail requested for the migration.
 
 ## Risks and Follow-up
 
+- Tranche 1 is Verified with the integrated acceptance evidence in STATUS.
+  The supplied ten-object genuine-growth convergence failure remains a tranche 2 issue; the full-size direct-placement
+  workaround and tiny growth smoke do not establish broader convergence.
+- Benchmark count allowance through 1,000 does not establish 100/300/1,000-object
+  throughput. Keep successful genuine growth, direct placement, fixed density
+  and increasing density as separately labeled measurement cases.
+- Detailed diagnostic capture has bounded overhead. Keep numeric snapshots and
+  omission counters with the run summary; replay success certifies no global
+  scene. Active backend work remains cooperative rather than hard-preemptible.
+
 - Milestone 8 is locally Verified with its symlink-escape regression explicitly
   skipped under the current Windows account. Run it where file-symlink creation
   is allowed to exercise that branch.
@@ -1035,8 +1138,8 @@ detailed implementation trail requested for the migration.
   make point-union TetGen emit a zero-volume tetrahedron. End-to-end toy fixtures
   that require genuine growth use small deterministic geometric perturbations and
   production retains bounded recovery. Already-complete barriers bypass this
-  dependency work; the current recovery warning does not expose the backend root
-  cause for genuine-growth failures.
+  dependency work. Tranche 1 now preserves the original backend reason in bounded
+  recovery records; improving recovery itself remains tranche 2 work.
 - Project limits bound TetGen inputs and accepted outputs but cannot strictly cap the
   backend's peak memory or time. Calls are serialized because TetGen's exact-predicate
   implementation uses mutable process-global state.

@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://irop.local/schemas/local-solve-snapshot-v1.schema.json",
+  "title": "IROP version-one prepared local solve snapshot",
+  "description": "Opt-in developer replay artifact. Contains one prepared seven-variable local problem, no mesh paths or global RNG. It is not a packing result or physical validation record. Reads enforce a 64 MiB ceiling, depth/node and 100000-row limits; replay work allowance defaults to 1000 iterations, 30000 ms and LocalSolveLimits callback budgets and can be explicitly configured. The same adapter validates finite transforms, feasible input bounds, normals, arithmetic and accepted transforms.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "request",
+    "limits",
+    "constraints"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "kind": {
+      "const": "irop-local-solve"
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "participant",
+        "current_transform",
+        "initial_guess",
+        "bounds",
+        "padding",
+        "maximum_result_volume_scale",
+        "tolerance"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "participant": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "current_transform": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "number"
+          },
+          "description": "[volume scale, rotation x/y/z in radians, translation x/y/z]; rotation convention Ry * Rz * Rx."
+        },
+        "initial_guess": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "number"
+          },
+          "description": "[volume scale multiplier, incremental rotation x/y/z, incremental translation x/y/z]."
+        },
+        "bounds": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          ],
+          "items": false,
+          "description": "[minimum volume multiplier, maximum volume multiplier or null, maximum absolute rotation delta radians, maximum absolute translation or null]."
+        },
+        "padding": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_result_volume_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "tolerance": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1e-06
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "required": [
+        "max_constraints",
+        "max_dense_jacobian_entries",
+        "max_constraint_rows_evaluated",
+        "max_jacobian_entries_evaluated",
+        "max_iterations",
+        "max_elapsed_time_ms"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_constraints": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_dense_jacobian_entries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_constraint_rows_evaluated": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_jacobian_entries_evaluated": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "max_elapsed_time_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "array",
+        "minItems": 9,
+        "maxItems": 9,
+        "items": {
+          "type": "number"
+        },
+        "description": "[current vertex x/y/z, plane point x/y/z, inward unit normal x/y/z]. Order matches prepared CAT row order."
+      }
+    }
+  }
+}

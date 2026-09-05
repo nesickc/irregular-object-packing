@@ -250,6 +250,20 @@ Mesh editing, advanced scene management, per-iteration animated geometry,
 cross-platform UI support and changes to packing algorithms are outside this
 initial UI scope.
 
+## Post-Milestone 8 Improvement Tranches
+
+Planning scope recorded on 2026-09-05 at the maintainer's request. The
+[improvement plan](IMPROVEMENT_PLAN.md) reviews issues raised during implementation,
+prioritizes genuine packing-growth reliability and automatic output folders, and
+sets the requested scale ladder at 100-300 objects followed by 1,000.
+
+The sequence is: (1) repeatable runs and useful diagnostics, (2) reliable
+packing growth, (3) practical 100-300-object performance, (4) extension to 1,000.
+Tranche 1 is now Verified under ADR-0015: numbered runs/preflight, bounded
+diagnostics/replay and real-STL measurement foundations pass the evidence gates
+recorded in STATUS. Tranches 2-4 remain planned. Hosted CI is a parallel acceptance
+item. Historical milestone scope and verification remain unchanged.
+
 ## Milestone Change Policy
 
 When changing this plan:

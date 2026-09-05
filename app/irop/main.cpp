@@ -1,6 +1,7 @@
 #include <spdlog/spdlog.h>
 
 #include <CLI/CLI.hpp>
+#include <algorithm>
 #include <chrono>
 #include <csignal>
 #include <cstdint>
@@ -12,6 +13,7 @@
 #include "irop/error.hpp"
 #include "irop/initialization/initialize_scene.hpp"
 #include "irop/inspection/inspect_stl.hpp"
+#include "irop/io/local_solve_replay.hpp"
 #include "irop/model/triangle_mesh.hpp"
 #include "irop/packing/pack_scene.hpp"
 
@@ -336,6 +338,33 @@ void log_error_noexcept(const char* category, const char* message) noexcept
                      "Maximum combined packed-object triangle count")
         ->check(CLI::PositiveNumber);
 
+    pack_command->add_flag("--capture-failed-local-solve",
+                           pack_options.algorithm.diagnostics.capture_failed_local_problem,
+                           "Save one bounded failed local problem for replay (no packed geometry)");
+    pack_command
+        ->add_option("--local-solve-trace-records", pack_options.algorithm.diagnostics.max_trace_records_per_solve,
+                     "Maximum diagnostic trace rows per retained solve; zero disables")
+        ->check(CLI::Range(0, 4096));
+    pack_command
+        ->add_option("--local-solve-records", pack_options.algorithm.diagnostics.max_local_solve_records,
+                     "Maximum retained per-object solve records; zero disables")
+        ->check(CLI::Range(0, 4096));
+
+    std::filesystem::path replay_path;
+    std::uint64_t replay_trace_records = 128;
+    std::uint64_t replay_max_iterations = 1000;
+    std::uint64_t replay_max_milliseconds = 30000;
+    CLI::App* replay_command =
+        application.add_subcommand("replay-local-solve", "Replay a bounded saved local optimization problem");
+    replay_command->add_option("snapshot", replay_path, "Saved failed-local-solve.json")->required();
+    replay_command->add_option("--trace-records", replay_trace_records, "Maximum printed diagnostic rows")
+        ->check(CLI::Range(0, 4096));
+    replay_command
+        ->add_option("--max-iterations", replay_max_iterations, "Maximum accepted saved solver iteration budget")
+        ->check(CLI::Range(1, 1000000));
+    replay_command->add_option("--max-milliseconds", replay_max_milliseconds, "Maximum accepted saved elapsed budget")
+        ->check(CLI::Range(1, 300000));
+
     try {
         application.parse(argc, argv);
     }
@@ -345,6 +374,27 @@ void log_error_noexcept(const char* category, const char* message) noexcept
                                                                      : static_cast<int>(ExitCode::usage);
     }
 
+    if (*replay_command) {
+        irop::LocalSolveSnapshotReadLimits read_limits;
+        read_limits.solve_limits.max_iterations = replay_max_iterations;
+        read_limits.solve_limits.max_elapsed_time =
+            std::chrono::milliseconds(static_cast<std::chrono::milliseconds::rep>(replay_max_milliseconds));
+        const auto snapshot = irop::read_local_solve_snapshot(replay_path, read_limits);
+        irop::LocalSolveWorkspace workspace;
+        const auto result =
+            irop::solve_prepared_local_transform(snapshot.constraints, snapshot.request, workspace, snapshot.limits,
+                                                 { .max_trace_records = replay_trace_records });
+        spdlog::info("local replay status={} constraints={} iterations={} elapsed_ms={}: {}",
+                     irop::to_string(result.status), result.work.constraints_prepared, result.work.iterations,
+                     result.work.elapsed_time.count(), result.diagnostic);
+        for (const auto& row : result.trace) {
+            spdlog::info("iteration={} restoration={} objective={} primal={} dual={} mu={}", row.iteration,
+                         row.restoration_phase, row.objective, row.primal_infeasibility, row.dual_infeasibility,
+                         row.barrier_parameter);
+        }
+        spdlog::info("trace_records_dropped={}", result.trace_records_dropped);
+        return static_cast<int>(result.succeeded() ? ExitCode::success : ExitCode::unsuccessful);
+    }
     if (*inspect_command) {
         const irop::InspectionResult result =
             irop::inspect_stl(input_path, inspection_output_directory, inspection_limits);
@@ -381,6 +431,13 @@ void log_error_noexcept(const char* category, const char* message) noexcept
         };
         pack_options.callbacks.progress = [](const irop::PackingProgress& progress) {
             switch (progress.phase) {
+            case irop::PackingProgressPhase::input_preparation:
+                spdlog::info("preparing object and container meshes");
+                break;
+            case irop::PackingProgressPhase::initialization_started:
+                spdlog::info("initializing {} objects; random attempt limit {}", progress.object_count,
+                             progress.initialization_attempt_limit.value_or(0));
+                break;
             case irop::PackingProgressPhase::scale_step_started:
                 spdlog::info("packing scale step {}/{}: target volume scale {}", progress.scale_step + 1,
                              progress.scale_step_count, progress.target_volume_scale);
@@ -388,6 +445,10 @@ void log_error_noexcept(const char* category, const char* message) noexcept
             case irop::PackingProgressPhase::tetrahedralization_recovery:
                 spdlog::warn("TetGen recovery at scale step {}, iteration {}", progress.scale_step + 1,
                              progress.iteration + 1);
+                break;
+            case irop::PackingProgressPhase::local_solve_started:
+                spdlog::debug("solving object {} at scale step {}, local iteration cap {}",
+                              progress.object_id.value_or(0), progress.scale_step + 1, progress.local_iteration_limit);
                 break;
             case irop::PackingProgressPhase::iteration_completed:
                 spdlog::debug("packing step {}, iteration {}: {}/{} objects at target", progress.scale_step + 1,
