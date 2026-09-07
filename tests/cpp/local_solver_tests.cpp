@@ -248,6 +248,69 @@ TEST_CASE("analytic local constraint gradient matches central differences")
     }
 }
 
+TEST_CASE("analytic local constraint Hessian matches central gradient differences")
+{
+    constexpr irop::Point3 object_center { 2.0, -1.0, 3.0 };
+    const irop::LocalPlaneConstraint constraint = golden_constraint();
+    constexpr std::array<double, 3> scales { 0.1, 1.728, 8.0 };
+    constexpr std::array<irop::EulerRotationRadians, 3> rotations {
+        irop::EulerRotationRadians {},
+         { 0.1, -0.2, 0.3 },
+         { -0.8, 0.7, -0.6 }
+    };
+    constexpr double step_size = 1.0e-6;
+    for (const double scale : scales) {
+        for (const auto& rotation : rotations) {
+            irop::LocalTransformStep step = golden_step();
+            step.volume_scale_multiplier = scale;
+            step.rotation_delta = rotation;
+            const auto sparse = irop::evaluate_local_constraint_hessian(object_center, constraint, 0.05, step);
+            std::array<std::array<double, irop::local_solve_variable_count>, irop::local_solve_variable_count> dense {};
+            std::size_t entry = 0;
+            for (std::size_t row = 0; row < 4; ++row) {
+                for (std::size_t column = 0; column <= row; ++column) {
+                    dense[row][column] = sparse[entry];
+                    dense[column][row] = sparse[entry];
+                    ++entry;
+                }
+            }
+            for (std::size_t variable = 0; variable < irop::local_solve_variable_count; ++variable) {
+                irop::LocalTransformStep lower = step;
+                irop::LocalTransformStep upper = step;
+                perturb(lower, variable, -step_size);
+                perturb(upper, variable, step_size);
+                const auto lower_gradient =
+                    irop::evaluate_local_constraint_gradient(object_center, constraint, 0.05, lower);
+                const auto upper_gradient =
+                    irop::evaluate_local_constraint_gradient(object_center, constraint, 0.05, upper);
+                for (std::size_t row = 0; row < irop::local_solve_variable_count; ++row) {
+                    const double difference = (upper_gradient[row] - lower_gradient[row]) / (2.0 * step_size);
+                    CAPTURE(scale, rotation.x, rotation.y, rotation.z, row, variable);
+                    CHECK(dense[row][variable] == Approx(difference).margin(2.0e-7));
+                }
+            }
+        }
+    }
+}
+
+TEST_CASE("local constraint Hessian validates inputs and rejects arithmetic overflow")
+{
+    irop::Point3 center { 2.0, -1.0, 3.0 };
+    irop::LocalPlaneConstraint constraint = golden_constraint();
+    irop::LocalTransformStep step = golden_step();
+    double padding = 0.05;
+    SECTION("nonpositive multiplier") { step.volume_scale_multiplier = 0.0; }
+    SECTION("nonfinite rotation") { step.rotation_delta.x = std::numeric_limits<double>::infinity(); }
+    SECTION("nonunit normal") { constraint.inward_unit_normal.x = 2.0; }
+    SECTION("negative padding") { padding = -1.0; }
+    SECTION("relative vertex overflow")
+    {
+        center.x = -std::numeric_limits<double>::max();
+        constraint.current_vertex.x = std::numeric_limits<double>::max();
+    }
+    CHECK_THROWS(irop::evaluate_local_constraint_hessian(center, constraint, padding, step));
+}
+
 TEST_CASE("local result application composes the optimized incremental rotation")
 {
     const irop::Transform current {
@@ -350,6 +413,23 @@ TEST_CASE("Ipopt solves the Python box scale fixture")
     CHECK(result.work.jacobian_entries_evaluated > 0);
 }
 
+TEST_CASE("exact Hessian solves the Python box scale fixture within shared row budget")
+{
+    const LocalSolveFixture fixture = make_box_fixture();
+    irop::LocalSolveRequest request = make_scale_only_request();
+    request.use_exact_hessian = true;
+    irop::LocalSolveWorkspace workspace;
+    const auto result = irop::solve_local_transform(fixture.mesh, fixture.cat, request, workspace);
+    INFO(result.diagnostic);
+    REQUIRE(result.succeeded());
+    CHECK(result.accepted_transform->volume_scale == Approx(1.3717421124828535).margin(5.0e-5));
+    REQUIRE(result.work.minimum_applied_constraint.has_value());
+    CHECK(*result.work.minimum_applied_constraint >= -1.0e-7);
+    REQUIRE(result.work.hessian_evaluations > 0);
+    CHECK(result.work.hessian_constraint_rows_evaluated == result.work.hessian_evaluations * 6);
+    CHECK(result.work.constraint_rows_evaluated > result.work.hessian_constraint_rows_evaluated);
+}
+
 TEST_CASE("Ipopt solves an asymmetric local scale fixture")
 {
     const LocalSolveFixture fixture = make_asymmetric_fixture();
@@ -376,6 +456,8 @@ TEST_CASE("Ipopt solves a genuine seven-variable local problem")
     request.initial_guess.translation_delta = { 0.01, -0.01, 0.005 };
     request.bounds.maximum_absolute_rotation_delta_radians = 0.25;
     request.bounds.maximum_absolute_translation = 0.2;
+    SECTION("legacy limited-memory default") { CHECK_FALSE(request.use_exact_hessian); }
+    SECTION("exact Hessian") { request.use_exact_hessian = true; }
     irop::LocalSolveWorkspace workspace;
 
     const irop::LocalSolveResult result = irop::solve_local_transform(fixture.mesh, fixture.cat, request, workspace);
@@ -394,6 +476,8 @@ TEST_CASE("Ipopt solves a genuine seven-variable local problem")
     REQUIRE(result.work.minimum_applied_constraint.has_value());
     CHECK(*result.work.minimum_applied_constraint >= -1.0e-7);
     CHECK(result.work.jacobian_entries_evaluated > 0);
+    CHECK((result.work.hessian_evaluations > 0) == request.use_exact_hessian);
+    CHECK(result.work.hessian_constraint_rows_evaluated <= result.work.constraint_rows_evaluated);
 }
 
 TEST_CASE("local solver ignores an ambient Ipopt option file", "[optimization][ambient-option-file]")
@@ -553,6 +637,24 @@ TEST_CASE("local solver enforces preparation and callback resource limits")
         CHECK_FALSE(result.candidate_step.has_value());
         CHECK_FALSE(result.accepted_transform.has_value());
     }
+}
+
+TEST_CASE("exact Hessian evaluation cannot bypass the constraint row work limit")
+{
+    const LocalSolveFixture fixture = make_box_fixture();
+    irop::LocalSolveRequest request = make_scale_only_request();
+    request.use_exact_hessian = true;
+    irop::LocalSolveWorkspace workspace;
+    irop::LocalSolveLimits limits;
+    // One constraint callback fits, but its following six-row Hessian does not.
+    limits.max_constraint_rows_evaluated = 6;
+    const auto result = irop::solve_local_transform(fixture.mesh, fixture.cat, request, workspace, limits);
+    INFO(result.diagnostic);
+    CHECK(result.status == irop::LocalSolveStatus::resource_exhausted);
+    CHECK_FALSE(result.accepted_transform.has_value());
+    CHECK(result.work.hessian_evaluations > 0);
+    CHECK(result.work.hessian_constraint_rows_evaluated == 0);
+    CHECK(result.work.constraint_rows_evaluated == 6);
 }
 
 TEST_CASE("fixed infeasible local problem returns a structured failure")

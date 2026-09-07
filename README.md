@@ -99,10 +99,12 @@ irop.exe replay-local-solve artifacts/my-packing/failed-local-solve.json
 Capture is optional and bounded. Failure summaries identify the object, barrier,
 iteration and local limit, while retained TetGen recovery records preserve the
 backend reason. Replay runs one local problem and does not certify a complete
-packing. Tranche 1 is verified; build/test, desktop and real-input evidence
+packing. Tranches 1 and 2 are verified: the supplied ten-object genuine-growth
+case now completes in three of three measured runs, with exact full-size targets
+and both physical validation gates. Build/test, desktop and real-input evidence
 is recorded in [STATUS](/docs/STATUS.md). The [improvement plan](/docs/IMPROVEMENT_PLAN.md)
-keeps convergence work and measured 100-300/1,000-object scaling as subsequent
-tranches. The real-STL [benchmark harness](/benchmarks/README.md) now records
+continues with measured 100-300/1,000-object scaling. The optional
+`--reference-growth-policy` flag retains the earlier growth policy for comparison. The real-STL [benchmark harness](/benchmarks/README.md) now records
 end-to-end stages, input/source hashes, work, outcomes and saved-run loading;
 its count range through 1,000 is not a throughput guarantee.
 

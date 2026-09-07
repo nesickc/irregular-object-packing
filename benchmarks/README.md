@@ -169,3 +169,58 @@ A short `irop_benchmark_pack_smoke` CTest exercises two-object direct placement,
 actual two-object growth, Unicode paths, source/input provenance, export/loading
 and argument bounds. Deliberate real-input and large-count measurements remain
 outside ordinary CTest; the smoke has no performance threshold.
+
+## Tranche 2 genuine-growth results (2026-09-06)
+
+The [tracked ledger](results/windows-20260906-tranche2.json) records the supplied
+`ulamok_2kg_simplified.stl` / `10_kg_np.stl` pair, ten copies, seed 1918,
+volume scale `.1 -> 1.0`, nine barriers, adaptive sampling on and structured
+initialization fallback off. Three serial Release processes on the recorded
+Ryzen 9 9950X machine all reach exact scale 1.0, pass full-resolution and
+serialized-float32 physical validation, export and load. Placements, geometry
+bytes and work are identical across the three repetitions.
+
+| Measurement | Result |
+| --- | --- |
+| Complete-run successes | 3/3; original tranche-1 growth baseline 0/3 |
+| Total wall time, each process | 216.343 / 221.492 / 227.274 seconds |
+| Engine wall time, median | 221.385 seconds |
+| Local solves, median | 207.973 seconds, about 94% of engine time |
+| Physical correction, median | 8.643 seconds |
+| TetGen / CAT / resampling, medians | 3.303 / 1.225 / 0.031 seconds |
+| Output validation / export / saved loading, medians | 77.19 / 13.00 / 8.83 milliseconds |
+| Lifetime peak working set / commit, medians | 69.75 / 152.33 MiB |
+| Growth work | 105 iterations, 328 local solves, 5 sampling refinements, 17 physical step retries |
+
+Engine and local time limits remain 300,000 and 30,000 ms; local iteration limit
+remains 1,000. The measured physical triangle allowance is one billion per engine
+run (762,607,476 used); standalone scene queries retain 100 million. CAT contact
+diagnostics have a separate ten-million allowance (9,738,240 used), and the run
+explicitly records incomplete CAT diagnostics. Physical validation is complete.
+No dependency threading override was applied: process CPU is roughly 16 times
+wall time. Profile local preparation, callbacks, linear algebra and dependency
+thread settings before choosing the next optimization.
+
+Reproduce with a fresh output parent:
+
+```powershell
+./benchmarks/run-stl-windows.ps1 `
+  -Executable build/windows-vs2026/benchmarks/Release/irop_benchmarks.exe `
+  -Object rc/input_models/ulamok_2kg_simplified.stl `
+  -Container rc/containers/10_kg_np.stl -Counts 10 -Repeats 3 -Seed 1918 `
+  -InitialScale 0.1 -FinalScale 1 -ScaleSteps 9 `
+  -DisableInitializationFallback -ContinueAfterFailure `
+  -OutputDirectory build/tranche2-benchmark-reproduction -Label tranche2
+```
+
+The ledger includes the failed baseline, all timing samples, source/input and
+executable hashes, machine/dependencies, work and resolved limits. Its source
+hashes describe the measured working tree over the recorded base revision. A
+subsequent exception-reporting correction only makes CAT completeness conservative
+on aborted physical queries; its source difference is recorded separately and
+all supported build/test matrices were rerun. These timings belong to the
+explicitly identified measured binary, with unchanged successful-growth policy.
+There is no speedup ratio between an early failure and a complete success.
+The user meshes live under ignored `rc/`; tracked generated tests cover the
+portable regression corpus. This measurement does not establish practical
+100/300/1,000-object throughput or convergence for other shapes/seeds.

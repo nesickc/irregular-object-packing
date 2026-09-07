@@ -19,10 +19,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <map>
 #include <new>
+#include <numeric>
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "irop/error.hpp"
 #include "irop/geometry/mesh_geometry.hpp"
@@ -259,6 +262,56 @@ struct SubdivisionPlan {
     return plan;
 }
 
+[[nodiscard]] TriangleMesh subdivide_without_moving_surface(const TriangleMesh& mesh, const SubdivisionPlan& plan)
+{
+    // DEVIATION(IROP-DEV-0034): Retain the input boundary and its double precision.
+    // VTK linear subdivision stores output points as float, while Loop subdivision
+    // and smoothing also move the boundary. See docs/COMPATIBILITY.md.
+    TriangleMesh result = mesh;
+    if (plan.final_vertices > result.vertices.max_size() || plan.final_triangles > result.triangles.max_size()) {
+        throw Error(ErrorCategory::resource_limit, "surface subdivision exceeds addressable memory");
+    }
+    result.vertices.reserve(static_cast<std::size_t>(plan.final_vertices));
+    for (std::uint64_t step = 0; step < plan.steps; ++step) {
+        std::map<std::pair<MeshIndex, MeshIndex>, MeshIndex> edge_midpoints;
+        std::vector<Triangle> triangles;
+        triangles.reserve(result.triangles.size() * 4U);
+        const auto midpoint_index = [&](const MeshIndex first_index, const MeshIndex second_index) {
+            const std::pair<MeshIndex, MeshIndex> edge { std::min(first_index, second_index),
+                                                         std::max(first_index, second_index) };
+            const auto existing = edge_midpoints.find(edge);
+            if (existing != edge_midpoints.end()) {
+                return existing->second;
+            }
+            if (result.vertices.size() >= plan.final_vertices) {
+                throw Error(ErrorCategory::invalid_mesh, "surface subdivision exceeded the preflight vertex count");
+            }
+            const Point3& first = result.vertices[static_cast<std::size_t>(first_index)];
+            const Point3& second = result.vertices[static_cast<std::size_t>(second_index)];
+            const Point3 midpoint {
+                std::midpoint(first.x, second.x),
+                std::midpoint(first.y, second.y),
+                std::midpoint(first.z, second.z),
+            };
+            const MeshIndex index = static_cast<MeshIndex>(result.vertices.size());
+            result.vertices.push_back(midpoint);
+            edge_midpoints.emplace(edge, index);
+            return index;
+        };
+        for (const Triangle& triangle : result.triangles) {
+            const MeshIndex last_first = midpoint_index(triangle[2], triangle[0]);
+            const MeshIndex first_second = midpoint_index(triangle[0], triangle[1]);
+            const MeshIndex second_last = midpoint_index(triangle[1], triangle[2]);
+            triangles.push_back({ triangle[0], first_second, last_first });
+            triangles.push_back({ first_second, triangle[1], second_last });
+            triangles.push_back({ second_last, triangle[2], last_first });
+            triangles.push_back({ first_second, second_last, last_first });
+        }
+        result.triangles = std::move(triangles);
+    }
+    return result;
+}
+
 [[nodiscard]] TriangleMesh resample_with_vtk(const TriangleMesh& mesh, const std::uint64_t target_triangle_count,
                                              const SurfaceResamplingLimits& limits, std::uint64_t& subdivision_steps)
 {
@@ -295,9 +348,13 @@ struct SubdivisionPlan {
 
 [[nodiscard]] SurfaceResamplingResult resample_closed_surface_impl(const TriangleMesh& mesh,
                                                                    const std::uint64_t target_triangle_count,
-                                                                   const SurfaceResamplingLimits& limits)
+                                                                   const SurfaceResamplingLimits& limits,
+                                                                   const SurfaceResamplingMode mode)
 {
     validate_resampling_limits(limits);
+    if (mode != SurfaceResamplingMode::reference && mode != SurfaceResamplingMode::preserve_surface) {
+        throw Error(ErrorCategory::invalid_configuration, "surface-resampling mode is not recognized");
+    }
     if (target_triangle_count < minimum_closed_triangle_count) {
         throw Error(ErrorCategory::invalid_configuration,
                     "surface-resampling target must contain at least four triangles");
@@ -308,7 +365,8 @@ struct SubdivisionPlan {
 
     const MeshStatistics input_statistics = validate_and_measure_mesh(mesh, limits.mesh_limits);
     static_cast<void>(ClosedMeshQuery(mesh));
-    if (target_triangle_count == input_statistics.triangle_count) {
+    if (target_triangle_count == input_statistics.triangle_count ||
+        (mode == SurfaceResamplingMode::preserve_surface && target_triangle_count < input_statistics.triangle_count)) {
         return {
             .mesh = mesh,
             .requested_triangle_count = target_triangle_count,
@@ -318,11 +376,19 @@ struct SubdivisionPlan {
         };
     }
 
-    // DEVIATION(IROP-DEV-0020): Use the pinned VTK resampling path instead of
-    // the Python implementation's Trimesh-first decimation fallback chain.
-    // See docs/COMPATIBILITY.md.
     std::uint64_t subdivision_steps = 0;
-    TriangleMesh resampled = resample_with_vtk(mesh, target_triangle_count, limits, subdivision_steps);
+    TriangleMesh resampled;
+    if (mode == SurfaceResamplingMode::preserve_surface) {
+        const SubdivisionPlan plan = plan_subdivision(input_statistics, target_triangle_count, limits);
+        subdivision_steps = plan.steps;
+        resampled = subdivide_without_moving_surface(mesh, plan);
+    }
+    else {
+        // DEVIATION(IROP-DEV-0020): Use the pinned VTK resampling path instead of
+        // the Python implementation's Trimesh-first decimation fallback chain.
+        // See docs/COMPATIBILITY.md.
+        resampled = resample_with_vtk(mesh, target_triangle_count, limits, subdivision_steps);
+    }
     const MeshStatistics output_statistics = validate_and_measure_mesh(resampled, limits.mesh_limits);
     try {
         static_cast<void>(ClosedMeshQuery(resampled));
@@ -331,12 +397,12 @@ struct SubdivisionPlan {
         if (error.category() == ErrorCategory::resource_limit) {
             throw;
         }
-        throw Error(ErrorCategory::dependency_failure, "VTK resampling produced an invalid closed surface");
+        throw Error(ErrorCategory::dependency_failure, "surface resampling produced an invalid closed surface");
     }
 
     if (target_triangle_count > input_statistics.triangle_count &&
         output_statistics.triangle_count < target_triangle_count) {
-        throw Error(ErrorCategory::dependency_failure, "VTK subdivision did not reach the requested surface count");
+        throw Error(ErrorCategory::dependency_failure, "surface subdivision did not reach the requested surface count");
     }
     if (target_triangle_count < input_statistics.triangle_count &&
         output_statistics.triangle_count >= input_statistics.triangle_count) {
@@ -404,10 +470,10 @@ std::uint64_t target_container_triangle_count(const TriangleMesh& sampled_object
 }
 
 SurfaceResamplingResult resample_closed_surface(const TriangleMesh& mesh, const std::uint64_t target_triangle_count,
-                                                const SurfaceResamplingLimits& limits)
+                                                const SurfaceResamplingLimits& limits, const SurfaceResamplingMode mode)
 {
     try {
-        return resample_closed_surface_impl(mesh, target_triangle_count, limits);
+        return resample_closed_surface_impl(mesh, target_triangle_count, limits, mode);
     }
     catch (const Error&) {
         throw;

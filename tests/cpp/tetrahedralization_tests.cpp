@@ -9,6 +9,8 @@
 #include <string_view>
 #include <vector>
 
+#include "../../src/tetrahedralization/output_validation.hpp"
+#include "irop/cat/cat.hpp"
 #include "irop/model/triangle_mesh.hpp"
 #include "irop/tetrahedralization/tetrahedralization.hpp"
 #include "support/test_support.hpp"
@@ -39,6 +41,24 @@ namespace {
     return combined;
 }
 
+[[nodiscard]] irop::TetrahedralMesh recovery_test_mesh()
+{
+    irop::TetrahedralMesh mesh;
+    mesh.participant_count = 2;
+    mesh.points = {
+        { 0.0,  0.0, 0.0 },
+        { 1.0,  0.0, 0.0 },
+        { 0.0,  1.0, 0.0 },
+        { 0.0,  0.0, 1.0 },
+        { 10.0, 0.0, 0.0 },
+        { 11.0, 0.0, 0.0 },
+        { 10.0, 1.0, 0.0 },
+        { 11.0, 1.0, 0.0 }
+    };
+    mesh.point_owners = { 0, 0, 0, 1, 0, 0, 0, 0 };
+    return mesh;
+}
+
 }  // namespace
 
 TEST_CASE("tetrahedralization status names are stable")
@@ -49,6 +69,76 @@ TEST_CASE("tetrahedralization status names are stable")
           "resource_exhausted");
     CHECK(std::string_view(irop::to_string(irop::TetrahedralizationStatus::dependency_failure)) ==
           "dependency_failure");
+}
+
+TEST_CASE("single-participant zero-volume output omission requires explicit opt-in")
+{
+    irop::TetrahedralMesh mesh = recovery_test_mesh();
+    irop::TetrahedralizationWork work;
+    work.output_tetrahedra = 1;
+    irop::TetrahedralizationOptions options;
+    CHECK_FALSE(options.omit_degenerate_single_participant_tetrahedra);
+    constexpr irop::Tetrahedron zero_cell { 4, 5, 6, 7 };
+    CHECK_FALSE(irop::detail::append_validated_tetrahedron(zero_cell, mesh, options, work));
+    CHECK(mesh.tetrahedra.empty());
+    CHECK(work.omitted_single_participant_tetrahedra == 0);
+
+    options.omit_degenerate_single_participant_tetrahedra = true;
+    CHECK(irop::detail::append_validated_tetrahedron(zero_cell, mesh, options, work));
+    CHECK(mesh.tetrahedra.empty());
+    CHECK(work.omitted_single_participant_tetrahedra == 1);
+    CHECK(work.output_tetrahedra == 1);
+}
+
+TEST_CASE("single-participant recovery cannot conceal invalid or mixed-participant output")
+{
+    irop::TetrahedralMesh mesh = recovery_test_mesh();
+    irop::Tetrahedron cell { 4, 5, 6, 7 };
+    irop::TetrahedralizationWork work;
+    work.output_tetrahedra = 1;
+    const irop::TetrahedralizationOptions options { .omit_degenerate_single_participant_tetrahedra = true };
+    SECTION("mixed-participant zero volume") { mesh.point_owners[7] = 1; }
+    SECTION("duplicate indices") { cell[3] = cell[2]; }
+    SECTION("out-of-range indices") { cell[3] = 8; }
+    SECTION("missing ownership") { mesh.point_owners.pop_back(); }
+    SECTION("invalid ownership") { mesh.point_owners[7] = 2; }
+    SECTION("nonfinite coordinates") { mesh.points[7].z = std::numeric_limits<double>::infinity(); }
+    SECTION("finite coordinates with overflowing determinant arithmetic")
+    {
+        mesh.points[4].x = -std::numeric_limits<double>::max();
+        mesh.points[5].x = std::numeric_limits<double>::max();
+    }
+    CHECK_FALSE(irop::detail::append_validated_tetrahedron(cell, mesh, options, work));
+    CHECK(mesh.tetrahedra.empty());
+    CHECK(work.omitted_single_participant_tetrahedra == 0);
+}
+
+TEST_CASE("omitted single-participant tetrahedra cannot generate CAT constraints")
+{
+    irop::TetrahedralMesh mesh = recovery_test_mesh();
+    constexpr irop::Tetrahedron mixed_cell { 0, 1, 2, 3 };
+    constexpr irop::Tetrahedron zero_cell { 4, 5, 6, 7 };
+    irop::TetrahedralizationWork work;
+    work.output_tetrahedra = 2;
+    const irop::TetrahedralizationOptions options { .omit_degenerate_single_participant_tetrahedra = true };
+    REQUIRE(irop::detail::append_validated_tetrahedron(mixed_cell, mesh, options, work));
+    REQUIRE(irop::detail::append_validated_tetrahedron(zero_cell, mesh, options, work));
+    REQUIRE(mesh.tetrahedra.size() == 1);
+    CHECK(mesh.tetrahedra.front() == mixed_cell);
+    CHECK(work.omitted_single_participant_tetrahedra == 1);
+    CHECK(work.output_tetrahedra == 2);
+    const auto cat = irop::build_cat(mesh);
+    INFO(cat.diagnostic);
+    REQUIRE(cat.succeeded());
+    CHECK(cat.work.tetrahedra_examined == 1);
+    CHECK(cat.work.relevant_tetrahedra == 1);
+    REQUIRE_FALSE(cat.constraints.empty());
+    for (const auto& constraint : cat.constraints) {
+        CHECK(constraint.source_point < 4);
+    }
+    for (const auto& polygon : cat.polygons) {
+        CHECK(polygon.tetrahedron == 0);
+    }
 }
 
 TEST_CASE("tetrahedralization validates its participant boundary")
@@ -225,7 +315,10 @@ TEST_CASE("TetGen produces a project-owned tetrahedral mesh for a tetrahedron")
     exact_limits.max_input_triangles = 4;
     exact_limits.max_output_points = 4;
     exact_limits.max_output_tetrahedra = 1;
-    const irop::TetrahedralizationResult result = irop::tetrahedralize_surfaces(participants, exact_limits);
+    irop::TetrahedralizationOptions options;
+    SECTION("strict default") {}
+    SECTION("packing recovery opt-in") { options.omit_degenerate_single_participant_tetrahedra = true; }
+    const irop::TetrahedralizationResult result = irop::tetrahedralize_surfaces(participants, exact_limits, options);
 
     REQUIRE(result.succeeded());
     CHECK(result.status == irop::TetrahedralizationStatus::success);
@@ -235,6 +328,7 @@ TEST_CASE("TetGen produces a project-owned tetrahedral mesh for a tetrahedron")
     CHECK(result.work.input_triangles == 4);
     CHECK(result.work.output_points == 4);
     CHECK(result.work.output_tetrahedra == 1);
+    CHECK(result.work.omitted_single_participant_tetrahedra == 0);
     CHECK(result.mesh.participant_count == 1);
     REQUIRE(result.mesh.points.size() == participants.front().vertices.size());
     for (std::size_t index = 0; index < result.mesh.points.size(); ++index) {

@@ -13,6 +13,11 @@ struct SurfaceResamplingLimits {
     std::uint64_t max_subdivision_steps = default_max_subdivision_steps;
 };
 
+enum class SurfaceResamplingMode {
+    reference,
+    preserve_surface,
+};
+
 struct SurfaceResamplingResult {
     TriangleMesh mesh;
     std::uint64_t requested_triangle_count = 0;
@@ -30,10 +35,13 @@ struct SurfaceResamplingResult {
                                                             std::uint64_t refinement_factor = 4,
                                                             std::uint64_t minimum_triangle_count = 4);
 
-// Uses pinned VTK filters privately, validates the result as one closed surface,
-// and never exposes dependency-specific types.
-[[nodiscard]] SurfaceResamplingResult resample_closed_surface(const TriangleMesh& mesh,
-                                                              std::uint64_t target_triangle_count,
-                                                              const SurfaceResamplingLimits& limits = {});
+// Validates the result as one closed surface and never exposes dependency-specific
+// types. The reference mode uses pinned VTK filters privately and may move the
+// surface through decimation, Loop subdivision and smoothing. Preserve-surface
+// mode retains the original when the target is no larger; otherwise it splits
+// triangles linearly in double precision without moving the original surface.
+[[nodiscard]] SurfaceResamplingResult resample_closed_surface(
+    const TriangleMesh& mesh, std::uint64_t target_triangle_count, const SurfaceResamplingLimits& limits = {},
+    SurfaceResamplingMode mode = SurfaceResamplingMode::reference);
 
 }  // namespace irop

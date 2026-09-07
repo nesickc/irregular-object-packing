@@ -1,6 +1,6 @@
 # C++ Implementation Status
 
-Last updated: 2026-09-05
+Last updated: 2026-09-06
 
 ## Current Summary
 
@@ -8,7 +8,7 @@ Milestones 1 through 5 are verified. The C++20 library and thin CLI now provide 
 
 Current milestone: Milestone 8 — Basic Visualization UI is Verified under ADR-0014. Native Debug/Release and Ninja clang-tidy builds, affected test suites, real desktop workflows and the default option-off CLI build pass, with one documented account-dependent symlink test skipped in each matrix. Milestone 7 remains Verified for its authorized first measured scope; Milestone 6 hosted CI acceptance remains pending.
 
-Next outcome: the requested [improvement plan](IMPROVEMENT_PLAN.md) prioritizes automatic run folders and diagnostics, reliable full-size growth, measured 100-300-object workloads, then 1,000 objects. Tranche 1 is Verified under ADR-0015. Tranches 2-4 remain planned; the next engineering gate is reliable genuine growth for the supplied ten-object case. Hosted CI acceptance remains a parallel Milestone 6 item; public distribution remains separate under ADR-0009/0010.
+Next outcome: the requested [improvement plan](IMPROVEMENT_PLAN.md) prioritizes automatic run folders and diagnostics, reliable full-size growth, measured 100-300-object workloads, then 1,000 objects. Tranche 1 is Verified under ADR-0015. Tranche 2 is Verified under ADR-0016: three of three supplied ten-object genuine-growth runs reach exact target, pass both validation gates and load successfully within 300 seconds. Tranches 3-4 remain planned. Hosted CI acceptance remains a parallel Milestone 6 item; public distribution remains separate under ADR-0009/0010.
 
 ## Status Vocabulary
 
@@ -53,15 +53,15 @@ Next outcome: the requested [improvement plan](IMPROVEMENT_PLAN.md) prioritizes 
 | Packing engine | Verified | Exact barriers with overflow-safe finite local scale caps and independently checked near-target snaps, pre-work completion of already-satisfied barriers without transform/RNG/history mutation, adaptive resampling, TetGen/CAT rebuilding, deterministic transactional per-object solves, run-owned RNG continuation, bounded recovery/correction/termination, history/work metrics, and mandatory full-resolution final validation pass representative integration coverage |
 | Collision correction | Verified | Deterministic fixtures prove selective object/container reduction to convergence, bounded correction-limit accounting, reduction of both members of an object/object overlap, and zero correction for CAT-only contact under COMPAT-0002; full-resolution and output-quantized validation still gate success |
 | Result serialization | Verified | Success artifacts retain their physical and serialized-output acceptance gates. Failures remain summary-only by default; explicit capture may add failed-local-solve.json under ADR-0015. Optional version-one diagnostics/timing fields preserve historical records. Captured real-input summary/snapshot and all six benchmark summaries validate against their schemas; snapshot replay needs no source meshes. |
-| C++ tests | Verified | Tranche 1 Debug, Release and Ninja each complete 220 tests with 219 passed, one skipped and no failures. Added coverage includes bounded diagnostics/replay/publication, destination preflight and concurrent/restart/Unicode/denied-permission run allocation. The saved-artifact symlink test remains skipped because this account cannot create file symlinks. |
-| CI and static analysis | Implemented | The source-only Windows workflow enables optional UI and benchmark targets alongside C++/Python/parity/notice gates. Tranche 1 local Debug/Release/Ninja builds and 220-test matrices pass (one account-dependent skip); final Ninja clang-tidy has zero diagnostics and the formatter passes. The real desktop/OpenGL smoke is separate from headless CTest. First hosted workflow acceptance remains pending. |
-| Benchmarks | Verified | The earlier Milestone 7 results remain in benchmarks/results/windows-20260905.json. Tranche 1 extends the opt-in harness to real-STL packing/export/loading through count 1,000 with source/input hashes, stage time/work and peak memory. Three actual ten-object direct runs validate and load; three genuine-growth failures are retained and halt the count ladder. This verifies the harness, not 100/300/1,000-object throughput. |
+| C++ tests | Verified | Tranche 2 Debug, Release and Ninja each complete 244 tests with 243 passed, one skipped and no failures. Added coverage includes exact Hessians, current/reference growth, adaptive and physical-step recovery, CAT diagnostic bounds and interrupted-report metadata, malformed inputs and genuine-growth/non-fit fixtures. The saved-artifact symlink test remains skipped because this account cannot create file symlinks. |
+| CI and static analysis | Implemented | The source-only Windows workflow enables optional UI and benchmark targets alongside C++/Python/parity/notice gates. Tranche 2 local Debug/Release/Ninja builds and 244-test matrices pass (one account-dependent skip); final Ninja clang-tidy has zero diagnostics and the formatter passes. The real desktop/OpenGL smoke is separate from headless CTest. First hosted workflow acceptance remains pending. |
+| Benchmarks | Verified | The earlier Milestone 7 results remain in benchmarks/results/windows-20260905.json. Tranche 1 extends the opt-in harness to real-STL packing/export/loading through count 1,000 with source/input hashes, stage time/work and peak memory. The retained tranche-1 genuine-growth baseline fails 3/3; tranche 2 succeeds 3/3 with exact targets, both physical gates, export and loading, at 221.49 seconds median total. The tracked tranche-2 ledger records hashes, limits, all samples and source provenance. This is not 100/300/1,000-object throughput evidence. |
 | Saved-run loading | Verified | Project-owned load_run_scene reads the display contract of local version-one pack/initialize summaries and fixed sibling artifacts, with bounded JSON/aggregate mesh input, canonical checks, cancellation and structural validation. Recorded source/individual-STL paths are not followed and recorded physical validation is not recertified. Debug/Release/Ninja hostile-input/relocation/worker tests pass except the documented symlink privilege skip |
-| Visualization UI | Verified | Studio now remembers a Runs parent and reserves a fresh numbered child for every dispatch, including retries and restarts; Open result folder and an independent completed-result path are available. Preference-save failures retain a usable session parent with a warning. Eleven actual desktop cases pass in Debug and Release, with inspected captures. One worker owns background preparation/loading/packing; VTK and controls remain on the UI thread. |
+| Visualization UI | Verified | Studio now remembers a Runs parent and reserves a fresh numbered child for every dispatch, including retries and restarts; Open result folder and an independent completed-result path are available. Preference-save failures retain a usable session parent with a warning. Thirteen actual desktop cases pass in Debug and Release, with inspected captures and distinct next-run/saved-run growth labels. The supplied ten-object genuine-growth result loads and renders successfully. One worker owns background preparation/loading/packing; VTK and controls remain on the UI thread. |
 
 ## Known Compatibility Work
 
-The catalog in `docs/COMPATIBILITY.md` is synchronized through `IROP-COMPAT-0007` and `IROP-DEV-0027`. ADR-0012 retires COMPAT-0001's unbounded solve-then-clamp path and COMPAT-0006's additive Euler update after practical failures, replacing them with exact left-composed rotations and overflow-safe barrier-bounded scale solves with independently checked exact-target snapping. DEV-0024 prevents redundant TetGen/CAT/Ipopt work from degrading an already-complete barrier while retaining both final validation gates. DEV-0007 bounds the reference initializer's greedy search without claiming that attempt exhaustion proves infeasibility. Its accepted prefix, work, and timeout behavior have live Python/C++ parity evidence; DEV-0026 now adds a bounded structured restart after candidate-attempt exhaustion, while the explicit disable option preserves the historical failure oracle. DEV-0027 bounds enumerated collision pairs after AABB rejection removes their narrow-phase work. COMPAT-0002 and the recovery/correction bounds in DEV-0001 and DEV-0004 now have targeted rare-path fixtures. DEV-0025 omits an unsupported, default-valued PyVista 0.38.4 keyword so the pinned Python oracle can exercise the live reference surface extraction without changing its behavior. Barrier-multiplied translation bounds remain preserved.
+The catalog in `docs/COMPATIBILITY.md` is synchronized through `IROP-COMPAT-0007` and `IROP-DEV-0035`. ADR-0016 and DEV-0028 through DEV-0035 add the measured current-pose/exact-derivative, sampling, diagnostic and bounded physical-retry policies summarized below; the explicit reference-growth switch preserves earlier growth policies. ADR-0012 retires COMPAT-0001's unbounded solve-then-clamp path and COMPAT-0006's additive Euler update after practical failures, replacing them with exact left-composed rotations and overflow-safe barrier-bounded scale solves with independently checked exact-target snapping. DEV-0024 prevents redundant TetGen/CAT/Ipopt work from degrading an already-complete barrier while retaining both final validation gates. DEV-0007 bounds the reference initializer's greedy search without claiming that attempt exhaustion proves infeasibility. Its accepted prefix, work, and timeout behavior have live Python/C++ parity evidence; DEV-0026 now adds a bounded structured restart after candidate-attempt exhaustion, while the explicit disable option preserves the historical failure oracle. DEV-0027 bounds enumerated collision pairs after AABB rejection removes their narrow-phase work. COMPAT-0002 and the recovery/correction bounds in DEV-0001 and DEV-0004 now have targeted rare-path fixtures. DEV-0025 omits an unsupported, default-valued PyVista 0.38.4 keyword so the pinned Python oracle can exercise the live reference surface extraction without changing its behavior. Barrier-multiplied translation bounds remain the base policy; default full-input physical retries can reduce them within their original envelope.
 
 ## Milestone 7 Evidence
 
@@ -256,19 +256,106 @@ is unavailable where reported as null.
   -DisableInitializationFallback -OutputDirectory build/tranche1-baseline
 ```
 
-The supplied growth case remains unresolved. Tranche 2 should use this isolated
-problem to evaluate initialization, conditioning and bounded recovery hypotheses.
+This is the retained tranche-1 failure baseline; the tranche-2 section below records
+its resolution and the controlled replay evidence.
 The harness accepts count 1,000 under production limits; successful complete
 100/300/1,000-object growth remains the acceptance work of later tranches.
+
+## Improvement Tranche 2 — Verified (2026-09-06)
+
+The supplied ten-copy, seed-1918 `.1 -> 1.0` run now completes all nine barriers
+with every object at exact target scale. The accepted run at
+`build/tranche2-real10-step-retry-experiment` takes **265.819 seconds** in the engine
+under the original **300-second** deadline, occupies **16.967%** of the container,
+and passes both full-resolution and serialized float32 physical validation. It
+uses adaptive sampling, disables structured initialization fallback and performs
+328 local solves, five sampling refinements and 17 bounded physical step retries.
+It is genuine growth, not full-size initialization. Studio loads and renders its
+published geometry (`build/studio-tranche2-real10-open`).
+
+[ADR-0016](adr/0016-current-pose-exact-derivatives-and-growth-recovery.md) and
+DEV-0028 through DEV-0035 record the selected policy:
+
+- Start from the current pose, retain completed objects, use an exact barrier
+  bound and analytic Hessian, and keep independent local/applied checks.
+- Refine the object approximation after correction. Preserve container surfaces
+  with double midpoint subdivision and retain their initial sampling across
+  barriers, instead of smoothing the container or escalating its triangle count.
+- Ignore only guarded, irrelevant single-participant TetGen cells whose tiny
+  determinants round to zero. Standalone/reference behavior remains strict.
+- Retry rejected full-input physical trials with smaller bounded motion and
+  absolute growth increments, up to four levels per object/barrier. Rejected
+  transforms/RNG are discarded; all attempted work remains counted. Existing
+  scale correction remains the fallback and no failed local iterate is accepted.
+- Bound CAT diagnostics separately at ten million triangle pairs and report
+  incompleteness explicitly. Physical checks use a one-billion cumulative engine
+  allowance; standalone scene queries retain 100 million. This measured ceiling
+  change was recorded before final tuning; local limits and the 300-second engine
+  envelope remain unchanged. The accepted run uses 762.6 million physical pairs.
+
+The original failure replay has 422 violated constraints at its random/small-scale
+start and none at identity; changing only that start resolves the isolated
+1,000-iteration failure in 80 iterations. Exact derivatives independently match
+finite differences. Exact-Hessian replays resolve further recorded stalls, and
+an exact barrier bound avoids a demonstrated post-solve clamp failure. Subsequent
+full-run experiments expose coarse-surface cycling, rounded internal TetGen cells,
+a smoothed box retaining only 37.14% of its volume, final-barrier oversampling to
+196,608 container triangles, and repeated physical shrink/regrowth cycles. Failed
+experiments remain in `build/tranche2-*`; their evidence motivates the bounded
+policies above rather than relaxed acceptance or an increased time limit.
+
+Verification:
+
+- Visual Studio Release/Debug and Ninja clang-tidy builds with UI/benchmarks enabled
+  each pass **243 tests with one existing symlink skip out of 244**. Logs are
+  `build/t2-release-ctest-final.log`, `build/t2-debug-ctest-final.log` and
+  `build/t2-ninja-ctest-final.log`. Final analysis reports no diagnostics;
+  `irop-format-check` and `git diff --check` pass. The symlink test still needs a suitable account.
+- The generated corpus covers asymmetric shapes at seeds 0/1918/12345, slender
+  shapes at 0/1918, rotation-required growth, regular-point recovery/reference
+  failure, and a volume-certified bounded non-fit with no geometry publication.
+  Adaptive and concave four-object fixtures exercise real sampling/step recovery,
+  exact target completion, physical validity and cancellation retaining committed
+  transforms/RNG. Hessian, unsafe-input and cumulative-work regressions pass.
+- **13 actual desktop cases pass in each Debug and Release build**, including
+  repeated numbered runs, failure/cancellation/restart, current versus recorded
+  growth, and full/reduced direct placement. Captures were inspected, including
+  the real ten-object result. Native file-picker interaction remains a manual gate.
+- Historical replay reproduces all **128 trace samples exactly** and the original
+  1,000-iteration outcome. A new bounded exact-Hessian failure captures and replays
+  with one iteration and no packed geometry. Schema checks cover historical and
+  current summaries/snapshots, placements, optional fields and invalid types.
+  Evidence: `build/t2-replay-validation.json`, `build/t2-schema-validation-final.json`.
+- Three independent Release benchmark processes at
+  `build/tranche2-benchmark-real10-growth` succeed **3/3**, with exact targets,
+  both physical gates, export and saved-run loading. Total times are **216.343,
+  221.492 and 227.274 seconds**; engine median is 221.385 seconds. All three have
+  identical placements, serialized geometry bytes and work. Peak working-set median
+  is 69.75 MiB and peak commit median is 152.33 MiB. The
+  [tracked ledger](../benchmarks/results/windows-20260906-tranche2.json) retains
+  all samples, stages, source/input hashes, resolved limits and the original 0/3
+  growth-failure baseline. Local solves take 207.97 seconds median (94% of engine
+  time); dependency thread defaults remain unchanged. No speedup against an early
+  failed run is claimed.
+- Final review fixes one failure-metadata edge: a CAT-bearing physical query that
+  throws before returning its report conservatively marks CAT diagnostics
+  incomplete while preserving the failure and committed state. Its focused test
+  passes 30 assertions across default/reference policies; all three matrices were
+  rerun afterward. The ledger distinguishes the measured binary's source hash
+  from this later reporting-only edit; successful growth policy is unchanged.
+
+Successful 100/300/1,000-object growth remains the explicit work of later tranches.
+The current corpus establishes bounded recovery and this supplied ten-object case;
+it does not guarantee that every geometry, density or seed will converge.
 
 ## Immediate Next Work
 
 The [reviewed improvement plan](IMPROVEMENT_PLAN.md) records issue triage, four
 related tranches and acceptance evidence. The user selected 100-300 objects first,
-then 1,000. Tranche 1 is Verified; tranches 2-4 remain planned.
+then 1,000. Tranches 1 and 2 are Verified; tranches 3-4 remain planned.
 
-1. Resolve the supplied ten-object genuine-growth failure using its captured local problem and trace. Full-size structured initialization remains a workaround and does not satisfy the growth gate.
-2. Profile and optimize complete successful 100/300-object workloads, then extend to 1,000; preserve physical/output validation and distinguish fixed-density scaling from denser packing.
+1. Begin the tranche-3 fixed-density 100/300-object study; profile local preparation/callbacks/linear algebra and compare dependency thread settings before selecting optimizations.
+2. Establish practical time/memory targets from those baselines, optimize complete successful workloads and then extend to 1,000; preserve physical/output validation and distinguish fixed-density scaling from denser packing.
 3. In parallel, observe the first hosted green workflow before marking Milestone 6 Verified, exercise the file-symlink test on a suitable account, and finish manual file-picker acceptance.
 4. If public distribution is proposed, conduct its separate ADR-0009/0010 review. Larger architecture and unrelated UI features remain conditional or deferred in the plan.
 
@@ -289,6 +376,7 @@ When updating status:
 
 | Date | Change | Verification |
 | --- | --- | --- |
+| 2026-09-06 | Verified improvement tranche 2 under ADR-0016 and DEV-0028 through DEV-0035: current-pose/exact-Hessian growth, exact barriers, object refinement, preserved/reused container surfaces, guarded internal TetGen-cell omission, separate CAT limits and bounded physical step retries | Supplied ten-object genuine growth succeeds 3/3 with identical exact-target placements, both validation gates and loading; median total 221.492 s within 300 s engine bound. Debug/Release/Ninja each 243 passed, one skipped of 244; clean analysis/format; 13 desktop cases per Debug/Release; derivative/recovery/cancellation/non-fit/schema/replay gates pass; tracked benchmark ledger preserves baseline and measured/delivered provenance |
 | 2026-09-05 | Verified improvement tranche 1 under ADR-0015: repeatable numbered Studio runs, early destination preflight, bounded failure diagnostics/snapshot replay and real-STL benchmark foundation | Debug/Release/Ninja each 219 passed, one skipped of 220; clean analysis/format; 11 desktop cases per Debug/Release; exact supplied failure and all 128 replay samples match; schemas pass; three real direct successes and three retained growth failures with stage/provenance records. Growth convergence remains tranche 2 |
 | 2026-09-05 | Verified Milestone 8 native Studio, bounded saved-run loading, worker lifetime/cancellation, native interaction smoke and UI-enabled CI under ADR-0014 | Debug/Release/Ninja each have 202 passed/one skipped out of 203; zero clang-tidy diagnostics and format pass; focused 10 passed/one skipped and 186 assertions; six desktop smoke cases in Debug/Release, native interactions, inspected real 36-object rendering, unsuccessful saved diagnostics and fresh option-off CLI build |
 | 2026-09-05 | Activated Milestone 8 at the maintainer's request: accepted ADR-0014 and concrete native Win32/private-VTK UI, single-worker cancellation/lifetime, safe local saved-run loading and verification scope | Documentation/architecture scope recorded; implementation and verification were pending at activation and are completed in the entry above; Milestone 6 hosted CI remains independent |

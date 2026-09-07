@@ -209,6 +209,9 @@ void discard_staged_success_artifacts(const std::filesystem::path& staging)
             configured.max_containment_triangle_visits - consumed.containment_triangle_visits,
         .max_reported_violations = configured.max_reported_violations,
         .max_object_pair_checks = configured.max_object_pair_checks - consumed.object_pairs_examined,
+        .max_cat_triangle_pair_tests =
+            configured.max_cat_triangle_pair_tests -
+            std::min(configured.max_cat_triangle_pair_tests, consumed.cat_triangle_pairs_tested),
     };
 }
 
@@ -223,6 +226,7 @@ void add_collision_work(SceneCollisionWork& destination, const SceneCollisionWor
     add(destination.object_pairs_examined, source.object_pairs_examined);
     add(destination.triangle_pairs_tested, source.triangle_pairs_tested);
     add(destination.containment_triangle_visits, source.containment_triangle_visits);
+    add(destination.cat_triangle_pairs_tested, source.cat_triangle_pairs_tested);
 }
 
 void write_new_text_file(const std::filesystem::path& path, const std::string& contents)
@@ -405,6 +409,7 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
         { "tetrahedralization_recovery_scale_factor",    algorithm.tetrahedralization_recovery_scale_factor            },
         { "local_solve_tolerance",                       algorithm.local_solve_tolerance                               },
         { "adaptive_sampling",                           algorithm.adaptive_sampling                                   },
+        { "use_reference_growth_policy",                 algorithm.use_reference_growth_policy                         },
         { "diagnostics",
          { { "capture_failed_local_problem", algorithm.diagnostics.capture_failed_local_problem },
             { "max_local_solve_records", algorithm.diagnostics.max_local_solve_records },
@@ -471,6 +476,7 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
               { "collision",
                 {
                     { "max_triangle_pair_tests", limits.collision.max_triangle_pair_tests },
+                    { "max_cat_triangle_pair_tests", limits.collision.max_cat_triangle_pair_tests },
                     { "max_containment_triangle_visits", limits.collision.max_containment_triangle_visits },
                     { "max_reported_violations", limits.collision.max_reported_violations },
                     { "max_object_pair_checks", limits.collision.max_object_pair_checks },
@@ -482,11 +488,12 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
 [[nodiscard]] nlohmann::json tetrahedralization_work_json(const TetrahedralizationWork& work)
 {
     return {
-        { "input_participants", work.input_participants },
-        { "input_points",       work.input_points       },
-        { "input_triangles",    work.input_triangles    },
-        { "output_points",      work.output_points      },
-        { "output_tetrahedra",  work.output_tetrahedra  },
+        { "input_participants",                    work.input_participants                    },
+        { "input_points",                          work.input_points                          },
+        { "input_triangles",                       work.input_triangles                       },
+        { "output_points",                         work.output_points                         },
+        { "output_tetrahedra",                     work.output_tetrahedra                     },
+        { "omitted_single_participant_tetrahedra", work.omitted_single_participant_tetrahedra },
     };
 }
 
@@ -506,15 +513,17 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
 [[nodiscard]] nlohmann::json local_solve_work_json(const LocalSolveWork& work)
 {
     return {
-        { "constraints_prepared",           work.constraints_prepared                        },
-        { "objective_evaluations",          work.objective_evaluations                       },
-        { "objective_gradient_evaluations", work.objective_gradient_evaluations              },
-        { "constraint_rows_evaluated",      work.constraint_rows_evaluated                   },
-        { "jacobian_entries_evaluated",     work.jacobian_entries_evaluated                  },
-        { "iterations",                     work.iterations                                  },
-        { "elapsed_milliseconds",           work.elapsed_time.count()                        },
-        { "minimum_solver_constraint",      optional_number(work.minimum_solver_constraint)  },
-        { "minimum_applied_constraint",     optional_number(work.minimum_applied_constraint) },
+        { "constraints_prepared",              work.constraints_prepared                        },
+        { "objective_evaluations",             work.objective_evaluations                       },
+        { "objective_gradient_evaluations",    work.objective_gradient_evaluations              },
+        { "constraint_rows_evaluated",         work.constraint_rows_evaluated                   },
+        { "jacobian_entries_evaluated",        work.jacobian_entries_evaluated                  },
+        { "hessian_evaluations",               work.hessian_evaluations                         },
+        { "hessian_constraint_rows_evaluated", work.hessian_constraint_rows_evaluated           },
+        { "iterations",                        work.iterations                                  },
+        { "elapsed_milliseconds",              work.elapsed_time.count()                        },
+        { "minimum_solver_constraint",         optional_number(work.minimum_solver_constraint)  },
+        { "minimum_applied_constraint",        optional_number(work.minimum_applied_constraint) },
     };
 }
 
@@ -584,6 +593,7 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
         { "object_pairs_examined",       work.object_pairs_examined       },
         { "triangle_pairs_tested",       work.triangle_pairs_tested       },
         { "containment_triangle_visits", work.containment_triangle_visits },
+        { "cat_triangle_pairs_tested",   work.cat_triangle_pairs_tested   },
     };
 }
 
@@ -594,6 +604,8 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
         { "iterations",                    work.iterations                                       },
         { "tetrahedralization_attempts",   work.tetrahedralization_attempts                      },
         { "tetrahedralization_recoveries", work.tetrahedralization_recoveries                    },
+        { "sampling_refinements",          work.sampling_refinements                             },
+        { "physical_step_retries",         work.physical_step_retries                            },
         { "cat_builds",                    work.cat_builds                                       },
         { "local_solves",                  work.local_solves                                     },
         { "correction_passes",             work.correction_passes                                },
@@ -654,6 +666,7 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
     return {
         { "status",                         status                                    },
         { "physical_scene_valid",           std::move(physical_scene_valid)           },
+        { "cat_diagnostics_complete",       packing.cat_diagnostics_complete          },
         { "cat_violation_object_ids",       packing.final_cat_violation_object_ids    },
         { "container_violation_object_ids", validation.container_violation_object_ids },
         { "object_collisions",              std::move(collisions)                     },
@@ -820,6 +833,7 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
               { "surface_intersection_triangle_pairs", result.packing.state.surface_intersection_triangle_pairs },
           } },
         { "work", packing_work_json(result.packing.work) },
+        { "cat_diagnostics_complete", result.packing.cat_diagnostics_complete },
         { "diagnostics", diagnostics_json(result.packing.diagnostics) },
         { "history", history_json(result.packing.history) },
         { "validation", validation_json(result.packing) },

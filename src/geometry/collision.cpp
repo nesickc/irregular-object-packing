@@ -73,6 +73,37 @@ void consume_containment_visits(const TriangleMesh& queried_surface, const Scene
     return intersection.intersects;
 }
 
+// DEVIATION(IROP-DEV-0032): Diagnostic CAT contacts must not exhaust the
+// physical-scene validation budget. Admit a complete bounded query or omit it
+// explicitly, so no physical resource or invalid-input errors are swallowed.
+void record_cat_contact(const TriangleMesh& object, const TriangleMesh& cat_surface, const std::uint64_t object_id,
+                        const SceneCollisionLimits& limits, SceneCollisionReport& report)
+{
+    if (!report.cat_diagnostics_complete) {
+        return;
+    }
+    const std::uint64_t remaining = limits.max_cat_triangle_pair_tests - report.work.cat_triangle_pairs_tested;
+    const auto object_triangles = static_cast<std::uint64_t>(object.triangles.size());
+    const auto cat_triangles = static_cast<std::uint64_t>(cat_surface.triangles.size());
+    // Both meshes are structurally validated and nonempty. Division avoids
+    // overflow in the worst-case pair count. A conservative omission can occur
+    // even if an early contact would have fit; completeness records that fact.
+    if (object_triangles > remaining / cat_triangles ||
+        report.cat_violation_object_ids.size() >= limits.max_reported_violations) {
+        report.cat_diagnostics_complete = false;
+        return;
+    }
+    const SurfaceIntersectionResult intersection =
+        detail::query_validated_surface_intersection(object, cat_surface, remaining);
+    if (intersection.tested_triangle_pairs > remaining) {
+        throw Error(ErrorCategory::internal, "CAT surface intersection exceeded its supplied work limit");
+    }
+    report.work.cat_triangle_pairs_tested += intersection.tested_triangle_pairs;
+    if (intersection.intersects) {
+        report.cat_violation_object_ids.push_back(object_id);
+    }
+}
+
 [[nodiscard]] bool bounds_are_disjoint(const MeshBounds& first, const MeshBounds& second) noexcept
 {
     // Bounds come from the validated closed-mesh snapshots. Strict comparisons
@@ -157,10 +188,9 @@ void record_violation(std::uint64_t& reported_violation_count, const SceneCollis
     for (std::size_t object_index = 0; object_index < objects.size(); ++object_index) {
         const bool has_cat_surface = !cat_surfaces.empty() && !cat_surfaces[object_index].vertices.empty() &&
                                      !cat_surfaces[object_index].triangles.empty();
-        if (has_cat_surface &&
-            bounded_surface_intersection(objects[object_index], cat_surfaces[object_index], limits, report.work)) {
-            record_violation(reported_violation_count, limits);
-            report.cat_violation_object_ids.push_back(static_cast<std::uint64_t>(object_index));
+        if (has_cat_surface) {
+            record_cat_contact(objects[object_index], cat_surfaces[object_index],
+                               static_cast<std::uint64_t>(object_index), limits, report);
         }
 
         // DEVIATION(IROP-DEV-0019): A wholly outside or container-enclosing

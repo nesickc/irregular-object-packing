@@ -186,6 +186,7 @@ struct Options {
     return {
         { "object_pairs_examined",       work.object_pairs_examined       },
         { "triangle_pairs_tested",       work.triangle_pairs_tested       },
+        { "cat_triangle_pairs_tested",   work.cat_triangle_pairs_tested   },
         { "containment_triangle_visits", work.containment_triangle_visits }
     };
 }
@@ -308,6 +309,7 @@ void growth_case(const Options& options, Json& report)
     report["configuration"]["initial_volume_scale"] = 0.1;
     report["configuration"]["final_volume_scale"] = algorithm.final_volume_scale;
     report["configuration"]["adaptive_sampling"] = true;
+    report["configuration"]["use_reference_growth_policy"] = algorithm.use_reference_growth_policy;
     report["configuration"]["max_iterations_per_scale_step"] = algorithm.max_iterations_per_scale_step;
     report["meshes"] = {
         { "object",    irop::benchmark::mesh_metadata(object)    },
@@ -320,16 +322,23 @@ void growth_case(const Options& options, Json& report)
     report["diagnostic"] = result.diagnostic;
     report["physically_valid"] = result.final_validation_performed && result.final_validation.physical_scene_valid();
     report["placements"] = placements(result.state);
+    report["cat_diagnostics_complete"] = result.cat_diagnostics_complete;
     report["work"] = {
-        { "iterations",                 result.work.iterations                             },
-        { "resamples",                  result.work.resampling_operations                  },
-        { "tetgen_calls",               result.work.tetrahedralization_attempts            },
-        { "cat_builds",                 result.work.cat_builds                             },
-        { "local_solves",               result.work.local_solves                           },
-        { "solver_iterations",          result.work.local_solve.iterations                 },
-        { "constraint_rows_evaluated",  result.work.local_solve.constraint_rows_evaluated  },
-        { "jacobian_entries_evaluated", result.work.local_solve.jacobian_entries_evaluated },
-        { "collision",                  collision_work(result.work.collision)              }
+        { "iterations",                            result.work.iterations                                    },
+        { "resamples",                             result.work.resampling_operations                         },
+        { "tetgen_calls",                          result.work.tetrahedralization_attempts                   },
+        { "sampling_refinements",                  result.work.sampling_refinements                          },
+        { "physical_step_retries",                 result.work.physical_step_retries                         },
+        { "omitted_single_participant_tetrahedra",
+         result.work.tetrahedralization.omitted_single_participant_tetrahedra                                },
+        { "cat_builds",                            result.work.cat_builds                                    },
+        { "local_solves",                          result.work.local_solves                                  },
+        { "solver_iterations",                     result.work.local_solve.iterations                        },
+        { "constraint_rows_evaluated",             result.work.local_solve.constraint_rows_evaluated         },
+        { "jacobian_entries_evaluated",            result.work.local_solve.jacobian_entries_evaluated        },
+        { "hessian_evaluations",                   result.work.local_solve.hessian_evaluations               },
+        { "hessian_constraint_rows_evaluated",     result.work.local_solve.hessian_constraint_rows_evaluated },
+        { "collision",                             collision_work(result.work.collision)                     }
     };
 }
 
@@ -344,21 +353,23 @@ void growth_case(const Options& options, Json& report)
 [[nodiscard]] Json solve_record(const irop::PackingLocalSolveRecord& record)
 {
     return {
-        { "object_id",                  record.object_id                       },
-        { "scale_step",                 record.scale_step                      },
-        { "iteration",                  record.iteration                       },
-        { "target_volume_scale",        record.target_volume_scale             },
-        { "status",                     irop::to_string(record.status)         },
-        { "reason",                     record.reason                          },
-        { "iteration_limit",            record.limits.max_iterations           },
-        { "time_limit_ms",              record.limits.max_elapsed_time.count() },
-        { "solver_iterations",          record.work.iterations                 },
-        { "constraints_prepared",       record.work.constraints_prepared       },
-        { "constraint_rows_evaluated",  record.work.constraint_rows_evaluated  },
-        { "jacobian_entries_evaluated", record.work.jacobian_entries_evaluated },
-        { "elapsed_ms",                 record.work.elapsed_time.count()       },
-        { "trace_records",              record.trace.size()                    },
-        { "trace_records_dropped",      record.trace_records_dropped           },
+        { "object_id",                         record.object_id                              },
+        { "scale_step",                        record.scale_step                             },
+        { "iteration",                         record.iteration                              },
+        { "target_volume_scale",               record.target_volume_scale                    },
+        { "status",                            irop::to_string(record.status)                },
+        { "reason",                            record.reason                                 },
+        { "iteration_limit",                   record.limits.max_iterations                  },
+        { "time_limit_ms",                     record.limits.max_elapsed_time.count()        },
+        { "solver_iterations",                 record.work.iterations                        },
+        { "constraints_prepared",              record.work.constraints_prepared              },
+        { "constraint_rows_evaluated",         record.work.constraint_rows_evaluated         },
+        { "jacobian_entries_evaluated",        record.work.jacobian_entries_evaluated        },
+        { "hessian_evaluations",               record.work.hessian_evaluations               },
+        { "hessian_constraint_rows_evaluated", record.work.hessian_constraint_rows_evaluated },
+        { "elapsed_ms",                        record.work.elapsed_time.count()              },
+        { "trace_records",                     record.trace.size()                           },
+        { "trace_records_dropped",             record.trace_records_dropped                  },
     };
 }
 
@@ -385,6 +396,7 @@ void pack_case(const Options& options, Json& report)
     report["configuration"]["final_volume_scale"] = packing.algorithm.final_volume_scale;
     report["configuration"]["scale_step_count"] = packing.algorithm.scale_step_count;
     report["configuration"]["adaptive_sampling"] = packing.algorithm.adaptive_sampling;
+    report["configuration"]["use_reference_growth_policy"] = packing.algorithm.use_reference_growth_policy;
     report["configuration"]["maximum_rotation_delta_radians"] = packing.algorithm.maximum_rotation_delta_radians;
     report["configuration"]["max_iterations_per_scale_step"] = packing.algorithm.max_iterations_per_scale_step;
     report["configuration"]["local_iteration_limit"] = packing.limits.local_solve.max_iterations;
@@ -432,6 +444,7 @@ void pack_case(const Options& options, Json& report)
         engine.final_validation_performed ? Json(engine.final_validation.physical_scene_valid()) : Json(nullptr);
     report["run_summary"] = irop::benchmark::path_utf8(result.run_summary_path);
     report["placements"] = placements(engine.state);
+    report["cat_diagnostics_complete"] = engine.cat_diagnostics_complete;
     report["initialization_work"] = initialization_work(engine.state);
     report["meshes"] = {
         { "object",
@@ -442,20 +455,26 @@ void pack_case(const Options& options, Json& report)
             { "triangles", result.container_statistics.triangle_count } }       },
     };
     report["work"] = {
-        { "completed_scale_steps",      engine.work.completed_scale_steps                  },
-        { "iterations",                 engine.work.iterations                             },
-        { "resamples",                  engine.work.resampling_operations                  },
-        { "tetgen_calls",               engine.work.tetrahedralization_attempts            },
-        { "tetgen_recoveries",          engine.work.tetrahedralization_recoveries          },
-        { "tetrahedra",                 engine.work.tetrahedralization.output_tetrahedra   },
-        { "cat_builds",                 engine.work.cat_builds                             },
-        { "cat_constraints",            engine.work.cat.constraints_generated              },
-        { "local_solves",               engine.work.local_solves                           },
-        { "solver_iterations",          engine.work.local_solve.iterations                 },
-        { "constraint_rows_evaluated",  engine.work.local_solve.constraint_rows_evaluated  },
-        { "jacobian_entries_evaluated", engine.work.local_solve.jacobian_entries_evaluated },
-        { "correction_passes",          engine.work.correction_passes                      },
-        { "collision",                  collision_work(engine.work.collision)              },
+        { "completed_scale_steps",                 engine.work.completed_scale_steps                         },
+        { "iterations",                            engine.work.iterations                                    },
+        { "resamples",                             engine.work.resampling_operations                         },
+        { "tetgen_calls",                          engine.work.tetrahedralization_attempts                   },
+        { "sampling_refinements",                  engine.work.sampling_refinements                          },
+        { "physical_step_retries",                 engine.work.physical_step_retries                         },
+        { "tetgen_recoveries",                     engine.work.tetrahedralization_recoveries                 },
+        { "tetrahedra",                            engine.work.tetrahedralization.output_tetrahedra          },
+        { "omitted_single_participant_tetrahedra",
+         engine.work.tetrahedralization.omitted_single_participant_tetrahedra                                },
+        { "cat_builds",                            engine.work.cat_builds                                    },
+        { "cat_constraints",                       engine.work.cat.constraints_generated                     },
+        { "local_solves",                          engine.work.local_solves                                  },
+        { "solver_iterations",                     engine.work.local_solve.iterations                        },
+        { "constraint_rows_evaluated",             engine.work.local_solve.constraint_rows_evaluated         },
+        { "jacobian_entries_evaluated",            engine.work.local_solve.jacobian_entries_evaluated        },
+        { "hessian_evaluations",                   engine.work.local_solve.hessian_evaluations               },
+        { "hessian_constraint_rows_evaluated",     engine.work.local_solve.hessian_constraint_rows_evaluated },
+        { "correction_passes",                     engine.work.correction_passes                             },
+        { "collision",                             collision_work(engine.work.collision)                     },
     };
     report["diagnostics"]["local_solves"] = Json::array();
     for (const auto& record : engine.diagnostics.local_solve_records) {
@@ -510,6 +529,7 @@ void stages_case(const Options& options, Json& report)
     const auto tetrahedra = irop::tetrahedralize_surfaces(participants);
     report["stages"]["tetrahedralization"] = tetrahedralization.elapsed();
     report["work"]["tetrahedra"] = tetrahedra.work.output_tetrahedra;
+    report["work"]["omitted_single_participant_tetrahedra"] = tetrahedra.work.omitted_single_participant_tetrahedra;
     if (!tetrahedra.succeeded()) {
         report["status"] = irop::to_string(tetrahedra.status);
         report["diagnostic"] = tetrahedra.diagnostic;
@@ -560,6 +580,8 @@ void stages_case(const Options& options, Json& report)
     report["work"]["solver_iterations"] = solved.work.iterations;
     report["work"]["solver_constraint_rows"] = solved.work.constraint_rows_evaluated;
     report["work"]["solver_jacobian_entries"] = solved.work.jacobian_entries_evaluated;
+    report["work"]["solver_hessian_evaluations"] = solved.work.hessian_evaluations;
+    report["work"]["solver_hessian_constraint_rows"] = solved.work.hessian_constraint_rows_evaluated;
     if (solved.accepted_transform.has_value()) {
         participants[0] = irop::transform_mesh(object, *solved.accepted_transform);
     }

@@ -1,0 +1,1515 @@
+{
+  "schema_version": 1,
+  "measurement_date_local": "2026-09-06",
+  "timezone": "Europe/Kiev",
+  "scope": "Tranche 2 supplied ten-object genuine growth, seed 1918; not a 100/300/1000-object scalability result",
+  "measurement_policy": "Three separate Release processes per policy; current repetitions serial with no concurrent project builds, tests or UI runs. Input hashing warms filesystem caches. All outcomes retained. Stage wall times are nested; process CPU can exceed wall time because dependency thread defaults are unchanged. Lifetime peak memory includes startup/dependencies. No speedup ratio between early failure and complete success.",
+  "source_policy": "Compiled source hashes identify the measured working tree over the recorded base revision; that revision alone is not the measured implementation. Raw reports and all canonical artifacts are retained locally under build/. User rc/ inputs are not clean-checkout fixtures; content hashes identify them.",
+  "comparison": "Original policy: 0/3 successes, local iteration limit, no final/output validation. Updated policy: 3/3 successes with exact target, physical and serialized-output gates, export and saved-run loading. Identical updated placements, geometry bytes and work across repetitions.",
+  "baseline": {
+    "executable_sha256": "48dd3d0d0e435cd828303fa1a13937c62172495c8ab51042f7adcf53aeaa84b4",
+    "compiled_build_provenance": {
+      "collision_sha256_at_configure": "4d621aebbde87f4826e409e8beb7ea4396102a084e20126bf426f2bcdf7bff3f",
+      "compiler": "MSVC 19.51.36252.0",
+      "configuration": "Release",
+      "initializer_sha256_at_configure": "04ae7eecc926be6274ff7ae96af10d24742d712e68f7efbdac8dac26a9905173",
+      "revision_at_configure": "13313a36188e0269330555e1f77bba2c6d2e366d",
+      "source_sha256_at_configure": {
+        "CMakeLists.txt": "7c2f45466107e5cca8764a6ac6f87d24137a51f6799cdf4e6676ebc359663fc7",
+        "CMakePresets.json": "d4f28c3907762bb8e54f5acf045a0e49f9e6ce7e4fedc4ee856f9ddab6c3b9d5",
+        "benchmarks/CMakeLists.txt": "c902dec262dde7cb18de17a3ecf0129c47b43d411c0037c87296303b5f2aa611",
+        "benchmarks/main.cpp": "2e6e5fea5ea692bcdd2846cb80a8f0151c5b5ad6b5ef21cc24b3f050202c0291",
+        "benchmarks/run-stl-windows.ps1": "f64097f2cbca62a6690a9f885b9200cbfd449bed39ed3b01d10cc8aea36086a5",
+        "benchmarks/run-windows.ps1": "2e36d5e8c6cd38642f389bffed67c80279497576c7fae0fdb5848ad5a002d6c0",
+        "benchmarks/support.hpp": "815fee985ddac49adaec98bb7a25aa6de87b28fbfdb7fb2395d45cc3f6be5921",
+        "cmake/IropTooling.cmake": "a78d34896f3620968bac4c603d3dcf4f8db31b4ad996cb7d098c72baad6d27ac",
+        "cmake/IropWarnings.cmake": "119f5be524d9432c6726d099d071b72b04c43b940386b49f81809c15b1118d1d",
+        "include/irop/cat/cat.hpp": "b1d37e139017c35065fcad9919c81d9a08281a7c52fc28462fbaae1d2935f729",
+        "include/irop/error.hpp": "a40e7e504f704504d808e84fbcbaf93161eaf65fbd8eed20ccdb2b05b0271f3f",
+        "include/irop/geometry/collision.hpp": "858934bbb309849ff0afcc75b0a535798361e49ea1b5d07a315410b13827d4b2",
+        "include/irop/geometry/mesh_geometry.hpp": "4847b310dca6fa791eac103d4762fde03241329c7d669c36927c2c982781e63d",
+        "include/irop/geometry/sampling_policy.hpp": "ef5aa7529c325e17bf8368300786277dc09242efa7bd84adb739e3e28a77764b",
+        "include/irop/geometry/surface_resampling.hpp": "03914c51edc774a27c8552680bdaa34e23eb7f310814fe445106116556338e90",
+        "include/irop/geometry/transform.hpp": "cf6314c07a444366190ec0fcbed6136d46b0c89cac0bd80a3e8522b426e5ccb7",
+        "include/irop/initialization/initialize_scene.hpp": "425e2d9d3ef187b7b253b6b03b8e76a56cbd7adc4e192a37e5956eede9bde7ad",
+        "include/irop/inspection/inspect_stl.hpp": "f98c3155dcc2f698093a2370313e258aafe85c643ed43fb26431608dd633358f",
+        "include/irop/io/diagnostic_geometry.hpp": "370d23b79e39657993b9c015263aaf01ff708a5f2c62f31d657bcc9a88c05cea",
+        "include/irop/io/local_solve_replay.hpp": "a0316505778cdcdd8e25faec4aab5b40842f8d201f3ce11821610dd80f5c0525",
+        "include/irop/io/run_scene.hpp": "ccaec4df8d2939464094adc16ea48478335c97892645c92715aec151ae53fefc",
+        "include/irop/io/stl_io.hpp": "e3f45e1d57ed56338e8275ffa3592acbe06fe835812bb86b8958f1467ddc4175",
+        "include/irop/model/mesh_validation.hpp": "7063909f1119ac363e6382a27a40363945dd01f94a489cf5ad32f0ca7a700bf9",
+        "include/irop/model/triangle_mesh.hpp": "1dfe29141e4d47847c55c001c18332eefa34c6c80e63bd175cf44ac8f52a6259",
+        "include/irop/optimization/local_solver.hpp": "0598eaca3bf71d9dcdbb707afc34fe02626ea9c9f78907261651a379535e24f1",
+        "include/irop/packing/initialization.hpp": "3e942f5c09f5ce1720efef2b9f3c6c8ccaee8c24db32244d4dff3734e1cad502",
+        "include/irop/packing/pack_scene.hpp": "a6a16a14468aeb27f94563975ad7910725796dc5388e856b6a3bd1843cdf3af8",
+        "include/irop/packing/packing.hpp": "a1b903d8e350d9c51175a6513ec4cc99ac19d1cdbae8b21107d0b4f86765fed6",
+        "include/irop/tetrahedralization/tetrahedralization.hpp": "84ed92ef0a24e48559a10d1d390b02a5cd9ceacc4ce61b3e89c3a36374e4c655",
+        "src/cat/cat.cpp": "285679221a6b0ccdb8d6e9580919626c79312cbe4e1caa005a45abf6f62a4756",
+        "src/error.cpp": "31df9b6182d62cbe836dd08f2be0fe52efb1a6840d6eb1f3c1a2023ffb218122",
+        "src/geometry/collision.cpp": "4d621aebbde87f4826e409e8beb7ea4396102a084e20126bf426f2bcdf7bff3f",
+        "src/geometry/mesh_geometry.cpp": "801fd659a6541bd819333d37a3117c7d907b3436f5923a960349d64d25293dc3",
+        "src/geometry/mesh_geometry_internal.hpp": "afd3c4b326f146d23c47aa8559cf6a68e18c57f0f645890bd2eafafe56dc98b9",
+        "src/geometry/sampling_policy.cpp": "4db3ecf2af148e82669a8b1dc06cb31c53b7de1d0450b0ea4554737c61e66725",
+        "src/geometry/surface_resampling.cpp": "1fecbb27d30c7d68261dd7af217da7689ceb0e344bdb3abf62db045b9060bc59",
+        "src/geometry/transform.cpp": "f79a121ea1215c795d297aa78d0b40eb3765ff1941a190a2188f1bd25e7eb720",
+        "src/initialization/initialize_scene.cpp": "97c584b55e3cbfb46a0a0f9372d22f3aa708e8e49ba092fd6ee636c0610fa256",
+        "src/inspection/inspect_stl.cpp": "33adb096f750abe071618069c07bfe05e59199a410d887b3493a59a81c22456f",
+        "src/io/diagnostic_geometry.cpp": "da7fadfdf4d6284d9e799c9ceecf048d9f82505f11301871dea6b7b7e4ae973d",
+        "src/io/local_solve_replay.cpp": "380082a999cb4d69d4f40d7031cca7cc0a1fb2da51e44907fc5f2c45bfeba412",
+        "src/io/run_scene.cpp": "249dba456e3f9eed394f08ec149abc1288dd75710c754abeb759e5cc59a6ec01",
+        "src/io/stl_io.cpp": "2f22b63ff4116e87c94c671dab410e4d245c2cc94e54533ee9619fc0821905e4",
+        "src/io/stl_io_internal.hpp": "03f91f6ffc7998b1f2b98fcf4e49f7d022b39442d0d22bb93e930346cde5500e",
+        "src/model/mesh_validation.cpp": "42dd2bc3bc511ab3621be685114969b9a882698b85d50e9e256b425cd6e6e1b1",
+        "src/optimization/ipopt_adapter.cpp": "ed35f283573af41708f71ef28dc1bc327546189908911e46af344b642fcd547f",
+        "src/optimization/local_solver.cpp": "d814f28c0d50a2d978615e8a82bc04d3d1f11d75eace2c5b3e900a0b91b95cf4",
+        "src/optimization/local_solver_internal.hpp": "88db83ae21cbc45236554b10f3dbb32021b0fe89898158dfe7f69c02cd124a9b",
+        "src/packing/initialization.cpp": "04ae7eecc926be6274ff7ae96af10d24742d712e68f7efbdac8dac26a9905173",
+        "src/packing/pack_scene.cpp": "c1d3642d0330c5d80dd8ad96d81fe0ce7dabb2dce54219185db9640acda08d25",
+        "src/packing/packing.cpp": "900083c162238a350800a28c311fb7ff303c3a5514742379d07989b5562bf806",
+        "src/tetrahedralization/tetgen_adapter.cpp": "8b4afa16f8f35a796f86f9b336609b7e37a9fb3506434578d066c490a03140e8",
+        "vcpkg-configuration.json": "6e1155991cd1e9ab5674750ba8fc7a6497bd644ba3b1539068ad01ea7d91c0b1",
+        "vcpkg.json": "eea0b4d3f3b815d3cf5eaec234e44e26ff5194ab71d11fedebb89a4083dc79b3"
+      }
+    },
+    "configuration": {
+      "adaptive_sampling": true,
+      "capture_failed_local_problem": false,
+      "cylinder_segments": 12,
+      "dependency_thread_policy": "unchanged library defaults",
+      "enable_structured_fallback": false,
+      "final_volume_scale": 1.0,
+      "initial_volume_scale": 0.1,
+      "local_iteration_limit": 1000,
+      "local_timeout_ms": 30000,
+      "max_iterations_per_scale_step": 200,
+      "max_local_solve_records": 1000,
+      "max_sampling_attempts": 1000000,
+      "max_structured_candidates": 100000,
+      "max_trace_records_per_solve": 0,
+      "maximum_rotation_delta_radians": 0.2617993877991494,
+      "object_count": 10,
+      "orchestration_threads": 1,
+      "remaining_settings": "unchanged library defaults; exact resolved config and limits are in the retained run summary",
+      "scale_step_count": 9,
+      "seed": 1918,
+      "timeout_ms": 300000
+    },
+    "resolved_config_and_limits": {
+      "adaptive_sampling": true,
+      "correction_volume_scale_factor": 0.93,
+      "diagnostics": {
+        "capture_failed_local_problem": false,
+        "max_failed_snapshot_constraints": 100000,
+        "max_local_solve_records": 1000,
+        "max_recovery_records": 32,
+        "max_trace_records_per_solve": 0
+      },
+      "engine_limits": {
+        "cat": {
+          "max_constraints": 20000000,
+          "max_participants": 1000000,
+          "max_points": 15000000,
+          "max_polygon_vertices": 80000000,
+          "max_polygons": 20000000,
+          "max_relevant_tetrahedra": 5000000,
+          "max_tetrahedra": 5000000
+        },
+        "collision": {
+          "max_containment_triangle_visits": 100000000,
+          "max_object_pair_checks": 100000000,
+          "max_reported_violations": 1000000,
+          "max_triangle_pair_tests": 100000000
+        },
+        "intermediate_mesh": {
+          "max_triangles": 5000000,
+          "max_vertices": 15000000
+        },
+        "local_solve": {
+          "max_constraint_rows_evaluated": 500000000,
+          "max_constraints": 1000000,
+          "max_dense_jacobian_entries": 7000000,
+          "max_elapsed_milliseconds": 30000,
+          "max_iterations": 1000,
+          "max_jacobian_entries_evaluated": 3500000000
+        },
+        "max_correction_passes_per_iteration": 100,
+        "max_elapsed_milliseconds": 300000,
+        "max_history_records": 10000,
+        "max_total_local_solves": 1000000,
+        "resampling": {
+          "max_subdivision_steps": 8,
+          "mesh": {
+            "max_triangles": 5000000,
+            "max_vertices": 15000000
+          }
+        },
+        "tetrahedralization": {
+          "max_input_points": 15000000,
+          "max_input_triangles": 5000000,
+          "max_output_points": 15000000,
+          "max_output_tetrahedra": 5000000,
+          "max_participants": 1000000
+        }
+      },
+      "final_volume_scale": 1.0,
+      "initial_volume_scale": 0.1,
+      "initialization_limits": {
+        "enable_structured_fallback": false,
+        "max_geometry_query_triangle_visits": 100000000,
+        "max_pairwise_distance_checks": 100000000,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "max_surface_intersection_triangle_pairs": 100000000
+      },
+      "input_limits": {
+        "max_input_bytes": 268435456,
+        "max_triangles": 5000000,
+        "max_vertices": 15000000
+      },
+      "local_solve_tolerance": 1e-06,
+      "max_iterations_per_scale_step": 200,
+      "maximum_rotation_delta_radians": 0.2617993877991494,
+      "maximum_translation_per_unit_scale": null,
+      "object_count": 10,
+      "output_limits": {
+        "max_triangles": 5000000,
+        "max_vertices": 15000000
+      },
+      "padding": 0.0,
+      "resolved_maximum_translation_per_unit_scale": 175.61429240418119,
+      "sampling": {
+        "alpha": 0.05,
+        "beta": 0.1,
+        "minimum_triangle_count": 4
+      },
+      "scale_step_count": 9,
+      "seed": 1918,
+      "tetrahedralization_recovery_scale_factor": 0.99
+    },
+    "machine": {
+      "cpu_model": "AMD Ryzen 9 9950X 16-Core Processor            ",
+      "logical_processors": 32,
+      "os": "Windows",
+      "page_size_bytes": 4096,
+      "physical_memory_bytes": 66155331584,
+      "pointer_bits": 64,
+      "processor_architecture": 9
+    },
+    "dependencies": {
+      "eigen": "3.4.1",
+      "ipopt": "3.14.19",
+      "tetgen": "1.6.0",
+      "vtk": "9.3.20231030"
+    },
+    "input_meshes": {
+      "container": {
+        "triangles": 12,
+        "vertices": 8
+      },
+      "object": {
+        "triangles": 768,
+        "vertices": 386
+      }
+    },
+    "inputs": {
+      "container": {
+        "resolved_path": "rc/containers/10_kg_np.stl",
+        "sha256": "357e06464e7190e9c53d1263985ee507842b760302a061c719986431eea53c1a",
+        "size_bytes": 684
+      },
+      "object": {
+        "resolved_path": "rc/input_models/ulamok_2kg_simplified.stl",
+        "sha256": "39bcc1c3a5849176fc83473ce191ec5106854ea68836aed412c7c93b11b5bb7e",
+        "size_bytes": 38484
+      }
+    },
+    "work": {
+      "cat_builds": 2,
+      "cat_constraints": 59068,
+      "collision": {
+        "containment_triangle_visits": 3192,
+        "object_pairs_examined": 45,
+        "triangle_pairs_tested": 5709086
+      },
+      "completed_scale_steps": 0,
+      "constraint_rows_evaluated": 5074875,
+      "correction_passes": 0,
+      "iterations": 2,
+      "jacobian_entries_evaluated": 34093136,
+      "local_solves": 19,
+      "resamples": 2,
+      "solver_iterations": 4499,
+      "tetgen_calls": 2,
+      "tetgen_recoveries": 0,
+      "tetrahedra": 14455
+    },
+    "initialization_work": {
+      "accepted_objects": 10,
+      "geometry_query_triangle_visits": 768,
+      "method": "random_rejection",
+      "orientations_examined": 0,
+      "pairwise_distance_checks": 116,
+      "random_draws": 129,
+      "reference_accepted_count": 10,
+      "rejected_candidates": 13,
+      "sampling_attempts": 23,
+      "structured_candidates": 0,
+      "surface_intersection_triangle_pairs": 0
+    },
+    "aggregate": {
+      "object_count": 10,
+      "repeats": 3,
+      "validated_and_loaded_successes": 0,
+      "success_fraction": 0.0,
+      "statuses": [
+        {
+          "status": "iteration_limit",
+          "count": 3
+        }
+      ],
+      "total_wall_ms": {
+        "samples": 3,
+        "minimum": 21122.0385,
+        "median": 21863.4258,
+        "maximum": 21997.5122
+      },
+      "total_cpu_ms": {
+        "samples": 3,
+        "minimum": 336984.375,
+        "median": 348781.25,
+        "maximum": 348859.375
+      },
+      "peak_working_set_bytes": {
+        "samples": 3,
+        "minimum": 39079936.0,
+        "median": 39129088.0,
+        "maximum": 39141376.0
+      },
+      "peak_commit_bytes": {
+        "samples": 3,
+        "minimum": 49815552.0,
+        "median": 49979392.0,
+        "maximum": 50651136.0
+      },
+      "stages": {
+        "cat": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 10.311,
+            "median": 10.376,
+            "maximum": 11.179
+          },
+          "cpu_ms": null
+        },
+        "correction": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 79.373,
+            "median": 83.358,
+            "maximum": 97.98700000000001
+          },
+          "cpu_ms": null
+        },
+        "export": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 0.0015,
+            "median": 0.002,
+            "maximum": 0.0031999999999999997
+          },
+          "cpu_ms": null
+        },
+        "final_validation": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 0.0,
+            "median": 0.0,
+            "maximum": 0.0
+          },
+          "cpu_ms": null
+        },
+        "initialization": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 0.1691,
+            "median": 0.1769,
+            "maximum": 0.1793
+          },
+          "cpu_ms": null
+        },
+        "input_hashing": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 0.5636,
+            "median": 0.5815,
+            "maximum": 0.7296
+          },
+          "cpu_ms": {
+            "samples": 3,
+            "minimum": 0.0,
+            "median": 0.0,
+            "maximum": 15.625
+          }
+        },
+        "input_preparation": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 1.3184,
+            "median": 1.3547,
+            "maximum": 1.5369
+          },
+          "cpu_ms": null
+        },
+        "local_solves": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 20984.940000000002,
+            "median": 21738.325,
+            "maximum": 21743.912
+          },
+          "cpu_ms": null
+        },
+        "output_validation": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 0.0,
+            "median": 0.0,
+            "maximum": 0.0
+          },
+          "cpu_ms": null
+        },
+        "pack_scene_total": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 21115.7867,
+            "median": 21854.1408,
+            "maximum": 21989.7031
+          },
+          "cpu_ms": {
+            "samples": 3,
+            "minimum": 336750.0,
+            "median": 348546.875,
+            "maximum": 348843.75
+          }
+        },
+        "packing_engine": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 21095.9835,
+            "median": 21845.4412,
+            "maximum": 21977.7633
+          },
+          "cpu_ms": null
+        },
+        "resampling": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 4.9750000000000005,
+            "median": 5.064,
+            "maximum": 112.71499999999999
+          },
+          "cpu_ms": null
+        },
+        "saved_run_loading": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 5.5203,
+            "median": 6.8505,
+            "maximum": 8.5285
+          },
+          "cpu_ms": {
+            "samples": 3,
+            "minimum": 0.0,
+            "median": 234.375,
+            "maximum": 234.375
+          }
+        },
+        "tetrahedralization": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 10.756,
+            "median": 11.09,
+            "maximum": 11.177
+          },
+          "cpu_ms": null
+        },
+        "transforms": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 0.022,
+            "median": 0.025,
+            "maximum": 0.028
+          },
+          "cpu_ms": null
+        }
+      }
+    },
+    "samples": [
+      {
+        "repeat": 1,
+        "report": "build/tranche1-benchmark-real10-growth/pack-10-1.json",
+        "report_sha256": "923cdf68a3bfc12579e96299763c832d5c2bc09a3476a00fb46756ea086b2c11",
+        "run_summary": "build/tranche1-benchmark-real10-growth/pack-10-1-run/run-summary.json",
+        "run_summary_sha256": "dcf2129034fb7a94f517856da6269a018fbd9225027f2ed27cbf213afc4635f8",
+        "status": "iteration_limit",
+        "physically_valid": null,
+        "completed_at_exact_target": false,
+        "saved_run": {
+          "has_geometry": false,
+          "object_count": 10,
+          "status": "loaded"
+        },
+        "total": {
+          "cpu_ms": 348859.375,
+          "wall_ms": 21997.5122
+        },
+        "stages": {
+          "cat": {
+            "cpu_ms": null,
+            "wall_ms": 11.179
+          },
+          "correction": {
+            "cpu_ms": null,
+            "wall_ms": 97.98700000000001
+          },
+          "export": {
+            "cpu_ms": null,
+            "wall_ms": 0.0031999999999999997
+          },
+          "final_validation": {
+            "cpu_ms": null,
+            "wall_ms": 0.0
+          },
+          "initialization": {
+            "cpu_ms": null,
+            "wall_ms": 0.1691
+          },
+          "input_hashing": {
+            "cpu_ms": 15.625,
+            "wall_ms": 0.7296
+          },
+          "input_preparation": {
+            "cpu_ms": null,
+            "wall_ms": 1.3184
+          },
+          "local_solves": {
+            "cpu_ms": null,
+            "wall_ms": 21743.912
+          },
+          "output_validation": {
+            "cpu_ms": null,
+            "wall_ms": 0.0
+          },
+          "pack_scene_total": {
+            "cpu_ms": 348843.75,
+            "wall_ms": 21989.7031
+          },
+          "packing_engine": {
+            "cpu_ms": null,
+            "wall_ms": 21977.7633
+          },
+          "resampling": {
+            "cpu_ms": null,
+            "wall_ms": 112.71499999999999
+          },
+          "saved_run_loading": {
+            "cpu_ms": 0.0,
+            "wall_ms": 6.8505
+          },
+          "tetrahedralization": {
+            "cpu_ms": null,
+            "wall_ms": 10.756
+          },
+          "transforms": {
+            "cpu_ms": null,
+            "wall_ms": 0.025
+          }
+        },
+        "memory": {
+          "current_private_bytes": 21475328,
+          "peak_commit_bytes": 49979392,
+          "peak_working_set_bytes": 39129088,
+          "scope": "process lifetime including startup and dependency loading; one case per process"
+        },
+        "metrics": {
+          "maximum_volume_scale": 0.2,
+          "mean_volume_scale": 0.15560512084069067,
+          "minimum_volume_scale": 0.10576794944833445,
+          "object_count": 10,
+          "objects_at_final_target": 0,
+          "packed_object_volume": 1053448.896726061,
+          "packing_fraction": 0.026402227988121828,
+          "target_volume_scale": 1.0
+        },
+        "cat_diagnostics_complete": null,
+        "geometry_sha256": {}
+      },
+      {
+        "repeat": 2,
+        "report": "build/tranche1-benchmark-real10-growth/pack-10-2.json",
+        "report_sha256": "7b423c795391db3942b20de772f37b081ebb1cd02f3a1097f432d4970980b987",
+        "run_summary": "build/tranche1-benchmark-real10-growth/pack-10-2-run/run-summary.json",
+        "run_summary_sha256": "70206b93b6ef7f122cab82113ed68aa54aa068e18eb4a27a21c7d49a328ab2fb",
+        "status": "iteration_limit",
+        "physically_valid": null,
+        "completed_at_exact_target": false,
+        "saved_run": {
+          "has_geometry": false,
+          "object_count": 10,
+          "status": "loaded"
+        },
+        "total": {
+          "cpu_ms": 336984.375,
+          "wall_ms": 21122.0385
+        },
+        "stages": {
+          "cat": {
+            "cpu_ms": null,
+            "wall_ms": 10.311
+          },
+          "correction": {
+            "cpu_ms": null,
+            "wall_ms": 83.358
+          },
+          "export": {
+            "cpu_ms": null,
+            "wall_ms": 0.0015
+          },
+          "final_validation": {
+            "cpu_ms": null,
+            "wall_ms": 0.0
+          },
+          "initialization": {
+            "cpu_ms": null,
+            "wall_ms": 0.1793
+          },
+          "input_hashing": {
+            "cpu_ms": 0.0,
+            "wall_ms": 0.5636
+          },
+          "input_preparation": {
+            "cpu_ms": null,
+            "wall_ms": 1.5369
+          },
+          "local_solves": {
+            "cpu_ms": null,
+            "wall_ms": 20984.940000000002
+          },
+          "output_validation": {
+            "cpu_ms": null,
+            "wall_ms": 0.0
+          },
+          "pack_scene_total": {
+            "cpu_ms": 336750.0,
+            "wall_ms": 21115.7867
+          },
+          "packing_engine": {
+            "cpu_ms": null,
+            "wall_ms": 21095.9835
+          },
+          "resampling": {
+            "cpu_ms": null,
+            "wall_ms": 5.064
+          },
+          "saved_run_loading": {
+            "cpu_ms": 234.375,
+            "wall_ms": 5.5203
+          },
+          "tetrahedralization": {
+            "cpu_ms": null,
+            "wall_ms": 11.09
+          },
+          "transforms": {
+            "cpu_ms": null,
+            "wall_ms": 0.022
+          }
+        },
+        "memory": {
+          "current_private_bytes": 21643264,
+          "peak_commit_bytes": 50651136,
+          "peak_working_set_bytes": 39079936,
+          "scope": "process lifetime including startup and dependency loading; one case per process"
+        },
+        "metrics": {
+          "maximum_volume_scale": 0.2,
+          "mean_volume_scale": 0.15560512084069067,
+          "minimum_volume_scale": 0.10576794944833445,
+          "object_count": 10,
+          "objects_at_final_target": 0,
+          "packed_object_volume": 1053448.896726061,
+          "packing_fraction": 0.026402227988121828,
+          "target_volume_scale": 1.0
+        },
+        "cat_diagnostics_complete": null,
+        "geometry_sha256": {}
+      },
+      {
+        "repeat": 3,
+        "report": "build/tranche1-benchmark-real10-growth/pack-10-3.json",
+        "report_sha256": "eb0cfa82dea65227eda80acf10ae3fd3ccbfb51e27b372a6d4f458160b63e085",
+        "run_summary": "build/tranche1-benchmark-real10-growth/pack-10-3-run/run-summary.json",
+        "run_summary_sha256": "08f2ec2ae1657a6f993bd637305289d3da3cb0e8da06d0a243450932f9f4baf9",
+        "status": "iteration_limit",
+        "physically_valid": null,
+        "completed_at_exact_target": false,
+        "saved_run": {
+          "has_geometry": false,
+          "object_count": 10,
+          "status": "loaded"
+        },
+        "total": {
+          "cpu_ms": 348781.25,
+          "wall_ms": 21863.4258
+        },
+        "stages": {
+          "cat": {
+            "cpu_ms": null,
+            "wall_ms": 10.376
+          },
+          "correction": {
+            "cpu_ms": null,
+            "wall_ms": 79.373
+          },
+          "export": {
+            "cpu_ms": null,
+            "wall_ms": 0.002
+          },
+          "final_validation": {
+            "cpu_ms": null,
+            "wall_ms": 0.0
+          },
+          "initialization": {
+            "cpu_ms": null,
+            "wall_ms": 0.1769
+          },
+          "input_hashing": {
+            "cpu_ms": 0.0,
+            "wall_ms": 0.5815
+          },
+          "input_preparation": {
+            "cpu_ms": null,
+            "wall_ms": 1.3547
+          },
+          "local_solves": {
+            "cpu_ms": null,
+            "wall_ms": 21738.325
+          },
+          "output_validation": {
+            "cpu_ms": null,
+            "wall_ms": 0.0
+          },
+          "pack_scene_total": {
+            "cpu_ms": 348546.875,
+            "wall_ms": 21854.1408
+          },
+          "packing_engine": {
+            "cpu_ms": null,
+            "wall_ms": 21845.4412
+          },
+          "resampling": {
+            "cpu_ms": null,
+            "wall_ms": 4.9750000000000005
+          },
+          "saved_run_loading": {
+            "cpu_ms": 234.375,
+            "wall_ms": 8.5285
+          },
+          "tetrahedralization": {
+            "cpu_ms": null,
+            "wall_ms": 11.177
+          },
+          "transforms": {
+            "cpu_ms": null,
+            "wall_ms": 0.028
+          }
+        },
+        "memory": {
+          "current_private_bytes": 21901312,
+          "peak_commit_bytes": 49815552,
+          "peak_working_set_bytes": 39141376,
+          "scope": "process lifetime including startup and dependency loading; one case per process"
+        },
+        "metrics": {
+          "maximum_volume_scale": 0.2,
+          "mean_volume_scale": 0.15560512084069067,
+          "minimum_volume_scale": 0.10576794944833445,
+          "object_count": 10,
+          "objects_at_final_target": 0,
+          "packed_object_volume": 1053448.896726061,
+          "packing_fraction": 0.026402227988121828,
+          "target_volume_scale": 1.0
+        },
+        "cat_diagnostics_complete": null,
+        "geometry_sha256": {}
+      }
+    ]
+  },
+  "tranche2": {
+    "executable_sha256": "58bd5465754f5ccaaf3b6d1b0b957ec8c76c60396235da62d3fd34a1a82e2cd1",
+    "compiled_build_provenance": {
+      "collision_sha256_at_configure": "cf0c6a0fffad9c19bfc75b9111b0188f76d71ac68af730a301f01be6b6349e40",
+      "compiler": "MSVC 19.51.36252.0",
+      "configuration": "Release",
+      "initializer_sha256_at_configure": "04ae7eecc926be6274ff7ae96af10d24742d712e68f7efbdac8dac26a9905173",
+      "revision_at_configure": "c11295e8749945662215481c533861ba730d05cc",
+      "source_sha256_at_configure": {
+        "CMakeLists.txt": "7c2f45466107e5cca8764a6ac6f87d24137a51f6799cdf4e6676ebc359663fc7",
+        "CMakePresets.json": "d4f28c3907762bb8e54f5acf045a0e49f9e6ce7e4fedc4ee856f9ddab6c3b9d5",
+        "benchmarks/CMakeLists.txt": "c902dec262dde7cb18de17a3ecf0129c47b43d411c0037c87296303b5f2aa611",
+        "benchmarks/main.cpp": "65d567c05182b640da125f185c22e4ec7123af049b718a63712affad85d9e7d7",
+        "benchmarks/run-stl-windows.ps1": "f64097f2cbca62a6690a9f885b9200cbfd449bed39ed3b01d10cc8aea36086a5",
+        "benchmarks/run-windows.ps1": "2e36d5e8c6cd38642f389bffed67c80279497576c7fae0fdb5848ad5a002d6c0",
+        "benchmarks/support.hpp": "815fee985ddac49adaec98bb7a25aa6de87b28fbfdb7fb2395d45cc3f6be5921",
+        "cmake/IropTooling.cmake": "a78d34896f3620968bac4c603d3dcf4f8db31b4ad996cb7d098c72baad6d27ac",
+        "cmake/IropWarnings.cmake": "119f5be524d9432c6726d099d071b72b04c43b940386b49f81809c15b1118d1d",
+        "include/irop/cat/cat.hpp": "b1d37e139017c35065fcad9919c81d9a08281a7c52fc28462fbaae1d2935f729",
+        "include/irop/error.hpp": "a40e7e504f704504d808e84fbcbaf93161eaf65fbd8eed20ccdb2b05b0271f3f",
+        "include/irop/geometry/collision.hpp": "9e8b035fb2787bc70185ddfaff3fb347d02af147afeb360960cb929745f9ce7b",
+        "include/irop/geometry/mesh_geometry.hpp": "4847b310dca6fa791eac103d4762fde03241329c7d669c36927c2c982781e63d",
+        "include/irop/geometry/sampling_policy.hpp": "ef5aa7529c325e17bf8368300786277dc09242efa7bd84adb739e3e28a77764b",
+        "include/irop/geometry/surface_resampling.hpp": "e5cfe93e6b041456dec4613592895988a0d5d769e911c085c46c85614c9b2541",
+        "include/irop/geometry/transform.hpp": "cf6314c07a444366190ec0fcbed6136d46b0c89cac0bd80a3e8522b426e5ccb7",
+        "include/irop/initialization/initialize_scene.hpp": "425e2d9d3ef187b7b253b6b03b8e76a56cbd7adc4e192a37e5956eede9bde7ad",
+        "include/irop/inspection/inspect_stl.hpp": "f98c3155dcc2f698093a2370313e258aafe85c643ed43fb26431608dd633358f",
+        "include/irop/io/diagnostic_geometry.hpp": "370d23b79e39657993b9c015263aaf01ff708a5f2c62f31d657bcc9a88c05cea",
+        "include/irop/io/local_solve_replay.hpp": "a0316505778cdcdd8e25faec4aab5b40842f8d201f3ce11821610dd80f5c0525",
+        "include/irop/io/run_scene.hpp": "ccaec4df8d2939464094adc16ea48478335c97892645c92715aec151ae53fefc",
+        "include/irop/io/stl_io.hpp": "e3f45e1d57ed56338e8275ffa3592acbe06fe835812bb86b8958f1467ddc4175",
+        "include/irop/model/mesh_validation.hpp": "7063909f1119ac363e6382a27a40363945dd01f94a489cf5ad32f0ca7a700bf9",
+        "include/irop/model/triangle_mesh.hpp": "1dfe29141e4d47847c55c001c18332eefa34c6c80e63bd175cf44ac8f52a6259",
+        "include/irop/optimization/local_solver.hpp": "d7547cef97cc9871d334f261683c73670a7ce262eea2fb036487579b30750c13",
+        "include/irop/packing/initialization.hpp": "3e942f5c09f5ce1720efef2b9f3c6c8ccaee8c24db32244d4dff3734e1cad502",
+        "include/irop/packing/pack_scene.hpp": "a6a16a14468aeb27f94563975ad7910725796dc5388e856b6a3bd1843cdf3af8",
+        "include/irop/packing/packing.hpp": "bcadeaaca7da07d78b0e4b8f0f045f6c27ad3b40b8e2c2ecf42d5f9198dc2623",
+        "include/irop/tetrahedralization/tetrahedralization.hpp": "8048b9a31aeb006eaf20180c5479ad8e2549bb1918a29e8677f3e2e8285687e0",
+        "src/cat/cat.cpp": "285679221a6b0ccdb8d6e9580919626c79312cbe4e1caa005a45abf6f62a4756",
+        "src/error.cpp": "31df9b6182d62cbe836dd08f2be0fe52efb1a6840d6eb1f3c1a2023ffb218122",
+        "src/geometry/collision.cpp": "cf0c6a0fffad9c19bfc75b9111b0188f76d71ac68af730a301f01be6b6349e40",
+        "src/geometry/mesh_geometry.cpp": "801fd659a6541bd819333d37a3117c7d907b3436f5923a960349d64d25293dc3",
+        "src/geometry/mesh_geometry_internal.hpp": "afd3c4b326f146d23c47aa8559cf6a68e18c57f0f645890bd2eafafe56dc98b9",
+        "src/geometry/sampling_policy.cpp": "4db3ecf2af148e82669a8b1dc06cb31c53b7de1d0450b0ea4554737c61e66725",
+        "src/geometry/surface_resampling.cpp": "7e2f819cf5e99e6b17ebfe596ca18923c6dd714c8c0dd88337f2e2321facadb4",
+        "src/geometry/transform.cpp": "f79a121ea1215c795d297aa78d0b40eb3765ff1941a190a2188f1bd25e7eb720",
+        "src/initialization/initialize_scene.cpp": "97c584b55e3cbfb46a0a0f9372d22f3aa708e8e49ba092fd6ee636c0610fa256",
+        "src/inspection/inspect_stl.cpp": "33adb096f750abe071618069c07bfe05e59199a410d887b3493a59a81c22456f",
+        "src/io/diagnostic_geometry.cpp": "da7fadfdf4d6284d9e799c9ceecf048d9f82505f11301871dea6b7b7e4ae973d",
+        "src/io/local_solve_replay.cpp": "7c239b85eb193c2a198e29b66b720c879db66565dab54527cac2e85475f9de49",
+        "src/io/run_scene.cpp": "249dba456e3f9eed394f08ec149abc1288dd75710c754abeb759e5cc59a6ec01",
+        "src/io/stl_io.cpp": "2f22b63ff4116e87c94c671dab410e4d245c2cc94e54533ee9619fc0821905e4",
+        "src/io/stl_io_internal.hpp": "03f91f6ffc7998b1f2b98fcf4e49f7d022b39442d0d22bb93e930346cde5500e",
+        "src/model/mesh_validation.cpp": "42dd2bc3bc511ab3621be685114969b9a882698b85d50e9e256b425cd6e6e1b1",
+        "src/optimization/ipopt_adapter.cpp": "82baffccbd71fbdd309a8dcd14e62b9f3f5e537ef41ccb4d615db658399ed2eb",
+        "src/optimization/local_solver.cpp": "e166319514c81d17bc5b1e4c5678ff75bf2ac02e8249dea30475f120e9ecb2f7",
+        "src/optimization/local_solver_internal.hpp": "26bd3cd1c0c907e9f44b53eb4fe14a1230cd3d169537ae62443deef48f2bad4a",
+        "src/packing/initialization.cpp": "04ae7eecc926be6274ff7ae96af10d24742d712e68f7efbdac8dac26a9905173",
+        "src/packing/pack_scene.cpp": "103c6efd7c9d6cc36fde084ec3abca50600bb40a2c30ae6e1b14251caa3a301b",
+        "src/packing/packing.cpp": "5d3dbe08719fc106915d10463a7407b2fe7e62fbd5f2dd0f2108ebf9304db84d",
+        "src/tetrahedralization/output_validation.hpp": "0dfc9981932aa4fbe76260e48cf9c6ec31be448310d08ffe21b06961a84461f1",
+        "src/tetrahedralization/tetgen_adapter.cpp": "af28382c9ef9e4c6b355c84622ba2657527d4b40460c01a2609048b8da720f6f",
+        "vcpkg-configuration.json": "6e1155991cd1e9ab5674750ba8fc7a6497bd644ba3b1539068ad01ea7d91c0b1",
+        "vcpkg.json": "eea0b4d3f3b815d3cf5eaec234e44e26ff5194ab71d11fedebb89a4083dc79b3"
+      }
+    },
+    "configuration": {
+      "adaptive_sampling": true,
+      "capture_failed_local_problem": false,
+      "cylinder_segments": 12,
+      "dependency_thread_policy": "unchanged library defaults",
+      "enable_structured_fallback": false,
+      "final_volume_scale": 1.0,
+      "initial_volume_scale": 0.1,
+      "local_iteration_limit": 1000,
+      "local_timeout_ms": 30000,
+      "max_iterations_per_scale_step": 200,
+      "max_local_solve_records": 1000,
+      "max_sampling_attempts": 1000000,
+      "max_structured_candidates": 100000,
+      "max_trace_records_per_solve": 0,
+      "maximum_rotation_delta_radians": 0.2617993877991494,
+      "object_count": 10,
+      "orchestration_threads": 1,
+      "remaining_settings": "unchanged library defaults; exact resolved config and limits are in the retained run summary",
+      "scale_step_count": 9,
+      "seed": 1918,
+      "timeout_ms": 300000,
+      "use_reference_growth_policy": false
+    },
+    "resolved_config_and_limits": {
+      "adaptive_sampling": true,
+      "correction_volume_scale_factor": 0.93,
+      "diagnostics": {
+        "capture_failed_local_problem": false,
+        "max_failed_snapshot_constraints": 100000,
+        "max_local_solve_records": 1000,
+        "max_recovery_records": 32,
+        "max_trace_records_per_solve": 0
+      },
+      "engine_limits": {
+        "cat": {
+          "max_constraints": 20000000,
+          "max_participants": 1000000,
+          "max_points": 15000000,
+          "max_polygon_vertices": 80000000,
+          "max_polygons": 20000000,
+          "max_relevant_tetrahedra": 5000000,
+          "max_tetrahedra": 5000000
+        },
+        "collision": {
+          "max_cat_triangle_pair_tests": 10000000,
+          "max_containment_triangle_visits": 100000000,
+          "max_object_pair_checks": 100000000,
+          "max_reported_violations": 1000000,
+          "max_triangle_pair_tests": 1000000000
+        },
+        "intermediate_mesh": {
+          "max_triangles": 5000000,
+          "max_vertices": 15000000
+        },
+        "local_solve": {
+          "max_constraint_rows_evaluated": 500000000,
+          "max_constraints": 1000000,
+          "max_dense_jacobian_entries": 7000000,
+          "max_elapsed_milliseconds": 30000,
+          "max_iterations": 1000,
+          "max_jacobian_entries_evaluated": 3500000000
+        },
+        "max_correction_passes_per_iteration": 100,
+        "max_elapsed_milliseconds": 300000,
+        "max_history_records": 10000,
+        "max_total_local_solves": 1000000,
+        "resampling": {
+          "max_subdivision_steps": 8,
+          "mesh": {
+            "max_triangles": 5000000,
+            "max_vertices": 15000000
+          }
+        },
+        "tetrahedralization": {
+          "max_input_points": 15000000,
+          "max_input_triangles": 5000000,
+          "max_output_points": 15000000,
+          "max_output_tetrahedra": 5000000,
+          "max_participants": 1000000
+        }
+      },
+      "final_volume_scale": 1.0,
+      "initial_volume_scale": 0.1,
+      "initialization_limits": {
+        "enable_structured_fallback": false,
+        "max_geometry_query_triangle_visits": 100000000,
+        "max_pairwise_distance_checks": 100000000,
+        "max_sampling_attempts": 1000000,
+        "max_structured_candidates": 100000,
+        "max_surface_intersection_triangle_pairs": 100000000
+      },
+      "input_limits": {
+        "max_input_bytes": 268435456,
+        "max_triangles": 5000000,
+        "max_vertices": 15000000
+      },
+      "local_solve_tolerance": 1e-06,
+      "max_iterations_per_scale_step": 200,
+      "maximum_rotation_delta_radians": 0.2617993877991494,
+      "maximum_translation_per_unit_scale": null,
+      "object_count": 10,
+      "output_limits": {
+        "max_triangles": 5000000,
+        "max_vertices": 15000000
+      },
+      "padding": 0.0,
+      "resolved_maximum_translation_per_unit_scale": 175.61429240418119,
+      "sampling": {
+        "alpha": 0.05,
+        "beta": 0.1,
+        "minimum_triangle_count": 4
+      },
+      "scale_step_count": 9,
+      "seed": 1918,
+      "tetrahedralization_recovery_scale_factor": 0.99,
+      "use_reference_growth_policy": false
+    },
+    "machine": {
+      "cpu_model": "AMD Ryzen 9 9950X 16-Core Processor            ",
+      "logical_processors": 32,
+      "os": "Windows",
+      "page_size_bytes": 4096,
+      "physical_memory_bytes": 66155331584,
+      "pointer_bits": 64,
+      "processor_architecture": 9
+    },
+    "dependencies": {
+      "eigen": "3.4.1",
+      "ipopt": "3.14.19",
+      "tetgen": "1.6.0",
+      "vtk": "9.3.20231030"
+    },
+    "input_meshes": {
+      "container": {
+        "triangles": 12,
+        "vertices": 8
+      },
+      "object": {
+        "triangles": 768,
+        "vertices": 386
+      }
+    },
+    "inputs": {
+      "container": {
+        "resolved_path": "rc/containers/10_kg_np.stl",
+        "sha256": "357e06464e7190e9c53d1263985ee507842b760302a061c719986431eea53c1a",
+        "size_bytes": 684
+      },
+      "object": {
+        "resolved_path": "rc/input_models/ulamok_2kg_simplified.stl",
+        "sha256": "39bcc1c3a5849176fc83473ce191ec5106854ea68836aed412c7c93b11b5bb7e",
+        "size_bytes": 38484
+      }
+    },
+    "work": {
+      "cat_builds": 105,
+      "cat_constraints": 9321444,
+      "collision": {
+        "cat_triangle_pairs_tested": 9738240,
+        "containment_triangle_visits": 1923180,
+        "object_pairs_examined": 5805,
+        "triangle_pairs_tested": 762607476
+      },
+      "completed_scale_steps": 9,
+      "constraint_rows_evaluated": 118562144,
+      "correction_passes": 18,
+      "hessian_constraint_rows_evaluated": 54794297,
+      "hessian_evaluations": 8448,
+      "iterations": 105,
+      "jacobian_entries_evaluated": 412430865,
+      "local_solves": 328,
+      "omitted_single_participant_tetrahedra": 89,
+      "physical_step_retries": 17,
+      "resamples": 21,
+      "sampling_refinements": 5,
+      "solver_iterations": 8448,
+      "tetgen_calls": 105,
+      "tetgen_recoveries": 0,
+      "tetrahedra": 3266210
+    },
+    "initialization_work": {
+      "accepted_objects": 10,
+      "geometry_query_triangle_visits": 768,
+      "method": "random_rejection",
+      "orientations_examined": 0,
+      "pairwise_distance_checks": 116,
+      "random_draws": 855,
+      "reference_accepted_count": 10,
+      "rejected_candidates": 13,
+      "sampling_attempts": 23,
+      "structured_candidates": 0,
+      "surface_intersection_triangle_pairs": 0
+    },
+    "aggregate": {
+      "object_count": 10,
+      "repeats": 3,
+      "validated_and_loaded_successes": 3,
+      "success_fraction": 1.0,
+      "statuses": [
+        {
+          "status": "success",
+          "count": 3
+        }
+      ],
+      "total_wall_ms": {
+        "samples": 3,
+        "minimum": 216343.281,
+        "median": 221492.0733,
+        "maximum": 227274.4329
+      },
+      "total_cpu_ms": {
+        "samples": 3,
+        "minimum": 3450046.875,
+        "median": 3531750.0,
+        "maximum": 3620546.875
+      },
+      "peak_working_set_bytes": {
+        "samples": 3,
+        "minimum": 72949760.0,
+        "median": 73134080.0,
+        "maximum": 73940992.0
+      },
+      "peak_commit_bytes": {
+        "samples": 3,
+        "minimum": 158101504.0,
+        "median": 159731712.0,
+        "maximum": 160501760.0
+      },
+      "stages": {
+        "cat": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 1220.512,
+            "median": 1224.876,
+            "maximum": 1234.828
+          },
+          "cpu_ms": null
+        },
+        "correction": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 8413.216,
+            "median": 8642.716,
+            "maximum": 8950.480000000001
+          },
+          "cpu_ms": null
+        },
+        "export": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 12.54269999999999,
+            "median": 13.00169999999999,
+            "maximum": 13.170700000000007
+          },
+          "cpu_ms": null
+        },
+        "final_validation": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 75.433,
+            "median": 79.001,
+            "maximum": 79.291
+          },
+          "cpu_ms": null
+        },
+        "initialization": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 0.1673,
+            "median": 0.1696,
+            "maximum": 0.17129999999999998
+          },
+          "cpu_ms": null
+        },
+        "input_hashing": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 0.5752,
+            "median": 0.6081,
+            "maximum": 0.8154
+          },
+          "cpu_ms": {
+            "samples": 3,
+            "minimum": 0.0,
+            "median": 0.0,
+            "maximum": 0.0
+          }
+        },
+        "input_preparation": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 1.272,
+            "median": 1.3172,
+            "maximum": 1.3520999999999999
+          },
+          "cpu_ms": null
+        },
+        "local_solves": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 203039.627,
+            "median": 207972.807,
+            "maximum": 213338.777
+          },
+          "cpu_ms": null
+        },
+        "output_validation": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 74.5717,
+            "median": 77.1901,
+            "maximum": 78.0006
+          },
+          "cpu_ms": null
+        },
+        "pack_scene_total": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 216332.7765,
+            "median": 221481.6211,
+            "maximum": 227263.2112
+          },
+          "cpu_ms": {
+            "samples": 3,
+            "minimum": 3450046.875,
+            "median": 3531750.0,
+            "maximum": 3620531.25
+          }
+        },
+        "packing_engine": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 216232.1688,
+            "median": 221385.2341,
+            "maximum": 227164.07259999998
+          },
+          "cpu_ms": null
+        },
+        "resampling": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 28.927,
+            "median": 31.029,
+            "maximum": 35.184
+          },
+          "cpu_ms": null
+        },
+        "saved_run_loading": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 8.8135,
+            "median": 8.8307,
+            "maximum": 9.3477
+          },
+          "cpu_ms": {
+            "samples": 3,
+            "minimum": 0.0,
+            "median": 0.0,
+            "maximum": 15.625
+          }
+        },
+        "tetrahedralization": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 3298.777,
+            "median": 3303.436,
+            "maximum": 3374.33
+          },
+          "cpu_ms": null
+        },
+        "transforms": {
+          "wall_ms": {
+            "samples": 3,
+            "minimum": 12.002,
+            "median": 12.144,
+            "maximum": 12.372
+          },
+          "cpu_ms": null
+        }
+      }
+    },
+    "samples": [
+      {
+        "repeat": 1,
+        "report": "build/tranche2-benchmark-real10-growth/pack-10-1.json",
+        "report_sha256": "38fa09d11ad3c90d3c9e87f141e4fd62f719765744ba405d6d137c9d7446a79c",
+        "run_summary": "build/tranche2-benchmark-real10-growth/pack-10-1-run/run-summary.json",
+        "run_summary_sha256": "9bb7c6dfe37d8be8574286d8252fd63692dfda1601ac671a141f0315c358d3ab",
+        "status": "success",
+        "physically_valid": true,
+        "completed_at_exact_target": true,
+        "saved_run": {
+          "has_geometry": true,
+          "object_count": 10,
+          "status": "loaded"
+        },
+        "total": {
+          "cpu_ms": 3450046.875,
+          "wall_ms": 216343.281
+        },
+        "stages": {
+          "cat": {
+            "cpu_ms": null,
+            "wall_ms": 1224.876
+          },
+          "correction": {
+            "cpu_ms": null,
+            "wall_ms": 8413.216
+          },
+          "export": {
+            "cpu_ms": null,
+            "wall_ms": 13.170700000000007
+          },
+          "final_validation": {
+            "cpu_ms": null,
+            "wall_ms": 79.291
+          },
+          "initialization": {
+            "cpu_ms": null,
+            "wall_ms": 0.1696
+          },
+          "input_hashing": {
+            "cpu_ms": 0.0,
+            "wall_ms": 0.6081
+          },
+          "input_preparation": {
+            "cpu_ms": null,
+            "wall_ms": 1.3172
+          },
+          "local_solves": {
+            "cpu_ms": null,
+            "wall_ms": 203039.627
+          },
+          "output_validation": {
+            "cpu_ms": null,
+            "wall_ms": 77.1901
+          },
+          "pack_scene_total": {
+            "cpu_ms": 3450046.875,
+            "wall_ms": 216332.7765
+          },
+          "packing_engine": {
+            "cpu_ms": null,
+            "wall_ms": 216232.1688
+          },
+          "resampling": {
+            "cpu_ms": null,
+            "wall_ms": 35.184
+          },
+          "saved_run_loading": {
+            "cpu_ms": 0.0,
+            "wall_ms": 8.8307
+          },
+          "tetrahedralization": {
+            "cpu_ms": null,
+            "wall_ms": 3303.436
+          },
+          "transforms": {
+            "cpu_ms": null,
+            "wall_ms": 12.002
+          }
+        },
+        "memory": {
+          "current_private_bytes": 31793152,
+          "peak_commit_bytes": 158101504,
+          "peak_working_set_bytes": 73134080,
+          "scope": "process lifetime including startup and dependency loading; one case per process"
+        },
+        "metrics": {
+          "maximum_volume_scale": 1.0,
+          "mean_volume_scale": 1.0,
+          "minimum_volume_scale": 1.0,
+          "object_count": 10,
+          "objects_at_final_target": 10,
+          "packed_object_volume": 6770014.322373023,
+          "packing_fraction": 0.16967454442037652,
+          "target_volume_scale": 1.0
+        },
+        "cat_diagnostics_complete": false,
+        "geometry_sha256": {
+          "packed-objects.stl": "2644a329d6fb5f9d8966f8f98e372d3926a82b8497246958fc3b24b0a2f304b1",
+          "container.stl": "53d4fa7da1b2be28e8358eb8d1c54c653cae77f0c3707e56fec8a070ee854455",
+          "placements.json": "5cef371b989de6e5d21ffc48e2e5f49c2d5d3d9866f51fafe85b2c2677f1390b"
+        }
+      },
+      {
+        "repeat": 2,
+        "report": "build/tranche2-benchmark-real10-growth/pack-10-2.json",
+        "report_sha256": "cdb2056d4901c12266b8ed515b78b056c97d5e14c92e0b26780164fdb122db43",
+        "run_summary": "build/tranche2-benchmark-real10-growth/pack-10-2-run/run-summary.json",
+        "run_summary_sha256": "a399de0cdb38015436d862137a9c0faf415b1e9fff315962e0fd2626c128de49",
+        "status": "success",
+        "physically_valid": true,
+        "completed_at_exact_target": true,
+        "saved_run": {
+          "has_geometry": true,
+          "object_count": 10,
+          "status": "loaded"
+        },
+        "total": {
+          "cpu_ms": 3531750.0,
+          "wall_ms": 221492.0733
+        },
+        "stages": {
+          "cat": {
+            "cpu_ms": null,
+            "wall_ms": 1220.512
+          },
+          "correction": {
+            "cpu_ms": null,
+            "wall_ms": 8642.716
+          },
+          "export": {
+            "cpu_ms": null,
+            "wall_ms": 13.00169999999999
+          },
+          "final_validation": {
+            "cpu_ms": null,
+            "wall_ms": 75.433
+          },
+          "initialization": {
+            "cpu_ms": null,
+            "wall_ms": 0.17129999999999998
+          },
+          "input_hashing": {
+            "cpu_ms": 0.0,
+            "wall_ms": 0.5752
+          },
+          "input_preparation": {
+            "cpu_ms": null,
+            "wall_ms": 1.3520999999999999
+          },
+          "local_solves": {
+            "cpu_ms": null,
+            "wall_ms": 207972.807
+          },
+          "output_validation": {
+            "cpu_ms": null,
+            "wall_ms": 74.5717
+          },
+          "pack_scene_total": {
+            "cpu_ms": 3531750.0,
+            "wall_ms": 221481.6211
+          },
+          "packing_engine": {
+            "cpu_ms": null,
+            "wall_ms": 221385.2341
+          },
+          "resampling": {
+            "cpu_ms": null,
+            "wall_ms": 28.927
+          },
+          "saved_run_loading": {
+            "cpu_ms": 0.0,
+            "wall_ms": 8.8135
+          },
+          "tetrahedralization": {
+            "cpu_ms": null,
+            "wall_ms": 3298.777
+          },
+          "transforms": {
+            "cpu_ms": null,
+            "wall_ms": 12.372
+          }
+        },
+        "memory": {
+          "current_private_bytes": 32055296,
+          "peak_commit_bytes": 160501760,
+          "peak_working_set_bytes": 73940992,
+          "scope": "process lifetime including startup and dependency loading; one case per process"
+        },
+        "metrics": {
+          "maximum_volume_scale": 1.0,
+          "mean_volume_scale": 1.0,
+          "minimum_volume_scale": 1.0,
+          "object_count": 10,
+          "objects_at_final_target": 10,
+          "packed_object_volume": 6770014.322373023,
+          "packing_fraction": 0.16967454442037652,
+          "target_volume_scale": 1.0
+        },
+        "cat_diagnostics_complete": false,
+        "geometry_sha256": {
+          "packed-objects.stl": "2644a329d6fb5f9d8966f8f98e372d3926a82b8497246958fc3b24b0a2f304b1",
+          "container.stl": "53d4fa7da1b2be28e8358eb8d1c54c653cae77f0c3707e56fec8a070ee854455",
+          "placements.json": "5cef371b989de6e5d21ffc48e2e5f49c2d5d3d9866f51fafe85b2c2677f1390b"
+        }
+      },
+      {
+        "repeat": 3,
+        "report": "build/tranche2-benchmark-real10-growth/pack-10-3.json",
+        "report_sha256": "fa5c46e67beea137962e3f39a84f4751e67b29a7092f0c2e6320d32185d57a57",
+        "run_summary": "build/tranche2-benchmark-real10-growth/pack-10-3-run/run-summary.json",
+        "run_summary_sha256": "59105fc1dede4c023efe057e742076020a6e82109064da47c1d8b506ddfe2fe0",
+        "status": "success",
+        "physically_valid": true,
+        "completed_at_exact_target": true,
+        "saved_run": {
+          "has_geometry": true,
+          "object_count": 10,
+          "status": "loaded"
+        },
+        "total": {
+          "cpu_ms": 3620546.875,
+          "wall_ms": 227274.4329
+        },
+        "stages": {
+          "cat": {
+            "cpu_ms": null,
+            "wall_ms": 1234.828
+          },
+          "correction": {
+            "cpu_ms": null,
+            "wall_ms": 8950.480000000001
+          },
+          "export": {
+            "cpu_ms": null,
+            "wall_ms": 12.54269999999999
+          },
+          "final_validation": {
+            "cpu_ms": null,
+            "wall_ms": 79.001
+          },
+          "initialization": {
+            "cpu_ms": null,
+            "wall_ms": 0.1673
+          },
+          "input_hashing": {
+            "cpu_ms": 0.0,
+            "wall_ms": 0.8154
+          },
+          "input_preparation": {
+            "cpu_ms": null,
+            "wall_ms": 1.272
+          },
+          "local_solves": {
+            "cpu_ms": null,
+            "wall_ms": 213338.777
+          },
+          "output_validation": {
+            "cpu_ms": null,
+            "wall_ms": 78.0006
+          },
+          "pack_scene_total": {
+            "cpu_ms": 3620531.25,
+            "wall_ms": 227263.2112
+          },
+          "packing_engine": {
+            "cpu_ms": null,
+            "wall_ms": 227164.07259999998
+          },
+          "resampling": {
+            "cpu_ms": null,
+            "wall_ms": 31.029
+          },
+          "saved_run_loading": {
+            "cpu_ms": 15.625,
+            "wall_ms": 9.3477
+          },
+          "tetrahedralization": {
+            "cpu_ms": null,
+            "wall_ms": 3374.33
+          },
+          "transforms": {
+            "cpu_ms": null,
+            "wall_ms": 12.144
+          }
+        },
+        "memory": {
+          "current_private_bytes": 30687232,
+          "peak_commit_bytes": 159731712,
+          "peak_working_set_bytes": 72949760,
+          "scope": "process lifetime including startup and dependency loading; one case per process"
+        },
+        "metrics": {
+          "maximum_volume_scale": 1.0,
+          "mean_volume_scale": 1.0,
+          "minimum_volume_scale": 1.0,
+          "object_count": 10,
+          "objects_at_final_target": 10,
+          "packed_object_volume": 6770014.322373023,
+          "packing_fraction": 0.16967454442037652,
+          "target_volume_scale": 1.0
+        },
+        "cat_diagnostics_complete": false,
+        "geometry_sha256": {
+          "packed-objects.stl": "2644a329d6fb5f9d8966f8f98e372d3926a82b8497246958fc3b24b0a2f304b1",
+          "container.stl": "53d4fa7da1b2be28e8358eb8d1c54c653cae77f0c3707e56fec8a070ee854455",
+          "placements.json": "5cef371b989de6e5d21ffc48e2e5f49c2d5d3d9866f51fafe85b2c2677f1390b"
+        }
+      }
+    ]
+  },
+  "post_measurement_source_changes": [
+    {
+      "path": "src/packing/packing.cpp",
+      "measured_sha256": "5d3dbe08719fc106915d10463a7407b2fe7e62fbd5f2dd0f2108ebf9304db84d",
+      "delivered_sha256": "52f5ebe16c1d44f82592bd79719b8aa5cef4a6146b0ef43009e247dc3a19f071"
+    }
+  ],
+  "post_measurement_note": "Final review conservatively marks CAT diagnostics incomplete when physical collision validation throws before returning a complete report. This changes failure metadata only; successful growth policy, geometry, work limits and acceptance predicates are unchanged. A focused regression and all supported build/test matrices verify the delivered code. Timings above belong to the explicitly hashed measured binary."
+}

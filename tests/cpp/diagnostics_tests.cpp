@@ -260,15 +260,66 @@ TEST_CASE("TetGen failure reason survives bounded recovery history truncation", 
     config.maximum_rotation_delta_radians = 0.0;
     config.adaptive_sampling = false;
     config.diagnostics.max_recovery_records = 1;
-    const auto result = irop::run_packing(object, container, state, config);
-    REQUIRE(result.status == irop::PackingStatus::dependency_failure);
-    REQUIRE(result.diagnostics.recovery_records.size() == 1);
-    CHECK(result.diagnostics.recovery_records_dropped == 2);
-    CHECK(result.diagnostics.recovery_records.front().recovery_applied);
-    CHECK_FALSE(result.diagnostics.recovery_records.front().reason.empty());
-    CHECK(result.diagnostics.recovery_records.front().reason.size() <= 2'048);
-    CHECK(result.work.tetrahedralization_recoveries == 2);
-    CHECK(result.work.local_solves == 0);
+    SECTION("reference policy retains the original failure and bounded recovery history")
+    {
+        config.use_reference_growth_policy = true;
+        const auto result = irop::run_packing(object, container, state, config);
+        REQUIRE(result.status == irop::PackingStatus::dependency_failure);
+        REQUIRE(result.diagnostics.recovery_records.size() == 1);
+        CHECK(result.diagnostics.recovery_records_dropped == 2);
+        CHECK(result.diagnostics.recovery_records.front().recovery_applied);
+        CHECK_FALSE(result.diagnostics.recovery_records.front().reason.empty());
+        CHECK(result.diagnostics.recovery_records.front().reason.size() <= 2'048);
+        CHECK(result.work.tetrahedralization_recoveries == 2);
+        CHECK(result.work.local_solves == 0);
+        CHECK(result.work.tetrahedralization.omitted_single_participant_tetrahedra == 0);
+    }
+
+    SECTION("default policy omits irrelevant degenerate cells and completes physical growth")
+    {
+        const auto result = irop::run_packing(object, container, state, config);
+        INFO(result.diagnostic);
+        REQUIRE(result.succeeded());
+        CHECK(result.work.tetrahedralization.omitted_single_participant_tetrahedra > 0);
+        CHECK(result.work.local_solves > 0);
+        CHECK(result.work.local_solve.constraints_prepared > 0);
+        CHECK(result.final_validation_performed);
+        CHECK(result.final_validation.physical_scene_valid());
+        REQUIRE(result.state.transforms.size() == 2);
+        for (const auto& transform : result.state.transforms) {
+            CHECK(transform.volume_scale == config.final_volume_scale);
+        }
+    }
+}
+
+TEST_CASE("local snapshots retain Hessian policy and read historical omission as limited memory",
+          "[diagnostics][local-solve][hessian]")
+{
+    irop::test::TempDirectory directory;
+    const auto path = directory.path() / "hessian-policy.json";
+    irop::LocalSolveSnapshot snapshot { scale_request(), {}, box_constraints() };
+    for (const bool exact : { false, true }) {
+        CAPTURE(exact);
+        snapshot.request.use_exact_hessian = exact;
+        irop::write_local_solve_snapshot(path, snapshot);
+        const auto decoded = irop::read_local_solve_snapshot(path);
+        CHECK(decoded.request.use_exact_hessian == exact);
+    }
+    nlohmann::json document;
+    {
+        std::ifstream input(path);
+        input >> document;
+    }
+    REQUIRE(document.at("request").at("use_exact_hessian") == true);
+    document["request"].erase("use_exact_hessian");
+    write_json(path, document);
+    CHECK_FALSE(irop::read_local_solve_snapshot(path).request.use_exact_hessian);
+    for (const nlohmann::json& malformed : { nlohmann::json(nullptr), nlohmann::json(1), nlohmann::json("true") }) {
+        CAPTURE(malformed);
+        document["request"]["use_exact_hessian"] = malformed;
+        write_json(path, document);
+        CHECK_THROWS_AS(irop::read_local_solve_snapshot(path), irop::Error);
+    }
 }
 
 }  // namespace

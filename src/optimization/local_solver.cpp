@@ -63,7 +63,8 @@ struct StepEvaluation {
            std::abs(squared_length - 1.0L) <= static_cast<long double>(unit_normal_squared_tolerance);
 }
 
-[[nodiscard]] bool make_rotation_evaluation(const EulerRotationRadians& angles, RotationEvaluation& result) noexcept
+[[nodiscard]] bool make_rotation_evaluation(const EulerRotationRadians& angles, RotationEvaluation& result,
+                                            std::array<Eigen::Matrix3d, 6>* const second_derivatives = nullptr) noexcept
 {
     const double cosine_x = std::cos(angles.x);
     const double cosine_y = std::cos(angles.y);
@@ -90,14 +91,35 @@ struct StepEvaluation {
     result.derivative_x = rotation_y * rotation_z * derivative_x;
     result.derivative_y = derivative_y * rotation_z * rotation_x;
     result.derivative_z = rotation_y * derivative_z * rotation_x;
+    if (second_derivatives != nullptr) {
+        Eigen::Matrix3d second_x;
+        second_x << 0.0, 0.0, 0.0, 0.0, -cosine_x, sine_x, 0.0, -sine_x, -cosine_x;
+        Eigen::Matrix3d second_y;
+        second_y << -cosine_y, 0.0, -sine_y, 0.0, 0.0, 0.0, sine_y, 0.0, -cosine_y;
+        Eigen::Matrix3d second_z;
+        second_z << -cosine_z, sine_z, 0.0, -sine_z, -cosine_z, 0.0, 0.0, 0.0, 0.0;
+        // Lower rotation triangle: xx, yx, yy, zx, zy, zz.
+        (*second_derivatives)[0] = rotation_y * rotation_z * second_x;
+        (*second_derivatives)[1] = derivative_y * rotation_z * derivative_x;
+        (*second_derivatives)[2] = second_y * rotation_z * rotation_x;
+        (*second_derivatives)[3] = rotation_y * derivative_z * derivative_x;
+        (*second_derivatives)[4] = derivative_y * derivative_z * rotation_x;
+        (*second_derivatives)[5] = rotation_y * second_z * rotation_x;
+        for (const auto& derivative : *second_derivatives) {
+            if (!derivative.allFinite()) {
+                return false;
+            }
+        }
+    }
     return result.rotation.allFinite() && result.derivative_x.allFinite() && result.derivative_y.allFinite() &&
            result.derivative_z.allFinite();
 }
 
-[[nodiscard]] bool make_step_evaluation(const LocalTransformStep& step, StepEvaluation& result) noexcept
+[[nodiscard]] bool make_step_evaluation(const LocalTransformStep& step, StepEvaluation& result,
+                                        std::array<Eigen::Matrix3d, 6>* const second_derivatives = nullptr) noexcept
 {
     if (!is_finite(step) || step.volume_scale_multiplier <= 0.0 ||
-        !make_rotation_evaluation(step.rotation_delta, result.rotation)) {
+        !make_rotation_evaluation(step.rotation_delta, result.rotation, second_derivatives)) {
         return false;
     }
     result.linear_scale = std::cbrt(step.volume_scale_multiplier);
@@ -225,6 +247,52 @@ bool evaluate_local_jacobian_unchecked(const std::span<const LocalPlaneConstrain
     return true;
 }
 
+bool evaluate_local_hessian_unchecked(const std::span<const LocalPlaneConstraint> constraints,
+                                      const std::span<const double> multipliers, const Point3& object_center,
+                                      const LocalTransformStep& step, const std::span<double> values) noexcept
+{
+    StepEvaluation evaluation;
+    std::array<Eigen::Matrix3d, 6> second_derivatives;
+    if (multipliers.size() != constraints.size() || values.size() != local_solve_hessian_nonzero_count ||
+        !is_finite(object_center) || !make_step_evaluation(step, evaluation, &second_derivatives)) {
+        return false;
+    }
+
+    // Sum the weighted geometry once. Each rotational derivative then needs
+    // only a 3x3 contraction instead of another pass over the constraint rows.
+    Eigen::Matrix3d weighted_geometry = Eigen::Matrix3d::Zero();
+    const Eigen::Vector3d center = vector_for(object_center);
+    for (std::size_t index = 0; index < constraints.size(); ++index) {
+        if (!std::isfinite(multipliers[index])) {
+            return false;
+        }
+        const Eigen::Vector3d relative_vertex = vector_for(constraints[index].current_vertex) - center;
+        weighted_geometry +=
+            (multipliers[index] * vector_for(constraints[index].inward_unit_normal)) * relative_vertex.transpose();
+        if (!weighted_geometry.allFinite()) {
+            return false;
+        }
+    }
+    const auto weighted_projection = [&weighted_geometry](const Eigen::Matrix3d& derivative) noexcept {
+        return weighted_geometry.cwiseProduct(derivative).sum();
+    };
+    const double second_scale_derivative =
+        (-2.0 / 3.0) * (evaluation.linear_scale_derivative / step.volume_scale_multiplier);
+    values[0] = second_scale_derivative * weighted_projection(evaluation.rotation.rotation);
+    values[1] = evaluation.linear_scale_derivative * weighted_projection(evaluation.rotation.derivative_x);
+    values[2] = evaluation.linear_scale * weighted_projection(second_derivatives[0]);
+    values[3] = evaluation.linear_scale_derivative * weighted_projection(evaluation.rotation.derivative_y);
+    values[4] = evaluation.linear_scale * weighted_projection(second_derivatives[1]);
+    values[5] = evaluation.linear_scale * weighted_projection(second_derivatives[2]);
+    values[6] = evaluation.linear_scale_derivative * weighted_projection(evaluation.rotation.derivative_z);
+    values[7] = evaluation.linear_scale * weighted_projection(second_derivatives[3]);
+    values[8] = evaluation.linear_scale * weighted_projection(second_derivatives[4]);
+    values[9] = evaluation.linear_scale * weighted_projection(second_derivatives[5]);
+    return std::all_of(values.begin(), values.end(), [](const double value) {
+        return std::isfinite(value);
+    });
+}
+
 bool evaluate_applied_constraints_unchecked(const std::span<const LocalPlaneConstraint> constraints,
                                             const Transform& current, const Transform& candidate, const double padding,
                                             const std::span<double> values) noexcept
@@ -341,6 +409,21 @@ std::array<double, local_solve_variable_count> evaluate_local_constraint_gradien
                     "local constraint gradient evaluation produced a non-finite value");
     }
     return gradient;
+}
+
+std::array<double, local_solve_hessian_nonzero_count> evaluate_local_constraint_hessian(
+    const Point3& object_center, const LocalPlaneConstraint& constraint, const double padding,
+    const LocalTransformStep& step)
+{
+    validate_constraint_inputs(object_center, constraint, padding, step);
+    std::array<double, local_solve_hessian_nonzero_count> hessian {};
+    constexpr double multiplier = 1.0;
+    if (!detail::evaluate_local_hessian_unchecked(std::span(&constraint, 1), std::span(&multiplier, 1), object_center,
+                                                  step, std::span(hessian))) {
+        throw Error(ErrorCategory::invalid_configuration,
+                    "local constraint Hessian evaluation produced a non-finite value");
+    }
+    return hessian;
 }
 
 Transform apply_local_step(const Transform& current, const LocalTransformStep& step,

@@ -47,3 +47,5 @@ Create or supersede an ADR when changing:
 Ordinary implementation details, status changes, and reversible local refactors do not need ADRs.
 
 - [ADR-0015: Repeatable Runs and Bounded Diagnostics](0015-repeatable-runs-and-bounded-diagnostics.md)
+
+- [ADR-0016: Current Poses, Exact Derivatives and Growth Recovery](0016-current-pose-exact-derivatives-and-growth-recovery.md)

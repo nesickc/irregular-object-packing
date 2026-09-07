@@ -117,6 +117,42 @@ TEST_CASE("packing scene atomically publishes the complete successful artifact s
     CHECK(summary.at("versions").at("ipopt") == "3.14.19");
 }
 
+TEST_CASE("packing publishes successful physical output with explicitly incomplete CAT diagnostics",
+          "[pack-scene][cat-diagnostics]")
+{
+    irop::test::TempDirectory temporary;
+    const SceneInputs inputs = write_scene_inputs(temporary.path());
+    irop::PackOptions options = no_growth_options();
+    options.algorithm.final_volume_scale = 0.2;
+    options.algorithm.max_iterations_per_scale_step = 10;
+    options.limits.collision.max_cat_triangle_pair_tests = 0;
+    const auto result = irop::pack_scene(inputs.object, inputs.container, temporary.path() / "packed", options);
+    INFO(result.packing.diagnostic);
+    REQUIRE(result.packing.succeeded());
+    REQUIRE(result.packing.work.local_solves > 0);
+    CHECK_FALSE(result.packing.cat_diagnostics_complete);
+    CHECK(result.packing.final_validation_performed);
+    CHECK(result.packing.final_validation.physical_scene_valid());
+    REQUIRE(result.packed_objects_path);
+    const auto summary = read_json(result.run_summary_path);
+    CHECK(summary.at("cat_diagnostics_complete") == false);
+    CHECK(summary.at("validation").at("physical_scene_valid") == true);
+    CHECK(summary.at("validation").at("cat_diagnostics_complete") == false);
+    CHECK(summary.at("work").at("collision").at("cat_triangle_pairs_tested") == 0);
+    CHECK(summary.at("work").at("collision").at("triangle_pairs_tested").get<std::uint64_t>() > 0);
+    CHECK(summary.at("config").at("engine_limits").at("collision").at("max_cat_triangle_pair_tests") == 0);
+    const std::vector<irop::TriangleMesh> serialized_objects { irop::read_stl(*result.packed_objects_path, {}).mesh };
+    CHECK(irop::validate_scene_collisions(serialized_objects, irop::read_stl(*result.container_output_path, {}).mesh)
+              .physical_scene_valid());
+    std::size_t incomplete_warnings = 0;
+    for (const auto& warning : summary.at("warnings")) {
+        if (warning.get<std::string>().find("CAT contact diagnostics") != std::string::npos) {
+            ++incomplete_warnings;
+        }
+    }
+    CHECK(incomplete_warnings == 1);
+}
+
 TEST_CASE("packing publishes a physically valid full-scale structured cylinder layout")
 {
     irop::test::TempDirectory temporary;

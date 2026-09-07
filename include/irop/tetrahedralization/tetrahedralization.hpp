@@ -34,6 +34,13 @@ struct TetrahedralizationLimits {
     std::uint64_t max_output_tetrahedra = default_max_output_tetrahedra;
 };
 
+struct TetrahedralizationOptions {
+    // CAT does not consume cells whose vertices all belong to one participant.
+    // Opt-in packing recovery may omit those cells when their finite computed
+    // determinant is zero. Standalone tetrahedralization remains strict.
+    bool omit_degenerate_single_participant_tetrahedra = false;
+};
+
 enum class TetrahedralizationStatus {
     success,
     invalid_input,
@@ -48,7 +55,9 @@ struct TetrahedralizationWork {
     std::uint64_t input_points = 0;
     std::uint64_t input_triangles = 0;
     std::uint64_t output_points = 0;
+    // Raw backend output count, including omitted cells; output limits use it.
     std::uint64_t output_tetrahedra = 0;
+    std::uint64_t omitted_single_participant_tetrahedra = 0;
 };
 
 struct TetrahedralizationResult {
@@ -63,6 +72,7 @@ struct TetrahedralizationResult {
 // Participants are ordered object surfaces followed by the container surface.
 // Point ownership in the result uses the corresponding zero-based participant ID.
 [[nodiscard]] TetrahedralizationResult tetrahedralize_surfaces(std::span<const TriangleMesh> participants,
-                                                               const TetrahedralizationLimits& limits = {});
+                                                               const TetrahedralizationLimits& limits = {},
+                                                               const TetrahedralizationOptions& options = {});
 
 }  // namespace irop

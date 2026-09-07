@@ -292,6 +292,10 @@ void log_error_noexcept(const char* category, const char* message) noexcept
                      "Maximum object-pair checks across packing and output validation")
         ->check(CLI::PositiveNumber);
     pack_command
+        ->add_option("--max-collision-triangle-pair-tests", pack_options.limits.collision.max_triangle_pair_tests,
+                     "Maximum surface triangle-pair tests across packing and output validation")
+        ->check(CLI::PositiveNumber);
+    pack_command
         ->add_option("--max-correction-passes", pack_options.limits.max_correction_passes_per_iteration,
                      "Maximum collision scale reductions per packing iteration")
         ->check(CLI::PositiveNumber);
@@ -338,6 +342,8 @@ void log_error_noexcept(const char* category, const char* message) noexcept
                      "Maximum combined packed-object triangle count")
         ->check(CLI::PositiveNumber);
 
+    pack_command->add_flag("--reference-growth-policy", pack_options.algorithm.use_reference_growth_policy,
+                           "Use the historical random-start and sampling policy for reproducibility");
     pack_command->add_flag("--capture-failed-local-solve",
                            pack_options.algorithm.diagnostics.capture_failed_local_problem,
                            "Save one bounded failed local problem for replay (no packed geometry)");
@@ -442,9 +448,15 @@ void log_error_noexcept(const char* category, const char* message) noexcept
                 spdlog::info("packing scale step {}/{}: target volume scale {}", progress.scale_step + 1,
                              progress.scale_step_count, progress.target_volume_scale);
                 break;
+            case irop::PackingProgressPhase::sampling_recovery:
+                spdlog::info("refining object mesh after physical collision correction");
+                break;
             case irop::PackingProgressPhase::tetrahedralization_recovery:
                 spdlog::warn("TetGen recovery at scale step {}, iteration {}", progress.scale_step + 1,
                              progress.iteration + 1);
+                break;
+            case irop::PackingProgressPhase::step_recovery:
+                spdlog::info("retrying smaller growth and movement steps after physical collision");
                 break;
             case irop::PackingProgressPhase::local_solve_started:
                 spdlog::debug("solving object {} at scale step {}, local iteration cap {}",

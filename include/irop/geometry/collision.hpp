@@ -20,17 +20,22 @@ struct SceneCollisionLimits {
     static constexpr std::uint64_t default_max_triangle_pair_tests = 100'000'000ULL;
     static constexpr std::uint64_t default_max_containment_triangle_visits = 100'000'000ULL;
     static constexpr std::uint64_t default_max_reported_violations = 1'000'000ULL;
+    static constexpr std::uint64_t default_max_cat_triangle_pair_tests = 10'000'000ULL;
 
     std::uint64_t max_triangle_pair_tests = default_max_triangle_pair_tests;
     std::uint64_t max_containment_triangle_visits = default_max_containment_triangle_visits;
     std::uint64_t max_reported_violations = default_max_reported_violations;
     std::uint64_t max_object_pair_checks = default_max_object_pair_checks;
+    // CAT diagnostics have a separate allowance. Zero skips nonempty CAT
+    // queries and marks the report incomplete without weakening physical checks.
+    std::uint64_t max_cat_triangle_pair_tests = default_max_cat_triangle_pair_tests;
 };
 
 struct SceneCollisionWork {
     std::uint64_t object_pairs_examined = 0;
     std::uint64_t triangle_pairs_tested = 0;
     std::uint64_t containment_triangle_visits = 0;
+    std::uint64_t cat_triangle_pairs_tested = 0;
 };
 
 struct SceneCollisionReport {
@@ -38,6 +43,7 @@ struct SceneCollisionReport {
     std::vector<std::uint64_t> container_violation_object_ids;
     std::vector<ObjectCollisionPair> object_collisions;
     SceneCollisionWork work;
+    bool cat_diagnostics_complete = true;
 
     [[nodiscard]] bool physical_scene_valid() const noexcept
     {
@@ -47,7 +53,11 @@ struct SceneCollisionReport {
 
 // CAT surfaces may be empty to skip CAT reporting, otherwise one surface must
 // correspond to each object. Physical validity is evaluated against the
-// supplied object/container meshes; CAT contacts are diagnostic only.
+// supplied object/container meshes; CAT contacts are diagnostic only. A CAT
+// query starts only when its worst-case triangle-pair count fits the remaining
+// diagnostic allowance. Omitted queries or reports set cat_diagnostics_complete
+// false. CAT and physical violation lists each have max_reported_violations
+// entries available; only exhaustion of the physical list fails validation.
 [[nodiscard]] SceneCollisionReport validate_scene_collisions(std::span<const TriangleMesh> objects,
                                                              const TriangleMesh& container,
                                                              std::span<const TriangleMesh> cat_surfaces = {},

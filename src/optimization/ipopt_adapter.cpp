@@ -49,6 +49,7 @@ struct CallbackContext {
     CallbackStopReason stop_reason = CallbackStopReason::none;
     LocalSolveResult* result = nullptr;
     std::uint64_t trace_limit = 0;
+    bool use_exact_hessian = false;
 };
 
 class IpoptProblemOwner final {
@@ -331,19 +332,81 @@ bool evaluate_jacobian_callback(const ipindex n, ipnumber* const x, const bool, 
     return true;
 }
 
-bool evaluate_hessian_callback(const ipindex n, ipnumber*, const bool, const ipnumber, const ipindex m, ipnumber*,
-                               const bool, const ipindex nonzero_count, ipindex*, ipindex*, ipnumber*,
+bool evaluate_hessian_callback(const ipindex n, ipnumber* const x, const bool, const ipnumber objective_factor,
+                               const ipindex m, ipnumber* const multipliers, const bool, const ipindex nonzero_count,
+                               ipindex* const rows, ipindex* const columns, ipnumber* const values,
                                void* const user_data) noexcept
 {
     CallbackContext* const context = callback_context(user_data);
-    if (context == nullptr || n != variable_count || m < 0 ||
-        static_cast<std::size_t>(m) != context->constraints.size() || nonzero_count != 0) {
+    if (context == nullptr || context->work == nullptr || context->limits == nullptr || n != variable_count || m < 0 ||
+        static_cast<std::size_t>(m) != context->constraints.size() ||
+        nonzero_count != (context->use_exact_hessian ? static_cast<ipindex>(local_solve_hessian_nonzero_count) : 0)) {
         if (context != nullptr) {
             context->stop_reason = CallbackStopReason::invalid_callback;
         }
         return false;
     }
-    return true;
+    if (elapsed_limit_reached(*context)) {
+        return false;
+    }
+    if (!context->use_exact_hessian) {
+        return true;
+    }
+    if (values == nullptr) {
+        if (rows == nullptr || columns == nullptr) {
+            context->stop_reason = CallbackStopReason::invalid_callback;
+            return false;
+        }
+        ipindex offset = 0;
+        for (ipindex row = 0; row < 4; ++row) {
+            for (ipindex column = 0; column <= row; ++column) {
+                rows[offset] = row;
+                columns[offset] = column;
+                ++offset;
+            }
+        }
+        return true;
+    }
+    if (x == nullptr || multipliers == nullptr) {
+        context->stop_reason = CallbackStopReason::invalid_callback;
+        return false;
+    }
+    // The objective is linear, so its Hessian is zero for every finite factor.
+    if (!std::isfinite(objective_factor) || !is_finite(step_for(x))) {
+        context->stop_reason = CallbackStopReason::invalid_number;
+        return false;
+    }
+    increment_saturated(context->work->hessian_evaluations);
+    std::fill_n(values, local_solve_hessian_nonzero_count, 0.0);
+    const LocalTransformStep step = step_for(x);
+    for (std::size_t offset = 0; offset < context->constraints.size(); offset += elapsed_check_stride) {
+        if (elapsed_limit_reached(*context)) {
+            return false;
+        }
+        const std::size_t count = std::min(elapsed_check_stride, context->constraints.size() - offset);
+        if (!add_bounded_work(static_cast<std::uint64_t>(count), context->limits->max_constraint_rows_evaluated,
+                              context->work->constraint_rows_evaluated)) {
+            context->stop_reason = CallbackStopReason::resource_limit;
+            return false;
+        }
+        // This is a subset of the checked cumulative count above, so cannot overflow.
+        context->work->hessian_constraint_rows_evaluated += static_cast<std::uint64_t>(count);
+        std::array<double, local_solve_hessian_nonzero_count> chunk {};
+        if (!detail::evaluate_local_hessian_unchecked(context->constraints.subspan(offset, count),
+                                                      std::span(multipliers + offset, count), context->object_center,
+                                                      step, std::span(chunk))) {
+            context->stop_reason = CallbackStopReason::invalid_number;
+            return false;
+        }
+        for (std::size_t entry = 0; entry < chunk.size(); ++entry) {
+            values[entry] += chunk[entry];
+            if (!std::isfinite(values[entry])) {
+                context->stop_reason = CallbackStopReason::invalid_number;
+                return false;
+            }
+        }
+    }
+    return !elapsed_limit_reached(*context);
 }
 
 bool intermediate_callback(const ipindex algorithm_mode, const ipindex iteration, const ipnumber objective,
@@ -420,7 +483,8 @@ bool intermediate_callback(const ipindex algorithm_mode, const ipindex iteration
            add_number_option(problem, "max_wall_time", maximum_seconds) &&
            add_integer_option(problem, "print_level", 0) && add_string_option(problem, "sb", "yes") &&
            add_string_option(problem, "mu_strategy", "adaptive") &&
-           add_string_option(problem, "hessian_approximation", "limited-memory") &&
+           add_string_option(problem, "hessian_approximation",
+                             request.use_exact_hessian ? "exact" : "limited-memory") &&
            add_string_option(problem, "linear_solver", "mumps") &&
            add_number_option(problem, "bound_relax_factor", 0.0);
 }
@@ -754,6 +818,7 @@ LocalSolveResult solve_local_transform_impl(const TetrahedralMesh* const mesh, c
             &result.work,           &start_time,
         };
         context.result = &result;
+        context.use_exact_hessian = request.use_exact_hessian;
         if (diagnostics.max_trace_records > 0) {
             try {
                 result.trace.reserve(static_cast<std::size_t>(diagnostics.max_trace_records));
@@ -817,10 +882,12 @@ LocalSolveResult solve_local_transform_impl(const TetrahedralMesh* const mesh, c
                       constraint_upper_bound);
             const auto constraint_count = static_cast<ipindex>(workspace.constraints_.size());
             const auto nonzero_count = static_cast<ipindex>(jacobian_entry_count);
+            const auto hessian_nonzero_count =
+                request.use_exact_hessian ? static_cast<ipindex>(local_solve_hessian_nonzero_count) : 0;
             IpoptProblemOwner problem(CreateIpoptProblem(
                 variable_count, workspace.variable_lower_bounds_.data(), workspace.variable_upper_bounds_.data(),
                 constraint_count, workspace.first_constraint_buffer_.data(), workspace.second_constraint_buffer_.data(),
-                nonzero_count, 0, 0, evaluate_objective_callback, evaluate_constraints_callback,
+                nonzero_count, hessian_nonzero_count, 0, evaluate_objective_callback, evaluate_constraints_callback,
                 evaluate_objective_gradient_callback, evaluate_jacobian_callback, evaluate_hessian_callback));
             if (problem.get() == nullptr) {
                 result.status = LocalSolveStatus::dependency_failure;

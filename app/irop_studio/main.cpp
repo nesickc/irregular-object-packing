@@ -47,6 +47,7 @@ enum ControlId {
     next_output,
     result_folder,
     result_location,
+    next_run_mode,
     browse_object,
     browse_container,
     browse_output,
@@ -114,6 +115,18 @@ Number number_of(HWND control, const char* label)
         throw std::runtime_error(std::string("Enter a valid ") + label + ".");
     }
     return result;
+}
+
+std::wstring run_mode_description(const double initial, const double target)
+{
+    std::wostringstream text;
+    if (initial == target) {
+        text << L"direct placement at volume scale " << initial;
+    }
+    else {
+        text << L"growth from volume scale " << initial << L" to " << target;
+    }
+    return text.str();
 }
 
 struct DialogRelease {
@@ -414,12 +427,33 @@ private:
         add(L"EDIT", details_.c_str(), ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL, details_text, 350, 720,
             790, 78);
         add(L"EDIT", L"No saved result selected.", ES_READONLY | ES_AUTOHSCROLL, result_location, 350, 806, 790, 26);
+        add(L"STATIC", L"", SS_LEFT, next_run_mode, 350, 53, 790, 22);
+        refresh_run_mode();
         viewport_ = std::make_unique<irop::studio::Viewport>(hwnd_);
         layout();
         SetTimer(hwnd_, poll_timer, 100, nullptr);
         if (!run_directories_.settings_warning().empty()) {
             show_status(L"Runs folder preference unavailable", wide(run_directories_.settings_warning()));
         }
+    }
+    void refresh_run_mode()
+    {
+        if (!control(next_run_mode)) {
+            return;
+        }
+        try {
+            const double initial = number_of<double>(control(initial_scale), "initial volume scale");
+            const double target = number_of<double>(control(final_scale), "target volume scale");
+            if (std::isfinite(initial) && std::isfinite(target) && initial > 0.0 && target <= 1.0 &&
+                initial <= target) {
+                set(next_run_mode, L"Next run: " + run_mode_description(initial, target));
+                return;
+            }
+        }
+        catch (const std::exception&) {
+            // Incomplete numeric text is normal while editing the form.
+        }
+        set(next_run_mode, L"Next run: enter valid initial and target volume scales.");
     }
     void refresh_next_output()
     {
@@ -441,6 +475,7 @@ private:
         const int width = std::max(1, static_cast<int>(area.right) - px(374));
         const int footer = static_cast<int>(area.bottom) - px(174);
         viewport_->resize(px(350), px(142), width, std::max(px(180), footer - px(166)));
+        MoveWindow(control(next_run_mode), px(350), px(53), width, px(22), TRUE);
         MoveWindow(control(progress_bar), px(350), footer, width, px(4), TRUE);
         MoveWindow(control(status_title), px(350), footer + px(15), width, px(26), TRUE);
         MoveWindow(control(details_text), px(350), footer + px(46), width, px(76), TRUE);
@@ -623,11 +658,14 @@ private:
                 details << L"\r\n" << wide(warning);
             }
         }
-        show_status(scene.command == "preview" ? L"Input preview"
-                    : scene.success
-                        ? (scene.command == "initialize" ? L"Initialized scene | Success" : L"Packing result | Success")
-                        : L"Run ended | " + wide(scene.status),
-                    details.str());
+        std::wstring title = scene.command == "preview" ? L"Input preview"
+                             : scene.success ? (scene.command == "initialize" ? L"Initialized scene | Success"
+                                                                              : L"Packing result | Success")
+                                             : L"Run ended | " + wide(scene.status);
+        if (scene.command == "pack" && scene.initial_volume_scale > 0.0 && scene.target_volume_scale > 0.0) {
+            title += L" | Recorded " + run_mode_description(scene.initial_volume_scale, scene.target_volume_scale);
+        }
+        show_status(title, details.str());
     }
     void capture_client(const std::filesystem::path& path)
     {
@@ -706,6 +744,13 @@ private:
     {
         if (startup_.smoke_directory.empty()) {
             return;
+        }
+        if (completion.scene && completion.scene->command == "pack") {
+            const bool direct = completion.scene->initial_volume_scale == completion.scene->target_volume_scale;
+            const std::wstring expected = direct ? L"Recorded direct placement" : L"Recorded growth";
+            if (text_of(control(status_title)).find(expected) == std::wstring::npos) {
+                throw std::runtime_error("The recorded run type was not displayed from its saved scale settings.");
+            }
         }
         ++smoke_completions_;
         if (smoke_completions_ == 1 &&
@@ -845,6 +890,12 @@ private:
                     if (progress->phase == irop::PackingProgressPhase::tetrahedralization_recovery) {
                         text << L"\r\nRecovering tetrahedralization...";
                     }
+                    else if (progress->phase == irop::PackingProgressPhase::sampling_recovery) {
+                        text << L"\r\nRefining object mesh after collision correction...";
+                    }
+                    else if (progress->phase == irop::PackingProgressPhase::step_recovery) {
+                        text << L"\r\nRetrying smaller growth and movement steps...";
+                    }
                 }
                 show_status(L"Packing in progress", text.str());
             }
@@ -878,8 +929,16 @@ private:
                                         startup_.smoke_action == L"close-active" ||
                                         startup_.smoke_action == L"cancel-rerun";
                 set(object_count, cancelling ? L"100" : L"1");
-                set(initial_scale, L"0.1");
-                set(final_scale, L"0.2");
+                const bool full_size_direct = startup_.smoke_action == L"direct";
+                const bool scaled_direct = startup_.smoke_action == L"scaled-direct";
+                set(initial_scale, full_size_direct ? L"1.0" : L"0.1");
+                set(final_scale, full_size_direct ? L"1.0" : scaled_direct ? L"0.1" : L"0.2");
+                const std::wstring expected_mode = full_size_direct || scaled_direct
+                                                       ? L"Next run: direct placement at volume scale "
+                                                       : L"Next run: growth from volume scale ";
+                if (!text_of(control(next_run_mode)).starts_with(expected_mode)) {
+                    throw std::runtime_error("Editing the scale fields did not update the next-run type.");
+                }
                 set(steps, L"1");
                 SendMessageW(control(adaptive), BM_SETCHECK, BST_UNCHECKED, 0);
                 command(startup_.smoke_action == L"preview" ? preview_button : run_button);
@@ -924,7 +983,7 @@ private:
         constexpr wchar_t subtitle[] = L"IRREGULAR OBJECT PACKING";
         TextOutW(dc, px(24), px(54), subtitle, static_cast<int>(sizeof(subtitle) / sizeof(wchar_t) - 1));
         constexpr wchar_t hint[] = L"Drag to orbit   |   Shift + drag to pan   |   Scroll to zoom";
-        TextOutW(dc, px(350), px(38), hint, static_cast<int>(sizeof(hint) / sizeof(wchar_t) - 1));
+        TextOutW(dc, px(350), px(27), hint, static_cast<int>(sizeof(hint) / sizeof(wchar_t) - 1));
         HPEN pen = CreatePen(PS_SOLID, 1, RGB(224, 230, 236));
         HGDIOBJ old_pen = SelectObject(dc, pen);
         MoveToEx(dc, 0, px(80), nullptr);
@@ -962,7 +1021,10 @@ private:
                 app->begin();
                 return 0;
             case WM_COMMAND:
-                if (HIWORD(word) == BN_CLICKED) {
+                if (HIWORD(word) == EN_CHANGE && (LOWORD(word) == initial_scale || LOWORD(word) == final_scale)) {
+                    app->refresh_run_mode();
+                }
+                else if (HIWORD(word) == BN_CLICKED) {
                     app->command(LOWORD(word));
                 }
                 return 0;

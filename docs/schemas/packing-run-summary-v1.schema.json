@@ -58,6 +58,10 @@
     "config": { "$ref": "#/$defs/config" },
     "initialization": { "$ref": "#/$defs/initialization" },
     "work": { "$ref": "#/$defs/packing_work" },
+    "cat_diagnostics_complete": {
+      "type": "boolean",
+      "description": "Whether every CAT contact diagnostic requested during packing was completed; physical validation has independent limits."
+    },
     "history": {
       "type": "array",
       "items": { "$ref": "#/$defs/history_record" }
@@ -331,6 +335,10 @@
         },
         "local_solve_tolerance": { "$ref": "#/$defs/positive_number" },
         "adaptive_sampling": { "type": "boolean" },
+        "use_reference_growth_policy": {
+          "type": "boolean",
+          "description": "Optional for historical summaries; explicitly records selection of the pre-tranche-2 growth policy."
+        },
         "sampling": {
           "type": "object",
           "additionalProperties": false,
@@ -496,6 +504,7 @@
       "required": ["max_triangle_pair_tests", "max_containment_triangle_visits", "max_reported_violations"],
       "properties": {
         "max_triangle_pair_tests": { "$ref": "#/$defs/positive_integer" },
+        "max_cat_triangle_pair_tests": { "$ref": "#/$defs/nonnegative_integer" },
         "max_object_pair_checks": { "$ref": "#/$defs/positive_integer" },
         "max_containment_triangle_visits": { "$ref": "#/$defs/positive_integer" },
         "max_reported_violations": { "$ref": "#/$defs/positive_integer" }
@@ -564,7 +573,8 @@
         "input_points": { "$ref": "#/$defs/nonnegative_integer" },
         "input_triangles": { "$ref": "#/$defs/nonnegative_integer" },
         "output_points": { "$ref": "#/$defs/nonnegative_integer" },
-        "output_tetrahedra": { "$ref": "#/$defs/nonnegative_integer" }
+        "output_tetrahedra": { "$ref": "#/$defs/nonnegative_integer" },
+        "omitted_single_participant_tetrahedra": { "$ref": "#/$defs/nonnegative_integer" }
       }
     },
     "cat_work": {
@@ -609,6 +619,11 @@
         "objective_gradient_evaluations": { "$ref": "#/$defs/nonnegative_integer" },
         "constraint_rows_evaluated": { "$ref": "#/$defs/nonnegative_integer" },
         "jacobian_entries_evaluated": { "$ref": "#/$defs/nonnegative_integer" },
+        "hessian_evaluations": { "$ref": "#/$defs/nonnegative_integer" },
+        "hessian_constraint_rows_evaluated": {
+          "$ref": "#/$defs/nonnegative_integer",
+          "description": "Subset of constraint_rows_evaluated charged by exact-Hessian callbacks; not additional work."
+        },
         "iterations": { "$ref": "#/$defs/nonnegative_integer" },
         "elapsed_milliseconds": { "$ref": "#/$defs/nonnegative_integer" },
         "minimum_solver_constraint": { "$ref": "#/$defs/nullable_number" },
@@ -622,6 +637,7 @@
       "properties": {
         "object_pairs_examined": { "$ref": "#/$defs/nonnegative_integer" },
         "triangle_pairs_tested": { "$ref": "#/$defs/nonnegative_integer" },
+        "cat_triangle_pairs_tested": { "$ref": "#/$defs/nonnegative_integer" },
         "containment_triangle_visits": { "$ref": "#/$defs/nonnegative_integer" }
       }
     },
@@ -648,6 +664,8 @@
         "iterations": { "$ref": "#/$defs/nonnegative_integer" },
         "tetrahedralization_attempts": { "$ref": "#/$defs/nonnegative_integer" },
         "tetrahedralization_recoveries": { "$ref": "#/$defs/nonnegative_integer" },
+        "sampling_refinements": { "$ref": "#/$defs/nonnegative_integer" },
+        "physical_step_retries": { "$ref": "#/$defs/nonnegative_integer" },
         "cat_builds": { "$ref": "#/$defs/nonnegative_integer" },
         "local_solves": { "$ref": "#/$defs/nonnegative_integer" },
         "correction_passes": { "$ref": "#/$defs/nonnegative_integer" },
@@ -737,6 +755,10 @@
       "properties": {
         "status": { "enum": ["passed", "failed", "not_run"] },
         "physical_scene_valid": { "type": ["boolean", "null"] },
+        "cat_diagnostics_complete": {
+          "type": "boolean",
+          "description": "Cumulative completeness of CAT diagnostics, including the retained CAT violation list; independent of the final physical validity result."
+        },
         "cat_violation_object_ids": {
           "type": "array",
           "items": { "$ref": "#/$defs/nonnegative_integer" }

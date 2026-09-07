@@ -57,6 +57,18 @@ Startup arguments can prefill the two mesh fields or open an existing result:
    as `irop pack`; unsuccessful engine runs publish their summary without packed
    geometry. An opted-in captured failure can also publish `failed-local-solve.json`.
 
+The **Next run** line updates as you edit the scale fields. Equal initial and
+target scales mean **direct placement at that volume scale**, with no growth
+solves; this is full-size placement only when both values are `1.0`. A larger
+target means **growth from the initial scale to the target**. For example,
+`0.1 -> 1.0` asks the packing engine to grow small initialized copies to full size.
+This label describes the requested run, not a promise that its search will succeed.
+
+Saved packing results show **Recorded direct placement** or **Recorded growth**
+from the saved scales, separately from the current Next run settings. The outcome
+and recorded physical validation still determine whether the requested packing
+completed. Initialization-only summaries remain labeled **Initialized scene**.
+
 Select **Run packing** again without editing any output path. A cancelled or
 failed attempt also consumes its number, even if it fails before creating an
 artifact directory; gaps are expected. Two Studio instances using the same Runs
@@ -94,39 +106,47 @@ its own bounded candidate and geometry budgets. Pre-engine cancellation creates
 no run directory. Engine cancellation can publish a summary-only cancelled run;
 an outcome already committed before a late cancellation remains authoritative.
 
-## A verified full-size run for the supplied meshes
+## A verified growth run for the supplied meshes
 
 For `rc/input_models/ulamok_2kg_simplified.stl` inside
-`rc/containers/10_kg_np.stl`, these settings produced a validated result on
-2026-09-05:
+`rc/containers/10_kg_np.stl`, these settings completed genuine growth with the
+updated packing engine on 2026-09-06:
 
 | Setting | Value |
 | --- | --- |
 | Copies / seed | 10 / 1918 |
-| Initial / target volume scale | 1.0 / 1.0 |
-| Scale steps / time limit | 1 / 300 seconds |
-| Adaptive mesh sampling | Off |
-| Structured initialization fallback | On |
+| Initial / target volume scale | 0.1 / 1.0 |
+| Scale steps / time limit | 9 / 300 seconds |
+| Adaptive mesh sampling | On |
+| Structured initialization fallback | Off |
 
-Choose a Runs folder and select **Run packing**. All ten objects remain at
-their original size, occupy 16.97% of the container volume, and pass full-resolution
-and serialized-output physical validation. The structured initializer already
-reaches the target, so no growth solves are needed. This is a verified placement
-for these inputs, not evidence that every mesh or growth configuration converges.
+Choose a Runs folder and select **Run packing**. The verified run grew all ten
+objects to exactly `1.0`, occupied 16.97% of the container volume, and passed both
+full-resolution physical validation and validation of the float32 coordinates
+written to the output STL files. Engine time was 265.8 seconds in the initial
+acceptance run; three serial benchmark repetitions took 216.3-227.3 seconds total
+on the baseline Windows machine; runtime depends on the machine and inputs. The retained result is
+`build/tranche2-real10-step-retry-experiment/run-summary.json`; see
+[implementation status](STATUS.md) for the complete evidence and current limits.
 
-The same count and seed with initial scale `0.1`, target `1.0`, nine steps,
-adaptive sampling on and fallback off reproducibly reaches a local Ipopt
-iteration limit. Initialization succeeds, but a per-object solve exhausts its
-1,000-iteration allowance while still approaching the first `0.2` barrier.
-Increasing Studio's overall timeout does not increase this separate local limit.
-Disabling adaptive sampling alone also failed in the diagnostic run. Enabling
-fallback alone cannot change a run whose random initialization already succeeded.
+Current builds start each local solve from the existing placement and use exact
+derivatives to help the solver converge. They automatically refine coarse object
+samples or retry smaller growth steps when needed, while preserving the original
+container boundary. Recovery shares the same 300-second engine budget, and a
+successful result still requires final physical and output validation.
 
-The displayed 2.64% is the last committed partial-size state, not the final target
-occupancy. **Recorded physical validation: not recorded** means this unsuccessful
-run never reached final validation; the summary-only output intentionally has no
-packed STL. Reliable `0.1` to `1.0` growth for this case remains unresolved. See
-[status and reproduction evidence](STATUS.md#supplied-ten-object-growth-diagnosis).
+Direct full-size placement remains an alternative for these meshes: use initial
+and target scales `1.0 / 1.0`, one scale step, adaptive sampling off and structured
+initialization fallback on. With the same ten copies and seed, this previously
+verified mode places full-size objects without growth solves. The **Next run**
+line makes this distinction visible before starting.
+
+The earlier `0.1 -> 1.0` run stopped at an Ipopt iteration limit before reaching
+the first barrier. Its displayed 2.64% described a partial state, and **Recorded
+physical validation: not recorded** meant final validation had not run. That
+summary remains useful diagnostic evidence; it does not describe the updated
+default behavior. The CLI's optional `--reference-growth-policy` switch retains
+the earlier growth policy for comparisons and reproducing failures.
 
 ## Inspect geometry and saved runs
 
@@ -173,7 +193,9 @@ The separate smoke driver opens real windows and exercises preview, genuine
 `.1 -> .2` growth, reopening the result, cancellation, closing during active work,
 a malformed saved summary, rerunning after success/cancellation/input failure,
 remembering the Runs folder and next number across a new process, and rerunning
-successfully while preference storage is unusable. It supplies
+successfully while preference storage is unusable. It also exercises full-size
+and reduced-size direct placement, checking that labels update when scales change
+and that successful direct placement performs no growth solves. It supplies
 isolated settings directories beneath its work directory, so the smoke never
 changes your normal Studio preferences. Use a fresh work directory for each run:
 

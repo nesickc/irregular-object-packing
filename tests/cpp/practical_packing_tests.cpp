@@ -2,13 +2,17 @@
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "irop/geometry/collision.hpp"
 #include "irop/geometry/mesh_geometry.hpp"
 #include "irop/geometry/transform.hpp"
+#include "irop/io/stl_io.hpp"
 #include "irop/packing/initialization.hpp"
+#include "irop/packing/pack_scene.hpp"
 #include "irop/packing/packing.hpp"
 #include "support/test_support.hpp"
 
@@ -226,7 +230,8 @@ TEST_CASE("two generated full-size cylinders reach the barrier with bounded loca
     CHECK(result.work.local_solves <= 8);
 }
 
-TEST_CASE("TetGen degeneracy recovery is bounded and observable", "[practical-packing][packing][integration][recovery]")
+TEST_CASE("reference TetGen degeneracy recovery is bounded and observable",
+          "[practical-packing][packing][integration][recovery]")
 {
     const irop::TriangleMesh object = centered(irop::test::cylinder_mesh(0.9, 1.055, 12));
     const irop::TriangleMesh container = irop::test::box_mesh(3.5, 4.0, 2.85);
@@ -244,6 +249,7 @@ TEST_CASE("TetGen degeneracy recovery is bounded and observable", "[practical-pa
     algorithm.max_iterations_per_scale_step = 3;
     algorithm.maximum_rotation_delta_radians = 0.0;
     algorithm.adaptive_sampling = false;
+    algorithm.use_reference_growth_policy = true;
 
     std::vector<irop::PackingProgressPhase> phases;
     irop::PackingCallbacks callbacks;
@@ -367,6 +373,131 @@ TEST_CASE("generated rod packing can use rotation to reach its known feasible or
 
     const irop::PackingResult result = irop::run_packing(object, container, std::move(state), algorithm, limits);
     require_success_at_target(result, 1.0);
+}
+
+[[nodiscard]] irop::PackSceneResult pack_generated_growth_scene(const irop::TriangleMesh& object,
+                                                                const irop::TriangleMesh& container,
+                                                                const std::filesystem::path& directory,
+                                                                const std::uint32_t seed, const std::uint64_t count,
+                                                                const std::uint64_t iterations_per_scale_step = 30)
+{
+    const auto object_path = directory / "object.stl";
+    const auto container_path = directory / "container.stl";
+    irop::write_stl(object_path, object);
+    irop::write_stl(container_path, container);
+    irop::PackOptions options;
+    options.initialization.object_count = count;
+    options.initialization.initial_volume_scale = 0.1;
+    options.initialization.seed = seed;
+    options.initialization.enable_structured_fallback = false;
+    options.algorithm.final_volume_scale = 1.0;
+    options.algorithm.scale_step_count = 9;
+    options.algorithm.max_iterations_per_scale_step = iterations_per_scale_step;
+    options.algorithm.adaptive_sampling = false;
+    options.limits.max_elapsed_time = std::chrono::seconds(30);
+    options.write_individual_objects = true;
+    return irop::pack_scene(object_path, container_path, directory / "result", options);
+}
+
+void require_generated_serialized_growth(const irop::PackSceneResult& result, const std::uint64_t count)
+{
+    INFO(result.packing.diagnostic);
+    CAPTURE(irop::to_string(result.packing.status), result.packing.work.local_solves,
+            result.packing.work.local_solve.iterations, result.packing.work.elapsed_time.count());
+    require_success_at_target(result.packing, 1.0);
+    REQUIRE(result.packing.state.transforms.size() == count);
+    for (const auto& transform : result.packing.state.transforms) {
+        CHECK(transform.volume_scale == 1.0);
+    }
+    CHECK(result.packing.state.config.initial_volume_scale == 0.1);
+    CHECK(result.packing.work.local_solves > 0);
+    REQUIRE(result.packed_objects_path.has_value());
+    REQUIRE(result.container_output_path.has_value());
+    REQUIRE(result.placements_path.has_value());
+    REQUIRE(result.individual_object_paths.size() == count);
+    std::vector<irop::TriangleMesh> published_objects;
+    for (const auto& path : result.individual_object_paths) {
+        const auto loaded = irop::read_stl(path, {});
+        CHECK(loaded.encoding == irop::StlEncoding::binary);
+        published_objects.push_back(loaded.mesh);
+    }
+    const auto published_container = irop::read_stl(*result.container_output_path, {}).mesh;
+    CHECK(irop::validate_scene_collisions(published_objects, published_container).physical_scene_valid());
+}
+
+TEST_CASE("two asymmetric generated cylinders grow fully and publish valid geometry across seeds",
+          "[practical-packing][packing][integration][growth-corpus]")
+{
+    const auto object = packing_cylinder(true);
+    const auto container = packing_container(true);
+    const std::vector<irop::TriangleMesh> known_fit {
+        placed(object, { .translation = { -1.5, 0.0, 0.0 } }
+         ),
+        placed(object, { .translation = { 1.5, 0.0, 0.0 }  }
+         ),
+    };
+    REQUIRE(irop::validate_scene_collisions(known_fit, container).physical_scene_valid());
+    for (const std::uint32_t seed : { 0U, 1918U, 12345U }) {
+        DYNAMIC_SECTION("seed " << seed)
+        {
+            irop::test::TempDirectory temporary;
+            const auto result = pack_generated_growth_scene(object, container, temporary.path(), seed, 2);
+            require_generated_serialized_growth(result, 2);
+        }
+    }
+}
+
+TEST_CASE("two slender generated objects grow fully and publish valid geometry across seeds",
+          "[practical-packing][packing][integration][growth-corpus]")
+{
+    auto object = packing_cylinder(true);
+    for (auto& point : object.vertices) {
+        point.x *= 0.3;
+        point.y *= 0.3;
+        point.z *= 1.8;
+    }
+    const auto container = packing_container(true);
+    const std::vector<irop::TriangleMesh> known_fit {
+        placed(object, { .translation = { -1.5, 0.0, 0.0 } }
+         ),
+        placed(object, { .translation = { 1.5, 0.0, 0.0 }  }
+         ),
+    };
+    REQUIRE(irop::validate_scene_collisions(known_fit, container).physical_scene_valid());
+    for (const std::uint32_t seed : { 0U, 1918U }) {
+        DYNAMIC_SECTION("seed " << seed)
+        {
+            irop::test::TempDirectory temporary;
+            const auto result = pack_generated_growth_scene(object, container, temporary.path(), seed, 2);
+            require_generated_serialized_growth(result, 2);
+        }
+    }
+}
+
+TEST_CASE("an initially small generated object too large at full size cannot publish packing geometry",
+          "[practical-packing][packing][integration][growth-corpus][non-fit]")
+{
+    const auto container = packing_container(true);
+    const double container_volume = irop::ClosedMeshQuery(container).volume();
+    const auto object = irop::scale_mesh_to_volume(packing_cylinder(true), 1.1 * container_volume);
+    REQUIRE(irop::ClosedMeshQuery(object).volume() > container_volume);
+    const std::vector<irop::TriangleMesh> initial_pose { placed(object, { .volume_scale = 0.1 }) };
+    REQUIRE(irop::validate_scene_collisions(initial_pose, container).physical_scene_valid());
+    irop::test::TempDirectory temporary;
+    const auto result = pack_generated_growth_scene(object, container, temporary.path(), 1918, 1, 3);
+    INFO(result.packing.diagnostic);
+    CAPTURE(irop::to_string(result.packing.status));
+    CHECK((result.packing.status == irop::PackingStatus::infeasible ||
+           result.packing.status == irop::PackingStatus::iteration_limit ||
+           result.packing.status == irop::PackingStatus::correction_limit));
+    CHECK_FALSE(result.packed_objects_path.has_value());
+    CHECK_FALSE(result.container_output_path.has_value());
+    CHECK_FALSE(result.placements_path.has_value());
+    CHECK(result.individual_object_paths.empty());
+    CHECK(std::filesystem::is_regular_file(result.run_summary_path));
+    const auto output = result.run_summary_path.parent_path();
+    CHECK_FALSE(std::filesystem::exists(output / "packed-objects.stl"));
+    CHECK_FALSE(std::filesystem::exists(output / "placements.json"));
 }
 
 }  // namespace

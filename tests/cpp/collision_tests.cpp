@@ -131,6 +131,109 @@ TEST_CASE("CAT surface contacts are diagnostic and empty CAT entries are allowed
     }
 }
 
+TEST_CASE("CAT diagnostic budgets leave physical validation complete", "[collision][cat-diagnostics]")
+{
+    const irop::TriangleMesh container = irop::test::cube_mesh(5.0);
+    const std::vector<irop::TriangleMesh> objects {
+        translated(irop::test::cube_mesh(0.5), -1.5),
+        translated(irop::test::cube_mesh(0.5), 1.5),
+    };
+    const std::vector<irop::TriangleMesh> disjoint_cats {
+        translated(irop::test::cube_mesh(0.5), -10.0),
+        translated(irop::test::cube_mesh(0.5), 10.0),
+    };
+    irop::SceneCollisionLimits limits;
+    limits.max_triangle_pair_tests = 288;
+    limits.max_containment_triangle_visits = 24;
+    limits.max_cat_triangle_pair_tests = 288;
+
+    SECTION("complete CAT work has its own exact allowance")
+    {
+        const auto report = irop::validate_scene_collisions(objects, container, disjoint_cats, limits);
+        CHECK(report.physical_scene_valid());
+        CHECK(report.cat_diagnostics_complete);
+        CHECK(report.work.triangle_pairs_tested == 288);
+        CHECK(report.work.cat_triangle_pairs_tested == 288);
+        CHECK(report.work.containment_triangle_visits == 24);
+    }
+
+    SECTION("a CAT query that cannot fit is skipped and completeness is explicit")
+    {
+        limits.max_cat_triangle_pair_tests = 287;
+        const auto report = irop::validate_scene_collisions(objects, container, disjoint_cats, limits);
+        CHECK(report.physical_scene_valid());
+        CHECK_FALSE(report.cat_diagnostics_complete);
+        CHECK(report.cat_violation_object_ids.empty());
+        CHECK(report.work.triangle_pairs_tested == 288);
+        CHECK(report.work.cat_triangle_pairs_tested == 144);
+        CHECK(report.work.containment_triangle_visits == 24);
+    }
+
+    SECTION("an exhausted CAT allowance still evaluates all physical geometry")
+    {
+        limits.max_cat_triangle_pair_tests = 0;
+        const std::vector<irop::TriangleMesh> outside_objects {
+            objects.front(),
+            translated(objects.back(), 10.0),
+        };
+        const auto report = irop::validate_scene_collisions(outside_objects, container, disjoint_cats, limits);
+        CHECK_FALSE(report.physical_scene_valid());
+        CHECK(report.container_violation_object_ids == std::vector<std::uint64_t> { 1 });
+        CHECK_FALSE(report.cat_diagnostics_complete);
+        CHECK(report.work.triangle_pairs_tested == 288);
+        CHECK(report.work.cat_triangle_pairs_tested == 0);
+    }
+
+    SECTION("no requested CAT queries remain complete with a zero allowance")
+    {
+        limits.max_cat_triangle_pair_tests = 0;
+        const std::vector<irop::TriangleMesh> empty_cats(objects.size());
+        const auto report = irop::validate_scene_collisions(objects, container, empty_cats, limits);
+        CHECK(report.physical_scene_valid());
+        CHECK(report.cat_diagnostics_complete);
+        CHECK(report.work.cat_triangle_pairs_tested == 0);
+    }
+
+    SECTION("CAT omission never swallows physical resource exhaustion")
+    {
+        limits.max_cat_triangle_pair_tests = 0;
+        limits.max_triangle_pair_tests = 287;
+        irop::test::require_error_category([&]() {
+            static_cast<void>(irop::validate_scene_collisions(objects, container, disjoint_cats, limits));
+        }, irop::ErrorCategory::resource_limit);
+    }
+
+    SECTION("all CAT inputs are validated even if diagnostics are skipped")
+    {
+        limits.max_cat_triangle_pair_tests = 0;
+        auto malformed_cats = disjoint_cats;
+        malformed_cats.back().triangles.front()[0] = static_cast<std::uint64_t>(malformed_cats.back().vertices.size());
+        irop::test::require_error_category([&]() {
+            static_cast<void>(irop::validate_scene_collisions(objects, container, malformed_cats, limits));
+        }, irop::ErrorCategory::invalid_mesh);
+    }
+}
+
+TEST_CASE("CAT contact reporting leaves the physical violation allowance available", "[collision][cat-diagnostics]")
+{
+    const std::vector<irop::TriangleMesh> objects {
+        irop::test::cube_mesh(0.5),
+        translated(irop::test::cube_mesh(0.5), 10.0),
+    };
+    const auto& cat_surfaces = objects;
+    irop::SceneCollisionLimits limits;
+    limits.max_reported_violations = 1;
+    limits.max_triangle_pair_tests = 288;
+    const auto report = irop::validate_scene_collisions(objects, irop::test::cube_mesh(5.0), cat_surfaces, limits);
+    CHECK(report.cat_violation_object_ids == std::vector<std::uint64_t> { 0 });
+    CHECK_FALSE(report.cat_diagnostics_complete);
+    CHECK(report.container_violation_object_ids == std::vector<std::uint64_t> { 1 });
+    CHECK_FALSE(report.physical_scene_valid());
+    CHECK(report.work.triangle_pairs_tested == 288);
+    CHECK(report.work.cat_triangle_pairs_tested > 0);
+    CHECK(report.work.cat_triangle_pairs_tested <= 144);
+}
+
 TEST_CASE("scene collision validation reports deterministic pair order")
 {
     const std::vector<irop::TriangleMesh> objects {

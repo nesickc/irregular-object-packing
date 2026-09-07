@@ -76,6 +76,7 @@ void accumulate(TetrahedralizationWork& destination, const TetrahedralizationWor
     add_count(destination.input_triangles, source.input_triangles);
     add_count(destination.output_points, source.output_points);
     add_count(destination.output_tetrahedra, source.output_tetrahedra);
+    add_count(destination.omitted_single_participant_tetrahedra, source.omitted_single_participant_tetrahedra);
 }
 
 void accumulate(CatConstructionWork& destination, const CatConstructionWork& source)
@@ -96,6 +97,8 @@ void accumulate(LocalSolveWork& destination, const LocalSolveWork& source)
     add_count(destination.objective_gradient_evaluations, source.objective_gradient_evaluations);
     add_count(destination.constraint_rows_evaluated, source.constraint_rows_evaluated);
     add_count(destination.jacobian_entries_evaluated, source.jacobian_entries_evaluated);
+    add_count(destination.hessian_evaluations, source.hessian_evaluations);
+    add_count(destination.hessian_constraint_rows_evaluated, source.hessian_constraint_rows_evaluated);
     add_count(destination.iterations, source.iterations);
     add_elapsed(destination.elapsed_time, source.elapsed_time);
 
@@ -115,6 +118,7 @@ void accumulate(SceneCollisionWork& destination, const SceneCollisionWork& sourc
 {
     add_count(destination.object_pairs_examined, source.object_pairs_examined);
     add_count(destination.triangle_pairs_tested, source.triangle_pairs_tested);
+    add_count(destination.cat_triangle_pairs_tested, source.cat_triangle_pairs_tested);
     add_count(destination.containment_triangle_visits, source.containment_triangle_visits);
 }
 
@@ -132,6 +136,9 @@ void accumulate(SceneCollisionWork& destination, const SceneCollisionWork& sourc
             configured.max_containment_triangle_visits - consumed.containment_triangle_visits,
         .max_reported_violations = configured.max_reported_violations,
         .max_object_pair_checks = configured.max_object_pair_checks - consumed.object_pairs_examined,
+        .max_cat_triangle_pair_tests =
+            configured.max_cat_triangle_pair_tests -
+            std::min(configured.max_cat_triangle_pair_tests, consumed.cat_triangle_pairs_tested),
     };
 }
 
@@ -401,6 +408,8 @@ PhysicalCollisionCorrectionResult correct_physical_collisions(
         SceneCollisionReport collision = validate_scene_collisions(
             objects, container, cat_surfaces, remaining_collision_limits(cumulative_collision_work, collision_limits));
         accumulate(cumulative_collision_work, collision.work);
+        collision.cat_diagnostics_complete =
+            collision.cat_diagnostics_complete && result.collision.cat_diagnostics_complete;
         result.collision = std::move(collision);
         return stop_status();
     };
@@ -596,6 +605,10 @@ const char* to_string(const PackingProgressPhase phase) noexcept
         return "scale_step_started";
     case PackingProgressPhase::tetrahedralization_recovery:
         return "tetrahedralization_recovery";
+    case PackingProgressPhase::sampling_recovery:
+        return "sampling_recovery";
+    case PackingProgressPhase::step_recovery:
+        return "step_recovery";
     case PackingProgressPhase::local_solve_started:
         return "local_solve_started";
     case PackingProgressPhase::iteration_completed:
@@ -670,6 +683,8 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
         const double scale_increment =
             (config.final_volume_scale - initial_scale) / static_cast<double>(config.scale_step_count);
         std::vector<std::uint64_t> last_cat_violations;
+        std::uint64_t refinement_floor = 0;
+        std::optional<TriangleMesh> preserved_sampled_container;
 
         for (std::uint64_t scale_step = 0; scale_step < config.scale_step_count; ++scale_step) {
             const double target_scale = scale_step + 1 == config.scale_step_count
@@ -699,6 +714,7 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
             }
 
             TriangleMesh sampled_object = centered_object;
+            bool sampled_object_is_original = true;
             TriangleMesh sampled_container = container;
             if (config.adaptive_sampling) {
                 const SurfaceResamplingLimits resampling_limits = effective_resampling_limits(limits);
@@ -708,6 +724,7 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                     return resample_closed_surface(centered_object, object_target, resampling_limits);
                 });
                 increment(result.work.resampling_operations);
+                sampled_object_is_original = !object_result.changed;
                 sampled_object = std::move(object_result.mesh);
                 if (object_result.actual_triangle_count != sampled_object.triangles.size()) {
                     return finish(PackingStatus::internal_failure,
@@ -717,23 +734,47 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                     return stop_result(*status);
                 }
 
-                const std::uint64_t container_target = target_container_triangle_count(
-                    sampled_object, container, 4, config.sampling.minimum_triangle_count);
-                SurfaceResamplingResult container_result = measure_stage(result.work.stage_timings.resampling, [&] {
-                    return resample_closed_surface(container, container_target, resampling_limits);
-                });
-                increment(result.work.resampling_operations);
-                sampled_container = std::move(container_result.mesh);
-                if (container_result.actual_triangle_count != sampled_container.triangles.size()) {
-                    return finish(PackingStatus::internal_failure,
-                                  "container resampling returned inconsistent triangle metadata");
+                if (preserved_sampled_container.has_value()) {
+                    sampled_container = *preserved_sampled_container;
+                }
+                else {
+                    const std::uint64_t container_target = target_container_triangle_count(
+                        sampled_object, container, 4, config.sampling.minimum_triangle_count);
+                    SurfaceResamplingResult container_result = measure_stage(result.work.stage_timings.resampling, [&] {
+                        return resample_closed_surface(container, container_target, resampling_limits,
+                                                       config.use_reference_growth_policy
+                                                           ? SurfaceResamplingMode::reference
+                                                           : SurfaceResamplingMode::preserve_surface);
+                    });
+                    increment(result.work.resampling_operations);
+                    sampled_container = std::move(container_result.mesh);
+                    if (container_result.actual_triangle_count != sampled_container.triangles.size()) {
+                        return finish(PackingStatus::internal_failure,
+                                      "container resampling returned inconsistent triangle metadata");
+                    }
+                    if (!config.use_reference_growth_policy) {
+                        // DEVIATION(IROP-DEV-0034): Growing objects do not require
+                        // denser samples of unchanged planar container faces.
+                        // Preserve the first barrier's surface sites across growth.
+                        preserved_sampled_container = sampled_container;
+                    }
                 }
                 if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
                     return stop_result(*status);
                 }
             }
 
+            if (config.adaptive_sampling && sampled_object.triangles.size() < refinement_floor) {
+                SurfaceResamplingResult refined = measure_stage(result.work.stage_timings.resampling, [&] {
+                    return resample_closed_surface(centered_object, refinement_floor,
+                                                   effective_resampling_limits(limits));
+                });
+                sampled_object_is_original = !refined.changed;
+                sampled_object = std::move(refined.mesh);
+                increment(result.work.resampling_operations);
+            }
             require_scene_mesh_budget(sampled_object, object_count, limits.intermediate_mesh_limits, "sampled packing");
+            std::vector<unsigned> physical_backoffs(static_cast<std::size_t>(object_count), 0);
             bool scale_step_completed = false;
             for (std::uint64_t iteration = 0; iteration < config.max_iterations_per_scale_step; ++iteration) {
                 increment(result.work.iterations);
@@ -754,7 +795,9 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                 increment(result.work.tetrahedralization_attempts);
                 TetrahedralizationResult tetrahedralization =
                     measure_stage(result.work.stage_timings.tetrahedralization, [&] {
-                    return tetrahedralize_surfaces(participants, limits.tetrahedralization);
+                    return tetrahedralize_surfaces(
+                        participants, limits.tetrahedralization,
+                        { .omit_degenerate_single_participant_tetrahedra = !config.use_reference_growth_policy });
                 });
                 accumulate(result.work.tetrahedralization, tetrahedralization.work);
                 std::optional<std::size_t> recovery_record_index;
@@ -845,6 +888,13 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                 }
 
                 for (std::uint64_t object = 0; object < object_count; ++object) {
+                    // DEVIATION(IROP-DEV-0028): A completed object already has a
+                    // physically checked pose. Preserve it while its neighbors grow.
+                    if (!config.use_reference_growth_policy &&
+                        result.state.transforms[static_cast<std::size_t>(object)].volume_scale >= target_scale) {
+                        accepted_transforms.push_back(result.state.transforms[static_cast<std::size_t>(object)]);
+                        continue;
+                    }
                     if (result.work.local_solves >= limits.max_total_local_solves) {
                         return finish(PackingStatus::resource_exhausted,
                                       "packing total local-solve limit was exhausted");
@@ -872,18 +922,36 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                     LocalSolveRequest request;
                     request.participant = static_cast<ParticipantId>(object);
                     request.current_transform = result.state.transforms[static_cast<std::size_t>(object)];
-                    request.initial_guess = initial_guess;
+                    // DEVIATION(IROP-DEV-0028): Shrinking toward the object center
+                    // can violate per-vertex CAT halfspaces. Start at the current pose.
+                    request.initial_guess = config.use_reference_growth_policy ? initial_guess : LocalTransformStep {};
+                    // DEVIATION(IROP-DEV-0030): Exact local curvature avoids the measured
+                    // limited-memory stalls while retaining the same strict postchecks.
+                    request.use_exact_hessian = !config.use_reference_growth_policy;
                     request.bounds.minimum_volume_scale_multiplier = initial_scale;
-                    // DEVIATION(IROP-DEV-0023): Stop the local objective near
-                    // the active barrier instead of optimizing irrelevant
-                    // growth and clamping it only after the solve. Fixed,
-                    // representable slack lets Ipopt cross the exact barrier;
-                    // extreme ratios saturate below the adapter's finite-bound
-                    // sentinel and advance over bounded packing iterations.
-                    request.bounds.maximum_volume_scale_multiplier = detail::barrier_volume_scale_multiplier_bound(
+                    // DEVIATION(IROP-DEV-0029): Removing artificial barrier slack
+                    // avoids making a feasible pose infeasible through scale clamping.
+                    // The independently checked exact-target snap remains available.
+                    const double reference_bound = detail::barrier_volume_scale_multiplier_bound(
                         request.current_transform.volume_scale, target_scale);
+                    request.bounds.maximum_volume_scale_multiplier =
+                        config.use_reference_growth_policy
+                            ? reference_bound
+                            : std::min(reference_bound, target_scale / request.current_transform.volume_scale);
                     request.bounds.maximum_absolute_rotation_delta_radians = effective_rotation_bound;
                     request.bounds.maximum_absolute_translation = effective_translation_bound;
+                    const unsigned backoffs = physical_backoffs[static_cast<std::size_t>(object)];
+                    if (backoffs > 0) {
+                        // DEVIATION(IROP-DEV-0035): Retry a physically rejected
+                        // full-surface trial with smaller bounded local motion.
+                        const double fraction = std::ldexp(1.0, -static_cast<int>(backoffs));
+                        request.bounds.maximum_absolute_rotation_delta_radians *= fraction;
+                        request.bounds.maximum_absolute_translation = effective_translation_bound * fraction;
+                        const double volume_increment = target_scale * (0.1 * fraction);
+                        const double multiplier = 1.0 + volume_increment / request.current_transform.volume_scale;
+                        request.bounds.maximum_volume_scale_multiplier =
+                            std::min(*request.bounds.maximum_volume_scale_multiplier, multiplier);
+                    }
                     request.padding = config.padding;
                     request.maximum_result_volume_scale = target_scale;
                     request.tolerance = config.local_solve_tolerance;
@@ -966,14 +1034,84 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                 // DEVIATION(IROP-DEV-0019): Sampled surfaces remain an
                 // optimization input, but physical collision correction is
                 // decided from the full-resolution object and container.
+                const bool try_smaller_step = !config.use_reference_growth_policy && sampled_object_is_original;
+                const auto correct_candidate = [&](std::vector<Transform>&& transforms,
+                                                   const std::uint64_t maximum_correction_passes) {
+                    try {
+                        return measure_stage(result.work.stage_timings.correction, [&] {
+                            return detail::correct_physical_collisions(
+                                centered_object, container, cat_surfaces, std::move(transforms),
+                                config.correction_volume_scale_factor, maximum_correction_passes,
+                                result.state.config.output_mesh_limits, limits.collision, result.work.collision,
+                                result.work.correction_passes, stopped);
+                        });
+                    }
+                    catch (...) {
+                        // DEVIATION(IROP-DEV-0032): An interrupted query cannot
+                        // certify CAT completeness, even when its report is lost.
+                        if (std::any_of(cat_surfaces.begin(), cat_surfaces.end(), [](const TriangleMesh& surface) {
+                            return !surface.vertices.empty() || !surface.triangles.empty();
+                        })) {
+                            result.cat_diagnostics_complete = false;
+                        }
+                        throw;
+                    }
+                };
                 detail::PhysicalCollisionCorrectionResult correction =
-                    measure_stage(result.work.stage_timings.correction, [&] {
-                    return detail::correct_physical_collisions(
-                        centered_object, container, cat_surfaces, std::move(candidate_state.transforms),
-                        config.correction_volume_scale_factor, limits.max_correction_passes_per_iteration,
-                        result.state.config.output_mesh_limits, limits.collision, result.work.collision,
-                        result.work.correction_passes, stopped);
-                });
+                    correct_candidate(std::move(candidate_state.transforms),
+                                      try_smaller_step ? 0 : limits.max_correction_passes_per_iteration);
+                const auto record_cat_completeness = [&](const SceneCollisionReport& collision) {
+                    if (!collision.cat_diagnostics_complete && result.cat_diagnostics_complete) {
+                        result.cat_diagnostics_complete = false;
+                        result.warnings.emplace_back(
+                            "CAT contact diagnostics reached their separate work allowance; physical checks retain "
+                            "their full allowance");
+                    }
+                };
+                record_cat_completeness(correction.collision);
+                if (try_smaller_step && correction.status == PackingStatus::correction_limit) {
+                    std::vector<bool> colliding(static_cast<std::size_t>(object_count), false);
+                    const auto mark_colliding = [&](const std::uint64_t object) {
+                        if (object >= object_count) {
+                            throw Error(ErrorCategory::internal, "physical retry received an invalid object ID");
+                        }
+                        colliding[static_cast<std::size_t>(object)] = true;
+                    };
+                    for (const auto object : correction.collision.container_violation_object_ids) {
+                        mark_colliding(object);
+                    }
+                    for (const auto& pair : correction.collision.object_collisions) {
+                        mark_colliding(pair.first);
+                        mark_colliding(pair.second);
+                    }
+                    bool retry = false;
+                    for (std::size_t object = 0; object < colliding.size(); ++object) {
+                        if (colliding[object] && physical_backoffs[object] < 4 &&
+                            result.state.transforms[object].volume_scale < target_scale) {
+                            ++physical_backoffs[object];
+                            retry = true;
+                        }
+                    }
+                    if (retry) {
+                        increment(result.work.physical_step_retries);
+                        if (result.work.physical_step_retries == 1) {
+                            result.warnings.emplace_back(
+                                "physically rejected trials retried with bounded smaller growth and motion");
+                        }
+                        progress.phase = PackingProgressPhase::step_recovery;
+                        progress.object_id.reset();
+                        emit_progress();
+                        if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
+                            return stop_result(*status);
+                        }
+                        // The complete candidate and its RNG draws are discarded.
+                        // The next counted iteration starts from the valid committed scene.
+                        continue;
+                    }
+                    correction =
+                        correct_candidate(std::move(correction.transforms), limits.max_correction_passes_per_iteration);
+                    record_cat_completeness(correction.collision);
+                }
                 if (!correction.succeeded()) {
                     if (correction.status == PackingStatus::cancelled ||
                         correction.status == PackingStatus::time_limit) {
@@ -1013,6 +1151,32 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                 emit_progress();
                 if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
                     return stop_result(*status);
+                }
+                if (!config.use_reference_growth_policy && config.adaptive_sampling && correction_passes > 0 &&
+                    sampled_object.triangles.size() < centered_object.triangles.size()) {
+                    // DEVIATION(IROP-DEV-0031): Refine a coarse optimization surface
+                    // after physical correction; retain the container sampling and
+                    // the existing cumulative work and iteration limits.
+                    const std::uint64_t current_count = sampled_object.triangles.size();
+                    const std::uint64_t original_count = centered_object.triangles.size();
+                    refinement_floor = current_count + std::min(current_count, original_count - current_count);
+                    SurfaceResamplingResult refined = measure_stage(result.work.stage_timings.resampling, [&] {
+                        return resample_closed_surface(centered_object, refinement_floor,
+                                                       effective_resampling_limits(limits));
+                    });
+                    sampled_object_is_original = !refined.changed;
+                    sampled_object = std::move(refined.mesh);
+                    require_scene_mesh_budget(sampled_object, object_count, limits.intermediate_mesh_limits,
+                                              "adaptive recovery");
+                    increment(result.work.resampling_operations);
+                    increment(result.work.sampling_refinements);
+                    result.warnings.emplace_back(
+                        "adaptive object sampling refined after physical collision correction");
+                    progress.phase = PackingProgressPhase::sampling_recovery;
+                    emit_progress();
+                    if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
+                        return stop_result(*status);
+                    }
                 }
                 if (objects_at_target == object_count) {
                     increment(result.work.completed_scale_steps);

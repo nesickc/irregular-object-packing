@@ -1,17 +1,17 @@
 # Improvement plan after Milestone 8
 
-Date: 2026-09-05. Status: tranche 1 is Verified with the evidence in
-[STATUS.md](STATUS.md#tranche-1-repeatable-runs-and-bounded-diagnostics). Tranches 2-4 remain planned.
+Updated: 2026-09-06. Status: tranches 1 and 2 are Verified with the evidence in
+[STATUS.md](STATUS.md). Tranches 3-4 remain planned.
 The requested scale target is 100-300 objects first, followed by 1,000.
 Historical milestone acceptance remains recorded in [STATUS.md](STATUS.md).
 This plan groups follow-up work without retroactively expanding those milestones.
 
 ## Recommendation and order
 
-The most important engineering task is reliable growth to full size. Deliver
-automatic run folders as a small independent change while gathering the solver
-evidence. Establish representative performance baselines during this first work,
-then optimize for 100-300 objects and extend to 1,000 on measured evidence.
+Automatic run folders and reliable full-size growth for the supplied ten-object
+case are delivered. The next engineering task is complete, validated performance
+for 100-300 objects, followed by 1,000. Profile representative fixed-density and
+increasing-density workloads before selecting further optimizations.
 
 | Tranche | Related outcome | Priority and dependency | Completion evidence |
 | --- | --- | --- | --- |
@@ -35,15 +35,15 @@ Current code and retained results take precedence over historical diagnoses.
 
 | Issue | Assessment | Treatment |
 | --- | --- | --- |
-| Ten-object growth stops at a local iteration limit | Critical practical failure; initialization succeeds but full-size growth has no demonstrated fix | Tranches 1-2 |
+| Ten-object growth stops at a local iteration limit | Original critical failure resolved for the supplied case: three exact-target, validated growth successes | Verified in tranche 2; broader convergence remains corpus-dependent |
 | Studio reused the previous output name | Confirmed everyday workflow defect; numbered allocation is now implemented | Verified in tranche 1 |
 | Output destination was checked after packing | Confirmed wasted-computation risk; early preflight is now implemented | Verified in tranche 1, including authoritative final publication checks |
-| Generic solver/TetGen diagnostics; aggregate-only solve metrics | Bounded context, traces and replay are implemented; the numerical cause still needs diagnosis | Capture/replay verified; tranche 2 experiments follow |
+| Generic solver/TetGen diagnostics; aggregate-only solve metrics | Bounded context, traces and replay are implemented; isolated start/bound/Hessian evidence informs the selected policy | Verified in tranches 1-2 |
 | No representative many-object growth measurements | Real-STL multi-object harness is now implemented; 100/300 throughput remains unproven | Baseline starts in tranche 1; acceptance expands in tranches 3-4 |
 | All object pairs still enumerated; exact triangle checks can be quadratic | Credible scaling candidates, not yet proven dominant in real growth | Profile in tranche 3, then accelerate the measured work |
 | Repeated query construction, validation and geometry copies | Credible CPU/memory cost | Profile and reuse immutable data in tranche 3 |
-| Adaptive sampling greatly refines coarse containers | Relevant to both convergence and work; disabling it alone did not fix the reported failure | Compare in tranche 2, introduce measured geometry-aware budgets in tranche 3 if justified |
-| Regular points can produce invalid TetGen tetrahedra | Existing bounded recovery is incomplete and hides its original reason | Diagnostics in tranche 1; fixture-driven recovery work in tranche 2 |
+| Adaptive sampling greatly refines coarse containers | Measured container shrinkage and oversampling blocked growth; preserved double midpoint sampling and reuse resolve those cases | Verified in tranche 2; extend only when tranche-3 profiles justify it |
+| Regular points can produce invalid TetGen tetrahedra | Original reason is retained; guarded irrelevant internal-cell omission handles the demonstrated case, with strict mixed-owner rejection | Verified in tranche 2; geometry perturbation and PLC remain unselected |
 | Greedy random initialization and six-orientation grid miss feasible arrangements | Demonstrated grid cases are fixed, but general search quality is incomplete | Use known-feasible failures to justify bounded restart/offset/orientation work; larger search redesign remains later |
 | Studio display limits can reject larger valid results | Conditional on mesh detail, not object count alone | Measure load/render memory in tranches 3-4; retain full-quality output |
 | Native dependency calls cannot be forcibly interrupted or hard memory-capped | Real architecture limitation, not a promised immediate fix | Record cancellation latency and peak memory; consider process isolation only if measured requirements demand it |
@@ -52,7 +52,7 @@ Current code and retained results take precedence over historical diagnoses.
 | GL2PS download fallback, narrow VTK patch and native-tool warning | Documented maintenance concerns with working local builds | Revisit at a dependency update or actual clean-machine failure |
 | Cavities/multiple solids, editing/animation, cross-platform UI, public packaging | New capability or distribution scope | Deferred; not prerequisites for the selected counts |
 
-The recent ten-object run failed after 19 local solves and 4,499 aggregate Ipopt
+The original reviewed ten-object run failed after 19 local solves and 4,499 aggregate Ipopt
 iterations. Reproduction took 22.29 seconds. Full-size structured placement of the
 same objects succeeds, but performs zero growth solves. These are distinct
 capabilities. See [the diagnosis](STATUS.md#supplied-ten-object-growth-diagnosis).
@@ -185,11 +185,34 @@ paths for user meshes;
 across the corpus. Starting at full size or lowering the target does not satisfy
 this growth gate. Preserve existing verified cases or document justified deviations.
 
+### Implemented and verified outcome (2026-09-06)
+
+The supplied genuine-growth gate now passes within the original 300-second engine
+budget, with ten exact full-size objects and both physical validation gates.
+[ADR-0016](adr/0016-current-pose-exact-derivatives-and-growth-recovery.md) records
+current-pose starts, exact scale bounds/Hessians, progressive object refinement,
+surface-preserving container sampling/reuse, guarded internal-cell omission and
+bounded smaller-step physical retries. Reference solver/sampling/recovery policies
+remain reproducible through the explicit CLI switch. Diagnostic CAT work is bounded
+separately; measured physical work requires a one-billion engine pair allowance,
+with unchanged time/local limits. The generated corpus and all three supported
+build/test matrices pass. Three independent complete-run repetitions succeed in
+216.343/221.492/227.274 seconds with identical placements and work; both physical
+gates, export and loading pass. The [tracked measurement ledger](../benchmarks/results/windows-20260906-tranche2.json)
+retains all samples and the original failed baseline; STATUS records the final
+reporting-only fix and verification limits.
+
+The measured container fidelity/reuse changes were pulled forward from tranche 3
+because they directly blocked the ten-object acceptance run. Local solves account
+for 94% of the accepted run; the next tranche must profile complete 100/300-object
+workloads before choosing its detailed optimizations.
+
 ## Tranche 3: Practical 100-300-object workloads
 
 Build profiles on complete successful workloads, then choose the highest-cost
-paths. Implementation candidates, in likely order subject to those profiles:
+paths. Implementation candidates, subject to those profiles (tranche 2 measured local solves as the dominant ten-object cost):
 
+- Measure local constraint preparation, callback evaluation and solver linear algebra separately; compare dependency thread settings as well as orchestration. The ten-object baseline consumes roughly 16 process-CPU seconds per wall second under library defaults. Reduce proved redundant work without changing feasible geometry.
 - Reuse immutable container queries and prepared geometry; eliminate redundant
   deep copies and repeated conversions/validations. Extend workspace lifetime
   where measured: local solve buffers already exist and are reused across objects,
@@ -200,9 +223,7 @@ paths. Implementation candidates, in likely order subject to those profiles:
 - Bound index build/traversal/candidate work and intermediate memory, including
   worst-case overlap. Define new work counters explicitly: accelerated candidate
   counts cannot retain the old meaning of enumerating every possible pair.
-- Measure adaptive object/container sampling separately. Avoid excessive container
-  refinement and cache repeatable resampling only when geometric behavior is
-  understood; final acceptance always uses full-resolution and serialized geometry.
+- Measure adaptive object/container sampling separately. Extend the tranche-2 surface-preserving container reuse where measurements justify it; final acceptance always uses full-resolution and serialized geometry.
 - Measure export and Studio load/render as part of a usable result, including
   cancellation latency. Improve geometry transfer/copy costs before adding a new
   rendering representation or increasing display limits.

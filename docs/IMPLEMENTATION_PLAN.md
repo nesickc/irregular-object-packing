@@ -261,8 +261,11 @@ The sequence is: (1) repeatable runs and useful diagnostics, (2) reliable
 packing growth, (3) practical 100-300-object performance, (4) extension to 1,000.
 Tranche 1 is now Verified under ADR-0015: numbered runs/preflight, bounded
 diagnostics/replay and real-STL measurement foundations pass the evidence gates
-recorded in STATUS. Tranches 2-4 remain planned. Hosted CI is a parallel acceptance
-item. Historical milestone scope and verification remain unchanged.
+recorded in STATUS. Tranche 2 is Verified under ADR-0016: current-pose/exact-derivative
+growth, bounded sampling/physical recovery and preserved container sampling pass
+the supplied ten-object gate in three independent runs under 300 seconds, with
+both physical gates and a generated regression corpus. Tranches 3-4 remain planned.
+Hosted CI is a parallel acceptance item. Historical milestone scope and verification remain unchanged.
 
 ## Milestone Change Policy
 

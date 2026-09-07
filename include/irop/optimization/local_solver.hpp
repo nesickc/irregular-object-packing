@@ -15,6 +15,7 @@
 namespace irop {
 
 inline constexpr std::size_t local_solve_variable_count = 7;
+inline constexpr std::size_t local_solve_hessian_nonzero_count = 10;
 inline constexpr double maximum_local_solve_tolerance = 1.0e-6;
 inline constexpr double maximum_local_solve_bound_magnitude_exclusive = 1.0e19;
 inline constexpr double local_solve_barrier_relative_slack = 20.0 * maximum_local_solve_tolerance;
@@ -51,6 +52,8 @@ struct LocalSolveLimits {
 
     std::uint64_t max_constraints = default_max_constraints;
     std::uint64_t max_dense_jacobian_entries = default_max_dense_jacobian_entries;
+    // Includes constraint values, accepted-transform checks, and weighted rows
+    // prepared for exact Hessian callbacks.
     std::uint64_t max_constraint_rows_evaluated = default_max_constraint_rows_evaluated;
     std::uint64_t max_jacobian_entries_evaluated = default_max_jacobian_entries_evaluated;
     std::uint64_t max_iterations = default_max_iterations;
@@ -65,6 +68,7 @@ struct LocalSolveRequest {
     double padding = 0.0;
     double maximum_result_volume_scale = 1.0;
     double tolerance = maximum_local_solve_tolerance;
+    bool use_exact_hessian = false;
 };
 
 enum class LocalSolveStatus {
@@ -93,6 +97,9 @@ struct LocalSolveWork {
     std::chrono::milliseconds elapsed_time {};
     std::optional<double> minimum_solver_constraint;
     std::optional<double> minimum_applied_constraint;
+    std::uint64_t hessian_evaluations = 0;
+    // Subset of constraint_rows_evaluated, not additional unbudgeted work.
+    std::uint64_t hessian_constraint_rows_evaluated = 0;
 };
 
 struct LocalSolveTraceRecord {
@@ -165,6 +172,13 @@ private:
 [[nodiscard]] double evaluate_local_constraint(const Point3& object_center, const LocalPlaneConstraint& constraint,
                                                double padding, const LocalTransformStep& step);
 [[nodiscard]] std::array<double, local_solve_variable_count> evaluate_local_constraint_gradient(
+    const Point3& object_center, const LocalPlaneConstraint& constraint, double padding,
+    const LocalTransformStep& step);
+
+// Lower-triangle entries (00, 10, 11, 20, 21, 22, 30, 31, 32, 33),
+// for volume multiplier and x/y/z rotation. All translation second derivatives
+// vanish because translation enters the constraint linearly.
+[[nodiscard]] std::array<double, local_solve_hessian_nonzero_count> evaluate_local_constraint_hessian(
     const Point3& object_center, const LocalPlaneConstraint& constraint, double padding,
     const LocalTransformStep& step);
 

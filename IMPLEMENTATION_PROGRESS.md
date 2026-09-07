@@ -1,10 +1,24 @@
 # C++ Migration Implementation Progress
 
-Last updated: 2026-09-05
+Last updated: 2026-09-06
 
 This working report tracks execution of `docs/IMPLEMENTATION_PLAN.md`. The concise,
 authoritative project status remains in `docs/STATUS.md`; this file records the more
 detailed implementation trail requested for the migration.
+
+## Post-milestone improvements
+
+Tranches 1 and 2 are Verified. Numbered Studio runs and bounded replay diagnostics
+are followed by current-pose/exact-Hessian growth, preserved container sampling,
+progressive object refinement and bounded physical step retries under ADR-0016.
+The supplied ten-object `.1 -> 1.0`, seed-1918 case now succeeds in three of three
+measured runs, with exact target scales, both physical validation gates and saved
+loading; median total is 221.492 seconds within the 300-second engine envelope.
+Final Debug/Release/Ninja matrices each have 243 passed and one existing symlink
+skip out of 244 tests. The [authoritative status](docs/STATUS.md) records complete
+verification, compatibility changes, measurement provenance and remaining limits.
+Tranches 3-4 target 100-300 objects and then 1,000; this ten-object result does not
+establish that throughput. Historical migration evidence below remains unchanged.
 
 ## Current Position
 

@@ -94,6 +94,11 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 1e-06
+        },
+        "use_exact_hessian": {
+          "type": "boolean",
+          "default": false,
+          "description": "Optional for historical snapshots. Omission preserves the original limited-memory Hessian policy."
         }
       }
     },

@@ -15,6 +15,7 @@
 #include "irop/geometry/mesh_geometry.hpp"
 #include "irop/model/mesh_validation.hpp"
 #include "irop/tetrahedralization/tetrahedralization.hpp"
+#include "tetrahedralization/output_validation.hpp"
 
 namespace irop {
 namespace {
@@ -77,16 +78,13 @@ constexpr char tetgen_switches[] = "O0/0Q";
     return left.x * right.x + left.y * right.y + left.z * right.z;
 }
 
-[[nodiscard]] bool tetrahedron_is_nondegenerate(const Tetrahedron& tetrahedron,
-                                                const std::vector<Point3>& points) noexcept
+[[nodiscard]] double tetrahedron_determinant(const Tetrahedron& tetrahedron, const std::vector<Point3>& points) noexcept
 {
     const Point3& first = points[static_cast<std::size_t>(tetrahedron[0])];
     const Point3& second = points[static_cast<std::size_t>(tetrahedron[1])];
     const Point3& third = points[static_cast<std::size_t>(tetrahedron[2])];
     const Point3& fourth = points[static_cast<std::size_t>(tetrahedron[3])];
-    const double signed_six_times_volume =
-        dot(subtract(second, first), cross(subtract(third, first), subtract(fourth, first)));
-    return std::isfinite(signed_six_times_volume) && signed_six_times_volume != 0.0;
+    return dot(subtract(second, first), cross(subtract(third, first), subtract(fourth, first)));
 }
 
 [[nodiscard]] TetrahedralizationStatus status_for_tetgen_code(const int code) noexcept
@@ -267,12 +265,10 @@ constexpr char tetgen_switches[] = "O0/0Q";
     };
 }
 
-[[nodiscard]] TetrahedralizationResult translate_output(const tetgenio& output,
-                                                        const std::span<const TriangleMesh> participants,
-                                                        std::vector<ParticipantId> input_point_owners,
-                                                        const std::uint64_t participant_count,
-                                                        const TetrahedralizationLimits& limits,
-                                                        TetrahedralizationWork work)
+[[nodiscard]] TetrahedralizationResult translate_output(
+    const tetgenio& output, const std::span<const TriangleMesh> participants,
+    std::vector<ParticipantId> input_point_owners, const std::uint64_t participant_count,
+    const TetrahedralizationLimits& limits, TetrahedralizationWork work, const TetrahedralizationOptions& options)
 {
     if (output.numberofpoints < 0 || output.numberoftetrahedra < 0) {
         return failure(TetrahedralizationStatus::dependency_failure, work, "TetGen returned a negative output count");
@@ -345,13 +341,14 @@ constexpr char tetgen_switches[] = "O0/0Q";
             }
             tetrahedron[corner] = static_cast<MeshIndex>(point_index);
         }
-        if (tetrahedron[0] == tetrahedron[1] || tetrahedron[0] == tetrahedron[2] || tetrahedron[0] == tetrahedron[3] ||
-            tetrahedron[1] == tetrahedron[2] || tetrahedron[1] == tetrahedron[3] || tetrahedron[2] == tetrahedron[3] ||
-            !tetrahedron_is_nondegenerate(tetrahedron, mesh.points)) {
+        if (!detail::append_validated_tetrahedron(tetrahedron, mesh, options, work)) {
             return failure(TetrahedralizationStatus::dependency_failure, work,
                            "TetGen returned a degenerate tetrahedron");
         }
-        mesh.tetrahedra.push_back(tetrahedron);
+    }
+    if (mesh.tetrahedra.empty()) {
+        return failure(TetrahedralizationStatus::dependency_failure, work,
+                       "TetGen produced no usable tetrahedra after single-participant recovery");
     }
 
     return {
@@ -365,6 +362,59 @@ constexpr char tetgen_switches[] = "O0/0Q";
 }
 
 }  // namespace
+
+namespace detail {
+
+bool append_validated_tetrahedron(const Tetrahedron& tetrahedron, TetrahedralMesh& mesh,
+                                  const TetrahedralizationOptions& options, TetrahedralizationWork& work)
+{
+    if (mesh.points.size() != mesh.point_owners.size()) {
+        return false;
+    }
+    for (std::size_t corner = 0; corner < tetrahedron.size(); ++corner) {
+        const MeshIndex index = tetrahedron[corner];
+        if (index >= mesh.points.size()) {
+            return false;
+        }
+        for (std::size_t previous = 0; previous < corner; ++previous) {
+            if (tetrahedron[previous] == index) {
+                return false;
+            }
+        }
+        const Point3& point = mesh.points[static_cast<std::size_t>(index)];
+        if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z) ||
+            mesh.point_owners[static_cast<std::size_t>(index)] >= mesh.participant_count) {
+            return false;
+        }
+    }
+    const double determinant = tetrahedron_determinant(tetrahedron, mesh.points);
+    if (!std::isfinite(determinant)) {
+        return false;
+    }
+    if (determinant == 0.0) {
+        if (!options.omit_degenerate_single_participant_tetrahedra) {
+            return false;
+        }
+        const ParticipantId first_owner = mesh.point_owners[static_cast<std::size_t>(tetrahedron[0])];
+        for (const MeshIndex index : tetrahedron) {
+            if (mesh.point_owners[static_cast<std::size_t>(index)] != first_owner) {
+                return false;
+            }
+        }
+        if (work.omitted_single_participant_tetrahedra == std::numeric_limits<std::uint64_t>::max()) {
+            return false;
+        }
+        // DEVIATION(IROP-DEV-0033): Rounded-zero cells can occur inside one
+        // participant's nearly coplanar surface. They contribute no CAT faces
+        // or constraints, so packing can omit them without moving any point.
+        ++work.omitted_single_participant_tetrahedra;
+        return true;
+    }
+    mesh.tetrahedra.push_back(tetrahedron);
+    return true;
+}
+
+}  // namespace detail
 
 const char* to_string(const TetrahedralizationStatus status) noexcept
 {
@@ -382,7 +432,8 @@ const char* to_string(const TetrahedralizationStatus status) noexcept
 }
 
 TetrahedralizationResult tetrahedralize_surfaces(const std::span<const TriangleMesh> participants,
-                                                 const TetrahedralizationLimits& limits)
+                                                 const TetrahedralizationLimits& limits,
+                                                 const TetrahedralizationOptions& options)
 {
     TetrahedralizationWork work;
     try {
@@ -410,7 +461,7 @@ TetrahedralizationResult tetrahedralize_surfaces(const std::span<const TriangleM
         }
 
         return translate_output(output, participants, std::move(input_point_owners), work.input_participants, limits,
-                                work);
+                                work, options);
     }
     catch (const std::bad_alloc&) {
         return failure(TetrahedralizationStatus::resource_exhausted, work,

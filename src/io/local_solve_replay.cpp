@@ -28,9 +28,13 @@ constexpr std::uint64_t maximum_constraints = 100'000;
     throw Error(ErrorCategory::input_io, std::string("invalid local-solve snapshot: ") + reason);
 }
 
-void exact_members(const Json& value, const std::initializer_list<const char*> names)
+void exact_members(const Json& value, const std::initializer_list<const char*> names,
+                   const std::initializer_list<const char*> optional_names = {})
 {
-    if (!value.is_object() || value.size() != names.size()) {
+    const auto optional_count = std::count_if(optional_names.begin(), optional_names.end(), [&](const char* name) {
+        return value.contains(name);
+    });
+    if (!value.is_object() || value.size() != names.size() + static_cast<std::size_t>(optional_count)) {
         invalid("unexpected or missing object fields");
     }
     for (const char* name : names) {
@@ -136,6 +140,7 @@ void array_size(const Json& value, const std::size_t count)
               { "padding", request.padding },
               { "maximum_result_volume_scale", request.maximum_result_volume_scale },
               { "tolerance", request.tolerance },
+              { "use_exact_hessian", request.use_exact_hessian },
           }                                        },
         { "limits",
          {
@@ -232,8 +237,10 @@ LocalSolveSnapshot read_local_solve_snapshot(const std::filesystem::path& path,
             invalid("unsupported kind or schema version");
         }
         const auto& request_json = root.at("request");
-        exact_members(request_json, { "participant", "current_transform", "initial_guess", "bounds", "padding",
-                                      "maximum_result_volume_scale", "tolerance" });
+        exact_members(request_json,
+                      { "participant", "current_transform", "initial_guess", "bounds", "padding",
+                        "maximum_result_volume_scale", "tolerance" },
+                      { "use_exact_hessian" });
         LocalSolveSnapshot result;
         auto& request = result.request;
         const auto participant = integer(request_json.at("participant"));
@@ -264,6 +271,13 @@ LocalSolveSnapshot read_local_solve_snapshot(const std::filesystem::path& path,
         request.padding = number(request_json.at("padding"));
         request.maximum_result_volume_scale = number(request_json.at("maximum_result_volume_scale"));
         request.tolerance = number(request_json.at("tolerance"));
+        if (request_json.contains("use_exact_hessian")) {
+            const auto& exact_hessian = request_json.at("use_exact_hessian");
+            if (!exact_hessian.is_boolean()) {
+                invalid("use_exact_hessian must be a Boolean");
+            }
+            request.use_exact_hessian = exact_hessian.get<bool>();
+        }
         const auto& saved_limits = root.at("limits");
         exact_members(saved_limits, { "max_constraints", "max_dense_jacobian_entries", "max_constraint_rows_evaluated",
                                       "max_jacobian_entries_evaluated", "max_iterations", "max_elapsed_time_ms" });

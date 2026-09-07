@@ -39,6 +39,8 @@ struct PackingAlgorithmConfig {
     double local_solve_tolerance = maximum_local_solve_tolerance;
     SurfaceSamplingPolicy sampling;
     bool adaptive_sampling = true;
+    // Retain the tranche-1 random-start, slack-bound and sampling policy for reproducibility.
+    bool use_reference_growth_policy = false;
     PackingDiagnosticsOptions diagnostics;
 };
 
@@ -47,6 +49,7 @@ struct PackingEngineLimits {
     static constexpr std::uint64_t default_max_history_records = 10'000;
     static constexpr std::uint64_t default_max_total_local_solves = 1'000'000;
     static constexpr std::uint64_t default_max_local_solve_iterations = 1'000;
+    static constexpr std::uint64_t default_max_collision_triangle_pair_tests = 1'000'000'000ULL;
     static constexpr std::chrono::milliseconds default_max_elapsed_time { 300'000 };
 
     std::uint64_t max_correction_passes_per_iteration = default_max_correction_passes_per_iteration;
@@ -61,7 +64,9 @@ struct PackingEngineLimits {
     // solver's conservative diagnostic default. Packing retains its own
     // explicitly bounded per-object limit.
     LocalSolveLimits local_solve { .max_iterations = default_max_local_solve_iterations };
-    SceneCollisionLimits collision;
+    // Full-input physical checks across scale barriers need a cumulative engine
+    // allowance distinct from a standalone scene query; the 300-second cap remains.
+    SceneCollisionLimits collision { .max_triangle_pair_tests = default_max_collision_triangle_pair_tests };
 };
 
 enum class PackingStatus {
@@ -85,6 +90,8 @@ enum class PackingProgressPhase {
     initialization_started,
     scale_step_started,
     tetrahedralization_recovery,
+    sampling_recovery,
+    step_recovery,
     local_solve_started,
     iteration_completed,
     finished,
@@ -176,6 +183,8 @@ struct PackingWork {
     std::uint64_t local_solves = 0;
     std::uint64_t correction_passes = 0;
     std::uint64_t resampling_operations = 0;
+    std::uint64_t sampling_refinements = 0;
+    std::uint64_t physical_step_retries = 0;
     TetrahedralizationWork tetrahedralization;
     CatConstructionWork cat;
     LocalSolveWork local_solve;
@@ -194,6 +203,7 @@ struct PackingResult {
     std::vector<PackingIterationRecord> history;
     SceneCollisionReport final_validation;
     bool final_validation_performed = false;
+    bool cat_diagnostics_complete = true;
     std::vector<std::uint64_t> final_cat_violation_object_ids;
     std::vector<std::string> warnings;
     std::string diagnostic;
