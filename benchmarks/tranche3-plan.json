@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "registered_date": "2026-09-07",
+  "scope": "Tranche 3: 100/300 objects; 1,000 deferred",
+  "registration_basis": {
+    "report": "build/tranche3-baseline-irregular100-pilot/pack-100-1.json",
+    "sha256": "c5938e8813e3011489d8f121652567ee3e62c09b431d07abe571b034e29276eb",
+    "status": "success",
+    "total_wall_ms": 173746.5388,
+    "peak_working_set_bytes": 65257472,
+    "peak_commit_bytes": 72085504,
+    "note": "First 100-object v1 pilot established a successful full-growth baseline before target selection. Controlled comparisons use v2 constant-aspect fixtures; v1 numbers are preliminary and not a before/after comparator."
+  },
+  "primary_cases": {
+    "generator": "benchmarks/fixtures/generate_scaling.py",
+    "generated_manifest": "build/tranche3-fixtures-v2/manifest.json",
+    "shape": "irregular",
+    "detail": 0,
+    "counts": [
+      100,
+      300
+    ],
+    "target_volume_fraction": 0.05,
+    "constant_container_aspect_and_shear": true,
+    "seed": 1918,
+    "initial_volume_scale": 0.1,
+    "target_volume_scale": 1.0,
+    "scale_steps": 9,
+    "adaptive_sampling": false,
+    "structured_initialization_fallback": false,
+    "engine_time_limit_ms": 300000,
+    "local_time_limit_ms": 30000,
+    "local_iterations": 1000,
+    "final_manifest": "build/tranche3-fixtures-v2-final/manifest.json",
+    "generator_sha256": "bd3a93763b8959f1fa033aebda216eb6fb9f6091e571878e4901d30d0190b54b",
+    "fixture_revision_note": "Final formatting and clean-checkout test integration changes the generator hash only; all 24 STL files and 18 fit witnesses are byte-identical to the v2 files used in controlled pilots."
+  },
+  "acceptance_targets": {
+    "100": {
+      "median_total_wall_ms_at_most": 120000
+    },
+    "300": {
+      "median_total_wall_ms_at_most": 300000
+    },
+    "each_case": {
+      "timing_repetitions": 3,
+      "required_successes": 3,
+      "peak_working_set_bytes_at_most": 1073741824,
+      "peak_commit_bytes_at_most": 2147483648,
+      "exact_final_target": true,
+      "physical_and_serialized_output_validation": true,
+      "saved_run_loading": true,
+      "studio_rendering": true
+    }
+  },
+  "secondary_cases": [
+    "10/36 regression counts",
+    "Seeds 0/12345 on compact generated cases",
+    "Slender/concave shapes",
+    "Higher-detail midpoint surfaces",
+    "Direct full-size placement, separate from growth",
+    "Supplied 768-face STL with uniformly scaled containers at 16.967% density",
+    "Fixed-original-container volume-certified non-fit controls"
+  ],
+  "measurement_policy": "Retain all attempted outcomes; three separate serial processes per final comparator, no concurrent project builds/tests/UI. Record source/input/executable hashes, resolved work/time/thread settings, nested timing attribution and process CPU/peak memory. Failed before runs are not speedup denominators. Timings do not become ordinary CTest thresholds.",
+  "threading_candidate": "Packing default requests one task-scoped OpenMP thread through the existing pinned runtime; explicit zero retains inherited setting. No process environment mutation or independent concurrent local solves. MKL thread environment overrides are reported separately. Full packing placements may change; exact target and physical invariants remain required.",
+  "not_claimed": [
+    "General convergence for arbitrary shape, density or seed",
+    "100/300 full-size supplied objects in the original too-small container",
+    "1,000-object performance",
+    "Hard preemption or hard native allocation caps"
+  ],
+  "retry_reuse_candidate": {
+    "selected_after": "Controlled v2 thread-only 300-object pilot still reaches the 300-second limit at seven of nine barriers. Rejected batches account for 57-65% of local calls in the controlled baseline profiles.",
+    "policy": "Retain one immediate rejected batch and only unchanged successful local results; preserve full physical checks, ordered logical requests, RNG draws and cancellation. Count actual and reused work separately.",
+    "acceptance_targets_changed": false
+  },
+  "triangle_index_candidate": {
+    "selected_after": "Secondary supplied100 growth exhausts the physical triangle-pair allowance at three of nine barriers in 69.517 seconds.",
+    "prior_plan": {
+      "path": "build/t3-plan-before-triangle-index.json",
+      "sha256": "8179e9727effd7e604e884e10306c7b55d8a7c224cc22f4200baa7cbb0541d5c"
+    },
+    "policy": "Keep exact VTK contacts and the exhaustive oracle. Bound index construction, traversal, candidates and logical memory; prune only when a conservative certificate proves the existing VTK same-plane-side early return. Fail open for uncertain arithmetic.",
+    "acceptance_targets_changed": false,
+    "additional_gate": "Retain the supplied100 outcome and measure its limiting work after indexing; re-run the full physical/output, supported build and Studio gates. Known-fit primary100/300 growth still requires three successes each.",
+    "status": "Rejected after measurement; removed from delivered implementation",
+    "outcomes": {
+      "primary100": {
+        "report": "build/tranche3-indexed-irregular100-v2-pilot/pack-100-1.json",
+        "status": "success",
+        "total_wall_seconds": 35.827,
+        "decision": "Slower than the retained retry policy."
+      },
+      "supplied100": {
+        "report": "build/tranche3-indexed-supplied100-pilot/pack-100-1.json",
+        "status": "resource_exhausted",
+        "total_wall_seconds": 265.862,
+        "completed_barriers": 4,
+        "collision_wall_seconds": 132.684
+      },
+      "source_archive": "build/tranche3-rejected-triangle-index/source",
+      "container_prepass": "Uncompiled, untested, unmeasured draft; not adopted"
+    }
+  }
+}

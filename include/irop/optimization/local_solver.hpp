@@ -60,6 +60,8 @@ struct LocalSolveLimits {
     std::chrono::milliseconds max_elapsed_time = default_max_elapsed_time;
 };
 
+inline constexpr std::uint32_t maximum_local_solve_openmp_threads = 256;
+
 struct LocalSolveRequest {
     ParticipantId participant = 0;
     Transform current_transform;
@@ -69,6 +71,8 @@ struct LocalSolveRequest {
     double maximum_result_volume_scale = 1.0;
     double tolerance = maximum_local_solve_tolerance;
     bool use_exact_hessian = false;
+    // Zero preserves the calling task setting, including historical snapshot replay.
+    std::uint32_t openmp_threads = 0;
 };
 
 enum class LocalSolveStatus {
@@ -87,6 +91,33 @@ enum class LocalSolveStatus {
 
 [[nodiscard]] const char* to_string(LocalSolveStatus status) noexcept;
 
+// The first four fields are disjoint wall-time stages. Dependency setup also
+// includes teardown; fixed-point evaluation belongs to postcheck. Callback times
+// are subsets of dependency_solve and must not be added to the stage total.
+struct LocalSolveTimings {
+    std::chrono::nanoseconds preparation {};
+    std::chrono::nanoseconds dependency_setup {};
+    std::chrono::nanoseconds dependency_solve {};
+    std::chrono::nanoseconds postcheck {};
+    std::chrono::nanoseconds constraint_callback {};
+    std::chrono::nanoseconds jacobian_callback {};
+    std::chrono::nanoseconds hessian_callback {};
+};
+
+// Values observed at the dependency boundary. MKL-specific overrides can take
+// precedence over OpenMP; scoped_openmp_threads is not an effective MKL team size.
+struct LocalSolveThreading {
+    std::uint32_t requested_openmp_threads = 0;
+    std::uint32_t before_openmp_threads = 0;
+    std::uint32_t scoped_openmp_threads = 0;
+    bool mkl_num_threads_present = false;
+    std::optional<std::string> mkl_num_threads;
+    bool mkl_domain_num_threads_present = false;
+    std::optional<std::string> mkl_domain_num_threads;
+
+    bool operator==(const LocalSolveThreading&) const = default;
+};
+
 struct LocalSolveWork {
     std::uint64_t constraints_prepared = 0;
     std::uint64_t objective_evaluations = 0;
@@ -100,6 +131,11 @@ struct LocalSolveWork {
     std::uint64_t hessian_evaluations = 0;
     // Subset of constraint_rows_evaluated, not additional unbudgeted work.
     std::uint64_t hessian_constraint_rows_evaluated = 0;
+    LocalSolveTimings timings;
+    // Absent when no dependency was entered, including fixed-point evaluation.
+    std::optional<LocalSolveThreading> threading;
+    // Aggregates retain the first observed record and explicitly mark differences.
+    bool threading_mixed = false;
 };
 
 struct LocalSolveTraceRecord {

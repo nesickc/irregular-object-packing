@@ -60,3 +60,23 @@ disabling initialization fallback in a new binary does not restore old collision
 code. Compare outcomes, exact successful seeded placements/RNG, and work alongside
 median timing. Retain process peak-memory and CPU-resolution caveats, and keep
 performance thresholds out of ordinary correctness tests.
+
+## Tranche 3 comparison controls
+
+Use `benchmarks/fixtures/generate_scaling.py` and its fit-witness tests for
+fixed-density 100/300 growth studies; keep supplied inputs and fixed-container
+density ladders separate. Register practical targets before selecting changes,
+retain failed outcomes and distinguish direct placement from genuine growth.
+
+Packing defaults to one task-scoped OpenMP thread and bounded immediate physical
+retry reuse. Compare inherited numerical threading with `--solver-openmp-threads 0`
+and recomputation with `--no-physical-retry-reuse`. Reference-growth alone restores
+neither the previous complete threading policy nor an old compiled implementation.
+Record bounded MKL override metadata; requested OpenMP maximum is not an actual
+worker count. Read ADR-0017 before changing scope/restoration or retry ownership.
+
+Use local preparation/setup/solve/postcheck timing to select the next hot path.
+Constraint/Jacobian/Hessian callback timing is nested in solve. Actual dependency
+calls and avoided retry work have separate counters; physical checks and limits
+still cover every candidate. Compare committed poses/history/RNG where deterministic
+and always require the full-resolution and serialized-output validation gates.

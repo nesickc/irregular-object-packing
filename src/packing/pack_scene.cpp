@@ -410,6 +410,8 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
         { "local_solve_tolerance",                       algorithm.local_solve_tolerance                               },
         { "adaptive_sampling",                           algorithm.adaptive_sampling                                   },
         { "use_reference_growth_policy",                 algorithm.use_reference_growth_policy                         },
+        { "solver_openmp_threads",                       algorithm.solver_openmp_threads                               },
+        { "reuse_physical_retry_results",                algorithm.reuse_physical_retry_results                        },
         { "diagnostics",
          { { "capture_failed_local_problem", algorithm.diagnostics.capture_failed_local_problem },
             { "max_local_solve_records", algorithm.diagnostics.max_local_solve_records },
@@ -510,6 +512,37 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
     };
 }
 
+[[nodiscard]] nlohmann::json local_solve_threading_json(const std::optional<irop::LocalSolveThreading>& threading)
+{
+    if (!threading.has_value()) {
+        return nullptr;
+    }
+    const auto& value = *threading;
+    return {
+        { "requested_openmp_threads",       value.requested_openmp_threads                                                           },
+        { "before_openmp_threads",          value.before_openmp_threads                                                              },
+        { "scoped_openmp_threads",          value.scoped_openmp_threads                                                              },
+        { "mkl_num_threads_present",        value.mkl_num_threads_present                                                            },
+        { "mkl_num_threads",                value.mkl_num_threads ? nlohmann::json(*value.mkl_num_threads) : nlohmann::json(nullptr) },
+        { "mkl_domain_num_threads_present", value.mkl_domain_num_threads_present                                                     },
+        { "mkl_domain_num_threads",
+         value.mkl_domain_num_threads ? nlohmann::json(*value.mkl_domain_num_threads) : nlohmann::json(nullptr)                      },
+    };
+}
+
+[[nodiscard]] nlohmann::json local_solve_timings_json(const LocalSolveTimings& timings)
+{
+    return {
+        { "preparation",         timings.preparation.count()         },
+        { "dependency_setup",    timings.dependency_setup.count()    },
+        { "dependency_solve",    timings.dependency_solve.count()    },
+        { "postcheck",           timings.postcheck.count()           },
+        { "constraint_callback", timings.constraint_callback.count() },
+        { "jacobian_callback",   timings.jacobian_callback.count()   },
+        { "hessian_callback",    timings.hessian_callback.count()    },
+    };
+}
+
 [[nodiscard]] nlohmann::json local_solve_work_json(const LocalSolveWork& work)
 {
     return {
@@ -522,6 +555,9 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
         { "hessian_constraint_rows_evaluated", work.hessian_constraint_rows_evaluated           },
         { "iterations",                        work.iterations                                  },
         { "elapsed_milliseconds",              work.elapsed_time.count()                        },
+        { "timings_nanoseconds",               local_solve_timings_json(work.timings)           },
+        { "threading",                         local_solve_threading_json(work.threading)       },
+        { "threading_mixed",                   work.threading_mixed                             },
         { "minimum_solver_constraint",         optional_number(work.minimum_solver_constraint)  },
         { "minimum_applied_constraint",        optional_number(work.minimum_applied_constraint) },
     };
@@ -606,6 +642,8 @@ void write_new_text_file(const std::filesystem::path& path, const std::string& c
         { "tetrahedralization_recoveries", work.tetrahedralization_recoveries                    },
         { "sampling_refinements",          work.sampling_refinements                             },
         { "physical_step_retries",         work.physical_step_retries                            },
+        { "reused_local_solves",           work.reused_local_solves                              },
+        { "reused_prepared_batches",       work.reused_prepared_batches                          },
         { "cat_builds",                    work.cat_builds                                       },
         { "local_solves",                  work.local_solves                                     },
         { "correction_passes",             work.correction_passes                                },

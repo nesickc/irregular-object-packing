@@ -47,6 +47,8 @@ struct Options {
     bool adaptive_sampling = true;
     double rotation_delta = irop::PackingAlgorithmConfig {}.maximum_rotation_delta_radians;
     bool detailed_diagnostics = false;
+    bool reuse_physical_retry_results = true;
+    std::uint32_t solver_openmp_threads = irop::PackingAlgorithmConfig {}.solver_openmp_threads;
     std::uint64_t count = 10;
     std::size_t segments = 12;
     std::uint64_t attempts = 100'000;
@@ -91,6 +93,10 @@ struct Options {
             options.adaptive_sampling = false;
             continue;
         }
+        if (key == "--no-physical-retry-reuse") {
+            options.reuse_physical_retry_results = false;
+            continue;
+        }
         if (key == "--detailed-diagnostics") {
             options.detailed_diagnostics = true;
             continue;
@@ -116,6 +122,12 @@ struct Options {
         }
         else if (key == "--local-iterations") {
             options.local_iterations = positive_integer(value, 10'000);
+        }
+        else if (key == "--solver-openmp-threads") {
+            options.solver_openmp_threads =
+                value == "0"
+                    ? 0
+                    : static_cast<std::uint32_t>(positive_integer(value, irop::maximum_local_solve_openmp_threads));
         }
         else if (key == "--local-timeout-ms") {
             options.local_timeout = std::chrono::milliseconds(positive_integer(value, 300'000));
@@ -283,6 +295,56 @@ void collision_case(const Options& options, Json& report)
     report["status"] = result.physical_scene_valid() ? "success" : "invalid_scene";
 }
 
+[[nodiscard]] Json local_solve_threading_json(const std::optional<irop::LocalSolveThreading>& threading)
+{
+    if (!threading.has_value()) {
+        return nullptr;
+    }
+    const auto& value = *threading;
+    return {
+        { "requested_openmp_threads",       value.requested_openmp_threads                                       },
+        { "before_openmp_threads",          value.before_openmp_threads                                          },
+        { "scoped_openmp_threads",          value.scoped_openmp_threads                                          },
+        { "mkl_num_threads_present",        value.mkl_num_threads_present                                        },
+        { "mkl_num_threads",                value.mkl_num_threads ? Json(*value.mkl_num_threads) : Json(nullptr) },
+        { "mkl_domain_num_threads_present", value.mkl_domain_num_threads_present                                 },
+        { "mkl_domain_num_threads",
+         value.mkl_domain_num_threads ? Json(*value.mkl_domain_num_threads) : Json(nullptr)                      },
+    };
+}
+
+[[nodiscard]] Json local_solve_timings(const irop::LocalSolveTimings& timings)
+{
+    return {
+        { "preparation",         timings.preparation.count()         },
+        { "dependency_setup",    timings.dependency_setup.count()    },
+        { "dependency_solve",    timings.dependency_solve.count()    },
+        { "postcheck",           timings.postcheck.count()           },
+        { "constraint_callback", timings.constraint_callback.count() },
+        { "jacobian_callback",   timings.jacobian_callback.count()   },
+        { "hessian_callback",    timings.hessian_callback.count()    },
+    };
+}
+
+void record_local_solve_timings(const irop::LocalSolveWork& work, Json& report)
+{
+    const auto& timings = work.timings;
+    report["local_solve_threading"] = local_solve_threading_json(work.threading);
+    report["local_solve_threading_mixed"] = work.threading_mixed;
+    const Json nanoseconds = local_solve_timings(timings);
+    report["local_solve_timings_nanoseconds"] = nanoseconds;
+    report["local_solve_timing_policy"] =
+        "preparation, dependency_setup (including teardown), dependency_solve and postcheck are disjoint; "
+        "callback times are subsets of dependency_solve and must not be added to it; "
+        "fixed-point evaluation is postcheck with zero dependency/callback work";
+    for (const auto& entry : nanoseconds.items()) {
+        report["local_solve_substages"][entry.key()] = {
+            { "wall_ms", static_cast<double>(entry.value().get<std::chrono::nanoseconds::rep>()) / 1'000'000.0 },
+            { "cpu_ms",  nullptr                                                                               }
+        };
+    }
+}
+
 void growth_case(const Options& options, Json& report)
 {
     const auto object = irop::benchmark::tetrahedron();
@@ -297,6 +359,8 @@ void growth_case(const Options& options, Json& report)
     report["stages"]["initialization"] = initialize.elapsed();
     report["initialization_work"] = initialization_work(state);
     irop::PackingAlgorithmConfig algorithm;
+    algorithm.solver_openmp_threads = options.solver_openmp_threads;
+    algorithm.reuse_physical_retry_results = options.reuse_physical_retry_results;
     algorithm.final_volume_scale = 0.2;
     algorithm.scale_step_count = 1;
     algorithm.max_iterations_per_scale_step = 4;
@@ -323,12 +387,15 @@ void growth_case(const Options& options, Json& report)
     report["physically_valid"] = result.final_validation_performed && result.final_validation.physical_scene_valid();
     report["placements"] = placements(result.state);
     report["cat_diagnostics_complete"] = result.cat_diagnostics_complete;
+    record_local_solve_timings(result.work.local_solve, report);
     report["work"] = {
         { "iterations",                            result.work.iterations                                    },
         { "resamples",                             result.work.resampling_operations                         },
         { "tetgen_calls",                          result.work.tetrahedralization_attempts                   },
         { "sampling_refinements",                  result.work.sampling_refinements                          },
         { "physical_step_retries",                 result.work.physical_step_retries                         },
+        { "reused_local_solves",                   result.work.reused_local_solves                           },
+        { "reused_prepared_batches",               result.work.reused_prepared_batches                       },
         { "omitted_single_participant_tetrahedra",
          result.work.tetrahedralization.omitted_single_participant_tetrahedra                                },
         { "cat_builds",                            result.work.cat_builds                                    },
@@ -353,23 +420,26 @@ void growth_case(const Options& options, Json& report)
 [[nodiscard]] Json solve_record(const irop::PackingLocalSolveRecord& record)
 {
     return {
-        { "object_id",                         record.object_id                              },
-        { "scale_step",                        record.scale_step                             },
-        { "iteration",                         record.iteration                              },
-        { "target_volume_scale",               record.target_volume_scale                    },
-        { "status",                            irop::to_string(record.status)                },
-        { "reason",                            record.reason                                 },
-        { "iteration_limit",                   record.limits.max_iterations                  },
-        { "time_limit_ms",                     record.limits.max_elapsed_time.count()        },
-        { "solver_iterations",                 record.work.iterations                        },
-        { "constraints_prepared",              record.work.constraints_prepared              },
-        { "constraint_rows_evaluated",         record.work.constraint_rows_evaluated         },
-        { "jacobian_entries_evaluated",        record.work.jacobian_entries_evaluated        },
-        { "hessian_evaluations",               record.work.hessian_evaluations               },
-        { "hessian_constraint_rows_evaluated", record.work.hessian_constraint_rows_evaluated },
-        { "elapsed_ms",                        record.work.elapsed_time.count()              },
-        { "trace_records",                     record.trace.size()                           },
-        { "trace_records_dropped",             record.trace_records_dropped                  },
+        { "object_id",                         record.object_id                                  },
+        { "scale_step",                        record.scale_step                                 },
+        { "iteration",                         record.iteration                                  },
+        { "target_volume_scale",               record.target_volume_scale                        },
+        { "status",                            irop::to_string(record.status)                    },
+        { "reason",                            record.reason                                     },
+        { "iteration_limit",                   record.limits.max_iterations                      },
+        { "time_limit_ms",                     record.limits.max_elapsed_time.count()            },
+        { "solver_iterations",                 record.work.iterations                            },
+        { "constraints_prepared",              record.work.constraints_prepared                  },
+        { "constraint_rows_evaluated",         record.work.constraint_rows_evaluated             },
+        { "jacobian_entries_evaluated",        record.work.jacobian_entries_evaluated            },
+        { "hessian_evaluations",               record.work.hessian_evaluations                   },
+        { "hessian_constraint_rows_evaluated", record.work.hessian_constraint_rows_evaluated     },
+        { "elapsed_ms",                        record.work.elapsed_time.count()                  },
+        { "timings_nanoseconds",               local_solve_timings(record.work.timings)          },
+        { "threading",                         local_solve_threading_json(record.work.threading) },
+        { "threading_mixed",                   record.work.threading_mixed                       },
+        { "trace_records",                     record.trace.size()                               },
+        { "trace_records_dropped",             record.trace_records_dropped                      },
     };
 }
 
@@ -382,6 +452,8 @@ void pack_case(const Options& options, Json& report)
     packing.initialization.max_sampling_attempts = options.attempts;
     packing.initialization.enable_structured_fallback = options.initialization_fallback;
     packing.initialization.max_structured_candidates = options.max_structured_candidates;
+    packing.algorithm.solver_openmp_threads = options.solver_openmp_threads;
+    packing.algorithm.reuse_physical_retry_results = options.reuse_physical_retry_results;
     packing.algorithm.final_volume_scale = options.final_scale;
     packing.algorithm.scale_step_count = options.scale_steps;
     packing.algorithm.adaptive_sampling = options.adaptive_sampling;
@@ -438,6 +510,7 @@ void pack_case(const Options& options, Json& report)
     report["stages"]["correction"] = wall_stage(std::chrono::duration<double>(timings.correction).count());
     report["stages"]["final_validation"] = wall_stage(std::chrono::duration<double>(timings.final_validation).count());
     const auto& engine = result.packing;
+    record_local_solve_timings(engine.work.local_solve, report);
     report["status"] = irop::to_string(engine.status);
     report["diagnostic"] = engine.diagnostic;
     report["physically_valid"] =
@@ -461,6 +534,8 @@ void pack_case(const Options& options, Json& report)
         { "tetgen_calls",                          engine.work.tetrahedralization_attempts                   },
         { "sampling_refinements",                  engine.work.sampling_refinements                          },
         { "physical_step_retries",                 engine.work.physical_step_retries                         },
+        { "reused_local_solves",                   engine.work.reused_local_solves                           },
+        { "reused_prepared_batches",               engine.work.reused_prepared_batches                       },
         { "tetgen_recoveries",                     engine.work.tetrahedralization_recoveries                 },
         { "tetrahedra",                            engine.work.tetrahedralization.output_tetrahedra          },
         { "omitted_single_participant_tetrahedra",
@@ -566,6 +641,7 @@ void stages_case(const Options& options, Json& report)
     report["work"]["standalone_constraint_rows"] = rows;
     report["work"]["constraint_checksum"] = checksum;
     irop::LocalSolveRequest request;
+    request.openmp_threads = options.solver_openmp_threads;
     request.current_transform = transform;
     request.bounds.maximum_volume_scale_multiplier = 2.00004;
     request.bounds.maximum_absolute_translation = 1.0;
@@ -577,6 +653,7 @@ void stages_case(const Options& options, Json& report)
     const auto solved = irop::solve_local_transform(tetrahedra.mesh, cat, request, workspace, limits);
     report["stages"]["ipopt_solve"] = solver_timer.elapsed();
     report["solver_status"] = irop::to_string(solved.status);
+    record_local_solve_timings(solved.work, report);
     report["work"]["solver_iterations"] = solved.work.iterations;
     report["work"]["solver_constraint_rows"] = solved.work.constraint_rows_evaluated;
     report["work"]["solver_jacobian_entries"] = solved.work.jacobian_entries_evaluated;
@@ -648,7 +725,10 @@ int wmain(const int argc, wchar_t** wide_arguments)
                 { "max_structured_candidates", options.max_structured_candidates },
                 { "timeout_ms", options.timeout.count() },
                 { "orchestration_threads", 1 },
-                { "dependency_thread_policy", "unchanged library defaults" } }                            },
+                { "solver_openmp_threads", options.solver_openmp_threads },
+                { "reuse_physical_retry_results", options.reuse_physical_retry_results },
+                { "dependency_thread_policy",
+                  "scoped solver OpenMP task request; MKL overrides may take precedence" } }              },
             { "timing_policy",
              "cold first call; wall and process CPU; no warmup; run repeated cases in separate processes" },
         };

@@ -98,6 +98,9 @@ void array_size(const Json& value, const std::size_t count)
         throw Error(ErrorCategory::resource_limit, "local-solve snapshot constraint count exceeds its bounded domain");
     }
     const auto& request = snapshot.request;
+    if (request.openmp_threads > maximum_local_solve_openmp_threads) {
+        invalid("OpenMP thread request exceeds 256");
+    }
     const auto& current = request.current_transform;
     const auto& initial = request.initial_guess;
     const auto& bounds = request.bounds;
@@ -141,6 +144,7 @@ void array_size(const Json& value, const std::size_t count)
               { "maximum_result_volume_scale", request.maximum_result_volume_scale },
               { "tolerance", request.tolerance },
               { "use_exact_hessian", request.use_exact_hessian },
+              { "openmp_threads", request.openmp_threads },
           }                                        },
         { "limits",
          {
@@ -240,7 +244,7 @@ LocalSolveSnapshot read_local_solve_snapshot(const std::filesystem::path& path,
         exact_members(request_json,
                       { "participant", "current_transform", "initial_guess", "bounds", "padding",
                         "maximum_result_volume_scale", "tolerance" },
-                      { "use_exact_hessian" });
+                      { "use_exact_hessian", "openmp_threads" });
         LocalSolveSnapshot result;
         auto& request = result.request;
         const auto participant = integer(request_json.at("participant"));
@@ -277,6 +281,13 @@ LocalSolveSnapshot read_local_solve_snapshot(const std::filesystem::path& path,
                 invalid("use_exact_hessian must be a Boolean");
             }
             request.use_exact_hessian = exact_hessian.get<bool>();
+        }
+        if (request_json.contains("openmp_threads")) {
+            const auto requested_threads = integer(request_json.at("openmp_threads"));
+            if (requested_threads > maximum_local_solve_openmp_threads) {
+                invalid("OpenMP thread request exceeds 256");
+            }
+            request.openmp_threads = static_cast<std::uint32_t>(requested_threads);
         }
         const auto& saved_limits = root.at("limits");
         exact_members(saved_limits, { "max_constraints", "max_dense_jacobian_entries", "max_constraint_rows_evaluated",

@@ -146,7 +146,16 @@ the first barrier. Its displayed 2.64% described a partial state, and **Recorded
 physical validation: not recorded** meant final validation had not run. That
 summary remains useful diagnostic evidence; it does not describe the updated
 default behavior. The CLI's optional `--reference-growth-policy` switch retains
-the earlier growth policy for comparisons and reproducing failures.
+the earlier growth policy for comparisons and reproducing failures. Complete
+historical runtime comparisons also require `--solver-openmp-threads 0`.
+
+The current packing library requests one numerical OpenMP thread per local solve
+and retains unchanged solver results during immediate physical retries. Studio
+uses these defaults automatically. Each retried candidate still receives full
+physical checks; final exported geometry has its own validation. These performance
+changes do not change the scale settings or establish that arbitrary inputs will
+fit. The summary records resolved threading, ambient MKL overrides and avoided
+retry work.
 
 ## Inspect geometry and saved runs
 
@@ -219,3 +228,17 @@ and headless hosted CI.
 See [ADR-0014](adr/0014-native-windows-visualization-ui.md) for ownership and
 saved-run contracts, and [implementation status](STATUS.md) for verification
 actually completed on the current build.
+
+## Measured larger runs
+
+Tranche 3 verifies generated 44-face irregular objects at 100 and 300 copies in
+larger containers at 5% full-size density: `.1 -> 1.0`, nine steps, seed 1918,
+adaptive sampling and structured fallback off. Medians are 33.484 and 125.446 seconds,
+with three successes each and actual Studio load/render checks. The thread/retry
+improvements apply automatically; no new Studio setting is required.
+
+Those results do not guarantee convergence for every STL. The supplied 768-face
+mesh at 100 copies still reaches the physical collision-work limit even in a
+proportionally larger container. In the original container, 100 full-size copies
+would require 169.67% of its volume. Keep container size, density and mesh detail
+explicit when comparing results; see [STATUS](STATUS.md) for the retained failures.

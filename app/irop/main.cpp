@@ -264,6 +264,10 @@ void log_error_noexcept(const char* category, const char* message) noexcept
                            "Use the full-resolution meshes at every scale barrier");
     pack_command->add_option("--seed", pack_options.initialization.seed, "Deterministic random seed");
     pack_command
+        ->add_option("--solver-openmp-threads", pack_options.algorithm.solver_openmp_threads,
+                     "Solver OpenMP task threads (0 inherits; MKL environment overrides may take precedence)")
+        ->check(CLI::Range(0, static_cast<int>(irop::maximum_local_solve_openmp_threads)));
+    pack_command
         ->add_option("--max-sampling-attempts", pack_options.initialization.max_sampling_attempts,
                      "Maximum initialization candidate samples")
         ->check(CLI::PositiveNumber);
@@ -342,6 +346,8 @@ void log_error_noexcept(const char* category, const char* message) noexcept
                      "Maximum combined packed-object triangle count")
         ->check(CLI::PositiveNumber);
 
+    pack_command->add_flag("!--no-physical-retry-reuse", pack_options.algorithm.reuse_physical_retry_results,
+                           "Recompute all local results after physical retries for reproducibility");
     pack_command->add_flag("--reference-growth-policy", pack_options.algorithm.use_reference_growth_policy,
                            "Use the historical random-start and sampling policy for reproducibility");
     pack_command->add_flag("--capture-failed-local-solve",

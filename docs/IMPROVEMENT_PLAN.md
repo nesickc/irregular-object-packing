@@ -1,7 +1,7 @@
 # Improvement plan after Milestone 8
 
-Updated: 2026-09-06. Status: tranches 1 and 2 are Verified with the evidence in
-[STATUS.md](STATUS.md). Tranches 3-4 remain planned.
+Updated: 2026-09-08. Status: tranches 1 and 2 are Verified with the evidence in
+[STATUS.md](STATUS.md). Tranche 3 is Verified for its registered known-fit 100/300 scope; tranche 4 remains planned.
 The requested scale target is 100-300 objects first, followed by 1,000.
 Historical milestone acceptance remains recorded in [STATUS.md](STATUS.md).
 This plan groups follow-up work without retroactively expanding those milestones.
@@ -9,9 +9,12 @@ This plan groups follow-up work without retroactively expanding those milestones
 ## Recommendation and order
 
 Automatic run folders and reliable full-size growth for the supplied ten-object
-case are delivered. The next engineering task is complete, validated performance
-for 100-300 objects, followed by 1,000. Profile representative fixed-density and
-increasing-density workloads before selecting further optimizations.
+case are delivered. The registered known-fit 100/300 growth cases now pass their
+performance and Studio gates. The [pryanik follow-up](PRYANIK_INVESTIGATION.md) now adds concrete priorities:
+constructive placement and adaptive/local-solve robustness on that mesh, plus
+collision acceleration where measured on other inputs. Establish this practical
+corpus before the 1,000-object study. Retain separate fixed-density and
+increasing-density measurements.
 
 | Tranche | Related outcome | Priority and dependency | Completion evidence |
 | --- | --- | --- | --- |
@@ -39,9 +42,9 @@ Current code and retained results take precedence over historical diagnoses.
 | Studio reused the previous output name | Confirmed everyday workflow defect; numbered allocation is now implemented | Verified in tranche 1 |
 | Output destination was checked after packing | Confirmed wasted-computation risk; early preflight is now implemented | Verified in tranche 1, including authoritative final publication checks |
 | Generic solver/TetGen diagnostics; aggregate-only solve metrics | Bounded context, traces and replay are implemented; isolated start/bound/Hessian evidence informs the selected policy | Verified in tranches 1-2 |
-| No representative many-object growth measurements | Real-STL multi-object harness is now implemented; 100/300 throughput remains unproven | Baseline starts in tranche 1; acceptance expands in tranches 3-4 |
-| All object pairs still enumerated; exact triangle checks can be quadratic | Credible scaling candidates, not yet proven dominant in real growth | Profile in tranche 3, then accelerate the measured work |
-| Repeated query construction, validation and geometry copies | Credible CPU/memory cost | Profile and reuse immutable data in tranche 3 |
+| No representative many-object growth measurements | Registered known-fit 100/300 full growth now has three successes each, source/work/memory evidence and Studio checks; heavier supplied100 retains a failure | Verified tranche-3 scope; 1,000 remains tranche 4 |
+| All object pairs still enumerated; exact triangle checks can be quadratic | Supplied100 growth exhausts physical work; a conservative index prototype was slower and still failed | Next measured priority: efficient collision acceleration for heavier meshes, preserving exact predicates and bounded worst-case work |
+| Repeated query construction, validation and geometry copies | Immediate retry preparation and local solves were measured redundant work; bounded reuse contributes to the 4.65x controlled100 gain | Verified in tranche 3; extend reuse only when further profiles justify it |
 | Adaptive sampling greatly refines coarse containers | Measured container shrinkage and oversampling blocked growth; preserved double midpoint sampling and reuse resolve those cases | Verified in tranche 2; extend only when tranche-3 profiles justify it |
 | Regular points can produce invalid TetGen tetrahedra | Original reason is retained; guarded irrelevant internal-cell omission handles the demonstrated case, with strict mixed-owner rejection | Verified in tranche 2; geometry perturbation and PLC remain unselected |
 | Greedy random initialization and six-orientation grid miss feasible arrangements | Demonstrated grid cases are fixed, but general search quality is incomplete | Use known-feasible failures to justify bounded restart/offset/orientation work; larger search redesign remains later |
@@ -238,6 +241,28 @@ comparisons, three independent timing samples, stage/work counters and peak memo
 Define practical time/memory targets after the first baseline on the recorded
 machine, before selecting the optimization; record them in the benchmark manifest.
 A faster early failure or reduced validation is not a performance improvement.
+
+### Completed execution (2026-09-07)
+
+[ADR-0017](adr/0017-measured-solver-thread-control-and-scaling.md) delivers scoped
+solver thread control, nested timing attribution and bounded immediate retry reuse.
+The [registered plan](../benchmarks/tranche3-plan.json) fixed the time/memory gates
+before selection. The [ledger](../benchmarks/results/windows-20260907-tranche3.json)
+records three full-growth successes each at 100 and 300, medians 33.484 and 125.446
+seconds, both physical gates, saved loading and actual Studio acceptance. At 100,
+the true tranche-2 median is 155.805 seconds, with matching final geometry across
+the controlled baseline/thread/retry policies. Generated fit witnesses are separate
+from initialization. All three build/test matrices pass with the existing skip.
+
+The wider corpus preserves limitations: known-fit slender10 still stalls in both
+old and new policies, and supplied768-face growth at 100 objects in a larger
+container exhausts physical triangle work after three barriers. A conservative
+index prototype was removed after it slowed primary100 and still failed supplied100.
+The later [pryanik investigation](PRYANIK_INVESTIGATION.md) sets the next priorities:
+constructive placement and sampling/local-solve robustness for pryanik, with collision
+acceleration where the measured profile warrants it. Concurrency and public
+display-limit increases were not selected.
+This closes the registered scope without claiming arbitrary-input convergence.
 
 ## Tranche 4: Extension to 1,000 objects
 

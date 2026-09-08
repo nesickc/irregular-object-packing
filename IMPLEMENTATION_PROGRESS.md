@@ -1,6 +1,6 @@
 # C++ Migration Implementation Progress
 
-Last updated: 2026-09-06
+Last updated: 2026-09-07
 
 This working report tracks execution of `docs/IMPLEMENTATION_PLAN.md`. The concise,
 authoritative project status remains in `docs/STATUS.md`; this file records the more
@@ -17,8 +17,28 @@ loading; median total is 221.492 seconds within the 300-second engine envelope.
 Final Debug/Release/Ninja matrices each have 243 passed and one existing symlink
 skip out of 244 tests. The [authoritative status](docs/STATUS.md) records complete
 verification, compatibility changes, measurement provenance and remaining limits.
-Tranches 3-4 target 100-300 objects and then 1,000; this ten-object result does not
-establish that throughput. Historical migration evidence below remains unchanged.
+Tranche 3 is Verified for registered known-fit 100/300 growth under ADR-0017 and DEV-0036/0037. Measured numerical
+thread overhead motivated scoped OpenMP control; repeated work after physical
+rejection motivated one bounded retained TetGen/CAT context and unchanged local
+results. Ordered requests, transactional state/RNG, cumulative bounds and complete
+physical/output acceptance are retained. Nested local timers distinguish callback
+cost from backend solve time. Reproducible fixed-density generated fixtures have
+independently checked float32 fit witnesses and CI coverage.
+
+Final controlled measurements complete exact `.1 -> 1.0` growth in three of three
+processes each at 100 and 300 objects, with medians 33.484 and 125.446 seconds.
+The 100-object tranche-2 median is 155.805 seconds (4.65x improvement), with identical
+final poses and geometry across baseline/thread/retry policies. Release/Debug/Ninja
+each pass 252 tests with one existing skip out of 253; formatting, static analysis,
+fixture checks and actual Studio rendering/cancellation gates pass. The complete
+ledger preserves source/runtime/input hashes and all secondary outcomes.
+
+The supplied 768-face mesh still exhausts physical work at 100 objects in a larger
+container. A conservative index prototype was removed after measurement showed
+higher cost and continued failure. A known-fit slender case also retains an existing
+convergence stall. These limits constrain the verified scope; efficient collision
+acceleration remains a priority before 1,000-object claims. Historical migration
+evidence below remains unchanged.
 
 ## Current Position
 

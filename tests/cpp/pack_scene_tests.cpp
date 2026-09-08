@@ -135,6 +135,15 @@ TEST_CASE("packing publishes successful physical output with explicitly incomple
     CHECK(result.packing.final_validation.physical_scene_valid());
     REQUIRE(result.packed_objects_path);
     const auto summary = read_json(result.run_summary_path);
+    CHECK(summary.at("config").at("solver_openmp_threads") == options.algorithm.solver_openmp_threads);
+    CHECK(summary.at("config").at("reuse_physical_retry_results") == options.algorithm.reuse_physical_retry_results);
+    CHECK(summary.at("work").at("reused_local_solves") == result.packing.work.reused_local_solves);
+    CHECK(summary.at("work").at("reused_prepared_batches") == result.packing.work.reused_prepared_batches);
+    REQUIRE(result.packing.work.local_solve.threading);
+    const auto& threading = summary.at("work").at("local_solve").at("threading");
+    CHECK(threading.at("requested_openmp_threads") == options.algorithm.solver_openmp_threads);
+    CHECK(threading.at("scoped_openmp_threads") == options.algorithm.solver_openmp_threads);
+    CHECK(summary.at("work").at("local_solve").at("threading_mixed") == false);
     CHECK(summary.at("cat_diagnostics_complete") == false);
     CHECK(summary.at("validation").at("physical_scene_valid") == true);
     CHECK(summary.at("validation").at("cat_diagnostics_complete") == false);

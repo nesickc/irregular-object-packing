@@ -103,8 +103,13 @@ packing. Tranches 1 and 2 are verified: the supplied ten-object genuine-growth
 case now completes in three of three measured runs, with exact full-size targets
 and both physical validation gates. Build/test, desktop and real-input evidence
 is recorded in [STATUS](/docs/STATUS.md). The [improvement plan](/docs/IMPROVEMENT_PLAN.md)
-continues with measured 100-300/1,000-object scaling. The optional
-`--reference-growth-policy` flag retains the earlier growth policy for comparison. The real-STL [benchmark harness](/benchmarks/README.md) now records
+records verified known-fit 100/300 growth (33.484/125.446 seconds median, three
+successes each) and the remaining heavier-mesh collision limits. The next scale
+target is 1,000. The optional
+`--reference-growth-policy` flag retains the earlier growth policy for comparison.
+Packing now requests one scoped numerical OpenMP thread and reuses unchanged work
+between rejected physical trials. Use `--solver-openmp-threads 0` for inherited
+threading or `--no-physical-retry-reuse` for recomputation. The real-STL [benchmark harness](/benchmarks/README.md) now records
 end-to-end stages, input/source hashes, work, outcomes and saved-run loading;
 its count range through 1,000 is not a throughput guarantee.
 

@@ -18,6 +18,7 @@
 
 #include "irop/optimization/local_solver.hpp"
 #include "optimization/local_solver_internal.hpp"
+#include "optimization/solver_openmp_scope.hpp"
 
 namespace irop {
 namespace {
@@ -52,14 +53,73 @@ struct CallbackContext {
     bool use_exact_hessian = false;
 };
 
+void add_timing(std::chrono::nanoseconds& destination, const std::chrono::nanoseconds duration) noexcept
+{
+    using Representation = std::chrono::nanoseconds::rep;
+    if (duration.count() < 0 || destination.count() > std::numeric_limits<Representation>::max() - duration.count()) {
+        destination = std::chrono::nanoseconds::max();
+        return;
+    }
+    destination += duration;
+}
+
+// Explicitly flush the active stage before finish() moves the result. This
+// object deliberately has no destructor that writes into the result.
+class LocalStageTimer final {
+public:
+    explicit LocalStageTimer(std::chrono::nanoseconds& destination) noexcept : destination_(&destination) {}
+
+    void stop() noexcept
+    {
+        if (destination_ != nullptr) {
+            add_timing(*destination_, std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start_));
+            destination_ = nullptr;
+        }
+    }
+
+    void start(std::chrono::nanoseconds& destination) noexcept
+    {
+        stop();
+        destination_ = &destination;
+        start_ = Clock::now();
+    }
+
+    LocalStageTimer(const LocalStageTimer&) = delete;
+    LocalStageTimer& operator=(const LocalStageTimer&) = delete;
+
+private:
+    using Clock = std::chrono::steady_clock;
+    std::chrono::nanoseconds* destination_ = nullptr;
+    Clock::time_point start_ = Clock::now();
+};
+
+class CallbackTimer final {
+public:
+    explicit CallbackTimer(std::chrono::nanoseconds& destination) noexcept : destination_(destination) {}
+    ~CallbackTimer()
+    {
+        add_timing(destination_, std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start_));
+    }
+    CallbackTimer(const CallbackTimer&) = delete;
+    CallbackTimer& operator=(const CallbackTimer&) = delete;
+
+private:
+    using Clock = std::chrono::steady_clock;
+    std::chrono::nanoseconds& destination_;
+    Clock::time_point start_ = Clock::now();
+};
+
 class IpoptProblemOwner final {
 public:
     explicit IpoptProblemOwner(IpoptProblem problem) noexcept : problem_(problem) {}
-    ~IpoptProblemOwner()
+    ~IpoptProblemOwner() { reset(nullptr); }
+
+    void reset(IpoptProblem problem) noexcept
     {
         if (problem_ != nullptr) {
             FreeIpoptProblem(problem_);
         }
+        problem_ = problem;
     }
 
     IpoptProblemOwner(const IpoptProblemOwner&) = delete;
@@ -264,6 +324,7 @@ bool evaluate_constraints_callback(const ipindex n, ipnumber* const x, const boo
         }
         return false;
     }
+    const CallbackTimer timer(context->work->timings.constraint_callback);
     if (!add_bounded_work(static_cast<std::uint64_t>(m), context->limits->max_constraint_rows_evaluated,
                           context->work->constraint_rows_evaluated)) {
         context->stop_reason = CallbackStopReason::resource_limit;
@@ -296,6 +357,7 @@ bool evaluate_jacobian_callback(const ipindex n, ipnumber* const x, const bool, 
         return false;
     }
 
+    const CallbackTimer timer(context->work->timings.jacobian_callback);
     if (values == nullptr) {
         if (rows == nullptr || columns == nullptr) {
             context->stop_reason = CallbackStopReason::invalid_callback;
@@ -346,6 +408,7 @@ bool evaluate_hessian_callback(const ipindex n, ipnumber* const x, const bool, c
         }
         return false;
     }
+    const CallbackTimer timer(context->work->timings.hessian_callback);
     if (elapsed_limit_reached(*context)) {
         return false;
     }
@@ -631,8 +694,22 @@ LocalSolveResult solve_local_transform_impl(const TetrahedralMesh* const mesh, c
 {
     const auto start_time = std::chrono::steady_clock::now();
     LocalSolveResult result;
+    LocalStageTimer timer(result.work.timings.preparation);
+    std::optional<detail::SolverOpenmpScope> openmp_scope;
+    IpoptProblemOwner problem(nullptr);
     bool prepared_valid = false;
     auto finish = [&]() noexcept -> LocalSolveResult {
+        // Teardown can occur after any early failure. Complete it while the
+        // result still owns its counters, then publish the elapsed stages.
+        if (problem.get() != nullptr) {
+            timer.start(result.work.timings.dependency_setup);
+            problem.reset(nullptr);
+        }
+        if (openmp_scope.has_value()) {
+            timer.start(result.work.timings.dependency_setup);
+            openmp_scope.reset();
+        }
+        timer.stop();
         result.work.elapsed_time =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time);
         if (!result.succeeded() && diagnostics.max_failed_snapshot_constraints > 0) {
@@ -658,6 +735,11 @@ LocalSolveResult solve_local_transform_impl(const TetrahedralMesh* const mesh, c
         if (diagnostics.max_trace_records > 4'096 || diagnostics.max_failed_snapshot_constraints > 100'000) {
             result.status = LocalSolveStatus::invalid_input;
             result.diagnostic = "local solve diagnostic collection limit exceeds its hard ceiling";
+            return finish();
+        }
+        if (request.openmp_threads > maximum_local_solve_openmp_threads) {
+            result.status = LocalSolveStatus::invalid_input;
+            result.diagnostic = "local solve OpenMP thread request exceeds 256";
             return finish();
         }
         if (cat != nullptr && !cat->succeeded()) {
@@ -830,6 +912,7 @@ LocalSolveResult solve_local_transform_impl(const TetrahedralMesh* const mesh, c
         }
         StatusTranslation translation;
         if (all_variables_fixed(workspace.variable_lower_bounds_, workspace.variable_upper_bounds_)) {
+            timer.start(result.work.timings.postcheck);
             const std::uint64_t row_count = static_cast<std::uint64_t>(workspace.constraints_.size());
             if (!add_bounded_work(row_count, limits.max_constraint_rows_evaluated,
                                   result.work.constraint_rows_evaluated)) {
@@ -862,6 +945,19 @@ LocalSolveResult solve_local_transform_impl(const TetrahedralMesh* const mesh, c
             translation = { LocalSolveStatus::success, "fixed local solve is feasible", true };
         }
         else {
+            timer.start(result.work.timings.dependency_setup);
+            // DEVIATION(IROP-DEV-0036): Scope task threading over creation, solve,
+            // and teardown, preserving the caller on every exit and exception.
+            openmp_scope.emplace(request.openmp_threads);
+            result.work.threading = LocalSolveThreading {
+                .requested_openmp_threads = request.openmp_threads,
+                .before_openmp_threads = static_cast<std::uint32_t>(openmp_scope->before_threads()),
+                .scoped_openmp_threads = static_cast<std::uint32_t>(openmp_scope->scoped_threads()),
+                .mkl_num_threads_present = openmp_scope->mkl_num_threads().present,
+                .mkl_num_threads = openmp_scope->mkl_num_threads().value,
+                .mkl_domain_num_threads_present = openmp_scope->mkl_domain_num_threads().present,
+                .mkl_domain_num_threads = openmp_scope->mkl_domain_num_threads().value,
+            };
             int version_major = 0;
             int version_minor = 0;
             int version_release = 0;
@@ -884,7 +980,7 @@ LocalSolveResult solve_local_transform_impl(const TetrahedralMesh* const mesh, c
             const auto nonzero_count = static_cast<ipindex>(jacobian_entry_count);
             const auto hessian_nonzero_count =
                 request.use_exact_hessian ? static_cast<ipindex>(local_solve_hessian_nonzero_count) : 0;
-            IpoptProblemOwner problem(CreateIpoptProblem(
+            problem.reset(CreateIpoptProblem(
                 variable_count, workspace.variable_lower_bounds_.data(), workspace.variable_upper_bounds_.data(),
                 constraint_count, workspace.first_constraint_buffer_.data(), workspace.second_constraint_buffer_.data(),
                 nonzero_count, hessian_nonzero_count, 0, evaluate_objective_callback, evaluate_constraints_callback,
@@ -907,11 +1003,18 @@ LocalSolveResult solve_local_transform_impl(const TetrahedralMesh* const mesh, c
             }
 
             ipnumber objective_value = 0.0;
+            timer.start(result.work.timings.dependency_solve);
             const ApplicationReturnStatus raw_status =
                 IpoptSolve(problem.get(), workspace.variables_.data(), workspace.first_constraint_buffer_.data(),
                            &objective_value, nullptr, nullptr, nullptr, &context);
+            timer.start(result.work.timings.dependency_setup);
+            problem.reset(nullptr);
+            openmp_scope.reset();
+            timer.start(result.work.timings.postcheck);
             translation = translate_status(raw_status, context.stop_reason);
         }
+
+        timer.start(result.work.timings.postcheck);
 
         // DEVIATION(IROP-DEV-0015): The Python implementation discards the
         // backend status and applies its iterate unconditionally. Publish no
@@ -1026,6 +1129,13 @@ LocalSolveResult solve_local_transform_impl(const TetrahedralMesh* const mesh, c
         result.status = translation.status;
         result.diagnostic = translation.diagnostic;
         result.accepted_transform = applied;
+        return finish();
+    }
+    catch (const Error& error) {
+        result.accepted_transform.reset();
+        result.status = error.category() == ErrorCategory::dependency_failure ? LocalSolveStatus::dependency_failure
+                                                                              : LocalSolveStatus::internal_failure;
+        set_diagnostic_best_effort(result, error.what());
         return finish();
     }
     catch (const std::bad_alloc&) {

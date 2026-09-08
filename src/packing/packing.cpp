@@ -45,6 +45,16 @@ auto measure_stage(std::chrono::microseconds& destination, Operation&& operation
 constexpr double reference_rotation_bound_factor = 0.9;
 constexpr std::uint64_t maximum_exact_binary64_integer = 9'007'199'254'740'992ULL;
 
+// DEVIATION(IROP-DEV-0037): A rejected physical trial leaves the committed
+// scene unchanged. Retain only that trial's immutable dependency context and
+// successful local results; all geometry still passes the next physical probe.
+struct PhysicalRetryBatch {
+    TetrahedralizationResult tetrahedralization;
+    CatConstructionResult cat;
+    std::vector<TriangleMesh> cat_surfaces;
+    std::vector<std::optional<Transform>> local_results;
+};
+
 [[nodiscard]] bool is_finite(const Point3& point) noexcept
 {
     return std::isfinite(point.x) && std::isfinite(point.y) && std::isfinite(point.z);
@@ -60,9 +70,10 @@ void add_count(std::uint64_t& destination, const std::uint64_t value)
 
 void increment(std::uint64_t& value) { add_count(value, 1); }
 
-void add_elapsed(std::chrono::milliseconds& destination, const std::chrono::milliseconds value)
+template <typename Duration>
+void add_elapsed(Duration& destination, const Duration value)
 {
-    using Representation = std::chrono::milliseconds::rep;
+    using Representation = typename Duration::rep;
     if (value.count() < 0 || destination.count() > std::numeric_limits<Representation>::max() - value.count()) {
         throw Error(ErrorCategory::resource_limit, "packing elapsed-work counter overflowed");
     }
@@ -101,6 +112,22 @@ void accumulate(LocalSolveWork& destination, const LocalSolveWork& source)
     add_count(destination.hessian_constraint_rows_evaluated, source.hessian_constraint_rows_evaluated);
     add_count(destination.iterations, source.iterations);
     add_elapsed(destination.elapsed_time, source.elapsed_time);
+    add_elapsed(destination.timings.preparation, source.timings.preparation);
+    add_elapsed(destination.timings.dependency_setup, source.timings.dependency_setup);
+    add_elapsed(destination.timings.dependency_solve, source.timings.dependency_solve);
+    add_elapsed(destination.timings.postcheck, source.timings.postcheck);
+    add_elapsed(destination.timings.constraint_callback, source.timings.constraint_callback);
+    add_elapsed(destination.timings.jacobian_callback, source.timings.jacobian_callback);
+    add_elapsed(destination.timings.hessian_callback, source.timings.hessian_callback);
+    destination.threading_mixed = destination.threading_mixed || source.threading_mixed;
+    if (source.threading.has_value()) {
+        if (!destination.threading.has_value()) {
+            destination.threading = source.threading;
+        }
+        else if (*destination.threading != *source.threading) {
+            destination.threading_mixed = true;
+        }
+    }
 
     if (source.minimum_solver_constraint.has_value() &&
         (!destination.minimum_solver_constraint.has_value() ||
@@ -507,6 +534,9 @@ double barrier_volume_scale_multiplier_bound(const double current_volume_scale, 
 void validate_packing_algorithm_config(const double initial_scale, const PackingAlgorithmConfig& config,
                                        const PackingEngineLimits& limits)
 {
+    if (config.solver_openmp_threads > maximum_local_solve_openmp_threads) {
+        throw Error(ErrorCategory::invalid_configuration, "packing solver OpenMP thread request exceeds 256");
+    }
     if (config.diagnostics.max_local_solve_records > 4'096 || config.diagnostics.max_trace_records_per_solve > 4'096 ||
         config.diagnostics.max_failed_snapshot_constraints > 100'000 || config.diagnostics.max_recovery_records > 256 ||
         (config.diagnostics.max_trace_records_per_solve > 0 &&
@@ -775,6 +805,7 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
             }
             require_scene_mesh_budget(sampled_object, object_count, limits.intermediate_mesh_limits, "sampled packing");
             std::vector<unsigned> physical_backoffs(static_cast<std::size_t>(object_count), 0);
+            std::optional<PhysicalRetryBatch> retry_batch;
             bool scale_step_completed = false;
             for (std::uint64_t iteration = 0; iteration < config.max_iterations_per_scale_step; ++iteration) {
                 increment(result.work.iterations);
@@ -783,88 +814,105 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                     return stop_result(*status);
                 }
 
-                std::vector<TriangleMesh> participants = measure_stage(result.work.stage_timings.transform, [&] {
-                    return instantiate(sampled_object, result.state.transforms, limits.intermediate_mesh_limits,
-                                       "sampled packing");
-                });
-                participants.push_back(sampled_container);
-                if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
-                    return stop_result(*status);
+                const bool reuse_retry_results = config.reuse_physical_retry_results &&
+                                                 !config.use_reference_growth_policy && sampled_object_is_original;
+                PhysicalRetryBatch prepared;
+                const bool reused_preparation = retry_batch.has_value();
+                if (reused_preparation) {
+                    prepared = std::move(*retry_batch);
+                    retry_batch.reset();
+                    increment(result.work.reused_prepared_batches);
                 }
+                auto& tetrahedralization = prepared.tetrahedralization;
+                auto& cat = prepared.cat;
+                auto& cat_surfaces = prepared.cat_surfaces;
+                if (!reused_preparation) {
+                    std::vector<TriangleMesh> participants = measure_stage(result.work.stage_timings.transform, [&] {
+                        return instantiate(sampled_object, result.state.transforms, limits.intermediate_mesh_limits,
+                                           "sampled packing");
+                    });
+                    participants.push_back(sampled_container);
+                    if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
+                        return stop_result(*status);
+                    }
 
-                increment(result.work.tetrahedralization_attempts);
-                TetrahedralizationResult tetrahedralization =
-                    measure_stage(result.work.stage_timings.tetrahedralization, [&] {
-                    return tetrahedralize_surfaces(
-                        participants, limits.tetrahedralization,
-                        { .omit_degenerate_single_participant_tetrahedra = !config.use_reference_growth_policy });
-                });
-                accumulate(result.work.tetrahedralization, tetrahedralization.work);
-                std::optional<std::size_t> recovery_record_index;
-                if (!tetrahedralization.succeeded()) {
-                    try {
-                        if (result.diagnostics.recovery_records.size() < config.diagnostics.max_recovery_records) {
-                            result.diagnostics.recovery_records.push_back(
-                                { scale_step, iteration, target_scale, tetrahedralization.status,
-                                  bounded_reason(tetrahedralization.diagnostic), false });
-                            recovery_record_index = result.diagnostics.recovery_records.size() - 1;
+                    increment(result.work.tetrahedralization_attempts);
+                    tetrahedralization = measure_stage(result.work.stage_timings.tetrahedralization, [&] {
+                        return tetrahedralize_surfaces(
+                            participants, limits.tetrahedralization,
+                            { .omit_degenerate_single_participant_tetrahedra = !config.use_reference_growth_policy });
+                    });
+                    accumulate(result.work.tetrahedralization, tetrahedralization.work);
+                    std::optional<std::size_t> recovery_record_index;
+                    if (!tetrahedralization.succeeded()) {
+                        try {
+                            if (result.diagnostics.recovery_records.size() < config.diagnostics.max_recovery_records) {
+                                result.diagnostics.recovery_records.push_back(
+                                    { scale_step, iteration, target_scale, tetrahedralization.status,
+                                      bounded_reason(tetrahedralization.diagnostic), false });
+                                recovery_record_index = result.diagnostics.recovery_records.size() - 1;
+                            }
+                            else {
+                                increment(result.diagnostics.recovery_records_dropped);
+                            }
                         }
-                        else {
+                        catch (...) {
                             increment(result.diagnostics.recovery_records_dropped);
                         }
                     }
-                    catch (...) {
-                        increment(result.diagnostics.recovery_records_dropped);
+                    if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
+                        return stop_result(*status);
                     }
-                }
-                if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
-                    return stop_result(*status);
-                }
-                if (!tetrahedralization.succeeded()) {
-                    if (tetrahedralization.status == TetrahedralizationStatus::dependency_failure &&
-                        iteration + 1 < config.max_iterations_per_scale_step) {
-                        // DEVIATION(IROP-DEV-0001): Iterate over valid object
-                        // transforms on the reference recovery path instead of
-                        // iterating over the integer object count.
-                        PackingState recovered =
-                            recovered_state(result.state, config.tetrahedralization_recovery_scale_factor);
-                        result.state = std::move(recovered);
-                        increment(result.work.tetrahedralization_recoveries);
-                        if (recovery_record_index.has_value()) {
-                            result.diagnostics.recovery_records[*recovery_record_index].recovery_applied = true;
+                    if (!tetrahedralization.succeeded()) {
+                        if (tetrahedralization.status == TetrahedralizationStatus::dependency_failure &&
+                            iteration + 1 < config.max_iterations_per_scale_step) {
+                            // DEVIATION(IROP-DEV-0001): Iterate over valid object
+                            // transforms on the reference recovery path instead of
+                            // iterating over the integer object count.
+                            PackingState recovered =
+                                recovered_state(result.state, config.tetrahedralization_recovery_scale_factor);
+                            result.state = std::move(recovered);
+                            increment(result.work.tetrahedralization_recoveries);
+                            if (recovery_record_index.has_value()) {
+                                result.diagnostics.recovery_records[*recovery_record_index].recovery_applied = true;
+                            }
+                            progress.phase = PackingProgressPhase::tetrahedralization_recovery;
+                            progress.object_id.reset();
+                            progress.objects_at_target = object_count_at_target(result.state.transforms, target_scale);
+                            emit_progress();
+                            progress.phase = PackingProgressPhase::scale_step_started;
+                            if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
+                                return stop_result(*status);
+                            }
+                            continue;
                         }
-                        progress.phase = PackingProgressPhase::tetrahedralization_recovery;
-                        progress.object_id.reset();
-                        progress.objects_at_target = object_count_at_target(result.state.transforms, target_scale);
-                        emit_progress();
-                        progress.phase = PackingProgressPhase::scale_step_started;
-                        if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
-                            return stop_result(*status);
-                        }
-                        continue;
+                        return finish(status_for(tetrahedralization.status),
+                                      nested_diagnostic("tetrahedralization", to_string(tetrahedralization.status),
+                                                        tetrahedralization.diagnostic));
                     }
-                    return finish(status_for(tetrahedralization.status),
-                                  nested_diagnostic("tetrahedralization", to_string(tetrahedralization.status),
-                                                    tetrahedralization.diagnostic));
-                }
 
-                increment(result.work.cat_builds);
-                CatConstructionResult cat = measure_stage(result.work.stage_timings.cat, [&] {
-                    return build_cat(tetrahedralization.mesh, limits.cat);
-                });
-                accumulate(result.work.cat, cat.work);
-                if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
-                    return stop_result(*status);
-                }
-                if (!cat.succeeded()) {
-                    return finish(status_for(cat.status),
-                                  nested_diagnostic("CAT construction", to_string(cat.status), cat.diagnostic));
-                }
-                const std::vector<TriangleMesh> cat_surfaces = measure_stage(result.work.stage_timings.cat, [&] {
-                    return make_cat_surfaces(cat, object_count, limits.intermediate_mesh_limits);
-                });
-                if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
-                    return stop_result(*status);
+                    increment(result.work.cat_builds);
+                    cat = measure_stage(result.work.stage_timings.cat, [&] {
+                        return build_cat(tetrahedralization.mesh, limits.cat);
+                    });
+                    accumulate(result.work.cat, cat.work);
+                    if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
+                        return stop_result(*status);
+                    }
+                    if (!cat.succeeded()) {
+                        return finish(status_for(cat.status),
+                                      nested_diagnostic("CAT construction", to_string(cat.status), cat.diagnostic));
+                    }
+                    cat_surfaces = measure_stage(result.work.stage_timings.cat, [&] {
+                        return make_cat_surfaces(cat, object_count, limits.intermediate_mesh_limits);
+                    });
+                    if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
+                        return stop_result(*status);
+                    }
+
+                    if (reuse_retry_results) {
+                        prepared.local_results.resize(static_cast<std::size_t>(object_count));
+                    }
                 }
 
                 // DEVIATION(IROP-DEV-0017): Python launches an un-awaited
@@ -895,10 +943,6 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                         accepted_transforms.push_back(result.state.transforms[static_cast<std::size_t>(object)]);
                         continue;
                     }
-                    if (result.work.local_solves >= limits.max_total_local_solves) {
-                        return finish(PackingStatus::resource_exhausted,
-                                      "packing total local-solve limit was exhausted");
-                    }
                     if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
                         return stop_result(*status);
                     }
@@ -928,6 +972,7 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                     // DEVIATION(IROP-DEV-0030): Exact local curvature avoids the measured
                     // limited-memory stalls while retaining the same strict postchecks.
                     request.use_exact_hessian = !config.use_reference_growth_policy;
+                    request.openmp_threads = config.solver_openmp_threads;
                     request.bounds.minimum_volume_scale_multiplier = initial_scale;
                     // DEVIATION(IROP-DEV-0029): Removing artificial barrier slack
                     // avoids making a feasible pose infeasible through scale clamping.
@@ -961,6 +1006,17 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                     emit_progress();
                     if (const std::optional<PackingStatus> status = stopped(); status.has_value()) {
                         return stop_result(*status);
+                    }
+                    // This progress event denotes a logical object request, including
+                    // a reused result. Preserve its ordered RNG draws and cancellation.
+                    if (reuse_retry_results && prepared.local_results[static_cast<std::size_t>(object)].has_value()) {
+                        accepted_transforms.push_back(*prepared.local_results[static_cast<std::size_t>(object)]);
+                        increment(result.work.reused_local_solves);
+                        continue;
+                    }
+                    if (result.work.local_solves >= limits.max_total_local_solves) {
+                        return finish(PackingStatus::resource_exhausted,
+                                      "packing total local-solve limit was exhausted");
                     }
                     const LocalSolveDiagnosticsOptions local_diagnostics {
                         .max_trace_records = config.diagnostics.max_trace_records_per_solve,
@@ -1027,6 +1083,9 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                         return finish(PackingStatus::internal_failure,
                                       "successful local solve did not publish an accepted transform");
                     }
+                    if (reuse_retry_results) {
+                        prepared.local_results[static_cast<std::size_t>(object)] = *local.accepted_transform;
+                    }
                     accepted_transforms.push_back(*local.accepted_transform);
                 }
                 candidate_state.transforms = std::move(accepted_transforms);
@@ -1089,6 +1148,11 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                         if (colliding[object] && physical_backoffs[object] < 4 &&
                             result.state.transforms[object].volume_scale < target_scale) {
                             ++physical_backoffs[object];
+                            if (reuse_retry_results) {
+                                // Only this object's request bounds change. Other
+                                // results refer to the identical committed scene/CAT.
+                                prepared.local_results[object].reset();
+                            }
                             retry = true;
                         }
                     }
@@ -1105,7 +1169,11 @@ PackingResult run_packing(const TriangleMesh& centered_object, const TriangleMes
                             return stop_result(*status);
                         }
                         // The complete candidate and its RNG draws are discarded.
-                        // The next counted iteration starts from the valid committed scene.
+                        // Only successful local results against the unchanged context
+                        // survive; the next trial still validates the entire scene.
+                        if (reuse_retry_results) {
+                            retry_batch.emplace(std::move(prepared));
+                        }
                         continue;
                     }
                     correction =

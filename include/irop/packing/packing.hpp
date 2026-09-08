@@ -42,6 +42,11 @@ struct PackingAlgorithmConfig {
     // Retain the tranche-1 random-start, slack-bound and sampling policy for reproducibility.
     bool use_reference_growth_policy = false;
     PackingDiagnosticsOptions diagnostics;
+    // DEVIATION(IROP-DEV-0036): Avoid parallel algebra overhead for small local problems.
+    // Zero preserves inherited dependency threading, independently of growth policy.
+    std::uint32_t solver_openmp_threads = 1;
+    // Effective only for default growth and immediate full-surface physical retries.
+    bool reuse_physical_retry_results = true;
 };
 
 struct PackingEngineLimits {
@@ -185,6 +190,10 @@ struct PackingWork {
     std::uint64_t resampling_operations = 0;
     std::uint64_t sampling_refinements = 0;
     std::uint64_t physical_step_retries = 0;
+    // Logical retry requests that reuse a previously successful local transform.
+    std::uint64_t reused_local_solves = 0;
+    // Immediate retry iterations that retain the unchanged TetGen/CAT context.
+    std::uint64_t reused_prepared_batches = 0;
     TetrahedralizationWork tetrahedralization;
     CatConstructionWork cat;
     LocalSolveWork local_solve;

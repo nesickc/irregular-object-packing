@@ -95,6 +95,10 @@
           "exclusiveMinimum": 0,
           "maximum": 1e-06
         },
+        "openmp_threads": {
+          "type": "integer", "minimum": 0, "maximum": 256, "default": 0,
+          "description": "Optional. Zero or omission preserves inherited task threading; positive values request scoped OpenMP threads. MKL environment overrides may take precedence."
+        },
         "use_exact_hessian": {
           "type": "boolean",
           "default": false,

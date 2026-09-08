@@ -381,6 +381,16 @@
               "$ref": "#/$defs/nonnegative_integer"
             }
           }
+        },
+        "solver_openmp_threads": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 256,
+          "description": "Resolved solver OpenMP task request. Zero inherits; independent of the selected growth policy."
+        },
+        "reuse_physical_retry_results": {
+          "type": "boolean",
+          "description": "Requested reuse across unchanged physical retry scenes; reference growth always disables it. Optional for historical summaries."
         }
       }
     },
@@ -627,7 +637,13 @@
         "iterations": { "$ref": "#/$defs/nonnegative_integer" },
         "elapsed_milliseconds": { "$ref": "#/$defs/nonnegative_integer" },
         "minimum_solver_constraint": { "$ref": "#/$defs/nullable_number" },
-        "minimum_applied_constraint": { "$ref": "#/$defs/nullable_number" }
+        "minimum_applied_constraint": { "$ref": "#/$defs/nullable_number" },
+        "timings_nanoseconds": { "$ref": "#/$defs/local_solve_timings" },
+        "threading": { "$ref": "#/$defs/local_solve_threading" },
+        "threading_mixed": {
+          "type": "boolean",
+          "description": "Aggregate threading retains its first observation; this flag records any later difference."
+        }
       }
     },
     "collision_work": {
@@ -710,7 +726,9 @@
               "$ref": "#/$defs/nonnegative_integer"
             }
           }
-        }
+        },
+        "reused_local_solves": { "$ref": "#/$defs/nonnegative_integer" },
+        "reused_prepared_batches": { "$ref": "#/$defs/nonnegative_integer" }
       }
     },
     "history_record": {
@@ -982,6 +1000,36 @@
         "recovery_records_dropped": {
           "$ref": "#/$defs/nonnegative_integer"
         }
+      }
+    },
+    "local_solve_timings": {
+      "type": "object",
+      "description": "Wall-time nanoseconds. Preparation, setup (including teardown), solve and postcheck are disjoint. Callback times are subsets of dependency_solve; fixed-point evaluation has zero dependency/callback times.",
+      "additionalProperties": false,
+      "required": ["preparation", "dependency_setup", "dependency_solve", "postcheck", "constraint_callback", "jacobian_callback", "hessian_callback"],
+      "properties": {
+        "preparation": { "$ref": "#/$defs/nonnegative_integer" },
+        "dependency_setup": { "$ref": "#/$defs/nonnegative_integer" },
+        "dependency_solve": { "$ref": "#/$defs/nonnegative_integer" },
+        "postcheck": { "$ref": "#/$defs/nonnegative_integer" },
+        "constraint_callback": { "$ref": "#/$defs/nonnegative_integer" },
+        "jacobian_callback": { "$ref": "#/$defs/nonnegative_integer" },
+        "hessian_callback": { "$ref": "#/$defs/nonnegative_integer" }
+      }
+    },
+    "local_solve_threading": {
+      "type": ["object", "null"],
+      "description": "Null when no dependency was entered. Otherwise a task observation, not an effective MKL team size. Present MKL overrides with null text were unreadable, overlong or outside printable ASCII.",
+      "additionalProperties": false,
+      "required": ["requested_openmp_threads", "before_openmp_threads", "scoped_openmp_threads", "mkl_num_threads_present", "mkl_num_threads", "mkl_domain_num_threads_present", "mkl_domain_num_threads"],
+      "properties": {
+        "requested_openmp_threads": { "type": "integer", "minimum": 0, "maximum": 256 },
+        "before_openmp_threads": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "scoped_openmp_threads": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "mkl_num_threads_present": { "type": "boolean" },
+        "mkl_num_threads": { "type": ["string", "null"], "maxLength": 256, "pattern": "^[ -~]*$" },
+        "mkl_domain_num_threads_present": { "type": "boolean" },
+        "mkl_domain_num_threads": { "type": ["string", "null"], "maxLength": 256, "pattern": "^[ -~]*$" }
       }
     }
   }

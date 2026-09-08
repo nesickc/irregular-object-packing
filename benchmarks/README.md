@@ -45,8 +45,10 @@ peak commit are process-lifetime values including executable startup and depende
 loading, not allocations attributed to a single stage. Reports include compiler,
 build configuration, pinned core dependency versions, CPU model, logical processor
 count, physical memory, input geometry dimensions/counts, configuration, work,
-outcomes, and successful initialization placements. Dependency thread defaults are
-retained and labeled; orchestration is deterministic and single-threaded.
+outcomes, and successful initialization placements. Orchestration remains deterministic
+and serial. Packing now requests one scoped OpenMP thread by default; standalone
+local requests retain inherited settings. Reports distinguish requested OpenMP
+settings from ambient MKL overrides, which may take precedence.
 
 The original initialization API does not return partial state when throwing. Dense
 failure reports therefore retain the outcome, diagnostic, limits, and timing and
@@ -117,6 +119,8 @@ fallback enabled, one million random attempts, 300,000 ms engine time, and
 | `--timeout-ms`, `--local-timeout-ms` | Separate engine and per-solve cooperative time bounds, each at most 300,000 ms. Preparation and initialization retain their independent resource bounds. |
 | `--local-iterations` | Per-solve iteration limit, at most 10,000; default 1,000. |
 | `--no-adaptive-sampling`, `--no-initialization-fallback` | Explicitly disable those policies; absence uses production defaults. |
+| `--solver-openmp-threads` | Request 1 through 256 OpenMP threads around numerical dependency work; zero inherits the caller setting. Packing defaults to one. Caller state is restored; actual MKL workers may differ when MKL environment overrides are present. |
+| `--no-physical-retry-reuse` | Recompute unchanged TetGen/CAT context and local results after physical rejection. Default growth reuses only immediate unchanged trial work; reference growth disables reuse. |
 | `--detailed-diagnostics` | Opt into 128 local records with up to 64 trace samples each, and one bounded failed-problem snapshot for replay. Normal measurements retain up to 1,000 lightweight local records with no numerical trace. Dropped counts remain visible. |
 
 Each report contains SHA256 hashes and sizes of the two input files, compiled
@@ -141,6 +145,13 @@ includes publication. A failed run can contain partial-stage elapsed work. A sta
 that was never reached has zero elapsed work, not evidence that its workload is
 free. Physical validation is null when it did not run.
 
+Local timing also separates preparation, dependency setup/destruction, inclusive
+solve and independent postcheck in nanoseconds. Constraint, Jacobian and Hessian
+callback times are nested within solve; do not add them to its total. Retry reuse
+counts avoided local calls and prepared batches separately. Actual solver/TetGen/CAT
+work and local records exclude reused requests, while logical retries, physical
+checks and deadline/iteration accounting remain active.
+
 SHA256 measurement is timed separately and warms filesystem caches. The report's
 total and peak memory include hashing, packing, record formatting and saved-run
 loading, but exclude final measurement JSON formatting/writing. Runs are separate
@@ -160,6 +171,10 @@ The runner preserves each console log, report and artifact directory, records th
 executable SHA256, and reports success fractions plus min/median/max wall, CPU and
 peak memory. It stops increasing counts after a case fails to pack, validate,
 export and load; `-ContinueAfterFailure` deliberately overrides that choice.
+Use `-SolverOpenmpThreads 0` for inherited dependency threading or
+`-DisablePhysicalRetryReuse` for the uncached comparison. The runner forwards
+the thread option only when explicitly specified, retaining compatibility with
+saved older benchmark executables.
 Repeated counts in one runner invocation use the **same container**, so they test
 increasing density. For fixed-density 100/300/1,000 studies, use separately scaled
 container inputs and a new invocation/output directory per size. Keep direct
@@ -201,11 +216,13 @@ No dependency threading override was applied: process CPU is roughly 16 times
 wall time. Profile local preparation, callbacks, linear algebra and dependency
 thread settings before choosing the next optimization.
 
-Reproduce with a fresh output parent:
+Reproduce on this checkout with the locally preserved tranche-2 executable and a
+fresh output parent. The current executable uses tranche-3 defaults; it is not the
+recorded baseline binary:
 
 ```powershell
 ./benchmarks/run-stl-windows.ps1 `
-  -Executable build/windows-vs2026/benchmarks/Release/irop_benchmarks.exe `
+  -Executable build/windows-vs2026/benchmarks/Release/irop_benchmarks-tranche2.exe `
   -Object rc/input_models/ulamok_2kg_simplified.stl `
   -Container rc/containers/10_kg_np.stl -Counts 10 -Repeats 3 -Seed 1918 `
   -InitialScale 0.1 -FinalScale 1 -ScaleSteps 9 `
@@ -224,3 +241,25 @@ There is no speedup ratio between an early failure and a complete success.
 The user meshes live under ignored `rc/`; tracked generated tests cover the
 portable regression corpus. This measurement does not establish practical
 100/300/1,000-object throughput or convergence for other shapes/seeds.
+
+## Tranche 3 scaling study (2026-09-07)
+
+The [registered plan](tranche3-plan.json) fixes genuine-growth 100/300-object
+acceptance before further optimization. [Fixture instructions](fixtures/README.md)
+cover generated irregular, slender and concave meshes, surface-preserving detail
+variants, constant-density container scaling and independent float32 fit witnesses.
+The nine standard-library checks run in CI; generating large timing cases remains
+an explicit local action. Supplied-STL scaled containers and fixed-container
+non-fit controls are separate workloads.
+
+[ADR-0017](../docs/adr/0017-measured-solver-thread-control-and-scaling.md) records
+scoped numerical thread control, nested local timings and bounded physical retry
+reuse. The primary exact-target, physical/output, memory and Studio gates remain
+unchanged. The [final ledger](results/windows-20260907-tranche3.json) records three
+validated/exported/loaded full-growth successes each at 100 and 300, with medians
+33.484 and 125.446 seconds. The controlled 100-object baseline is 155.805 seconds
+(4.65x improvement); both final counts meet registered memory limits and Studio
+acceptance. See [STATUS](../docs/STATUS.md) for settings and verification. The
+supplied768-face 100-object scaled-container growth failure and the rejected slower
+collision-index prototype remain visible; these results do not certify arbitrary
+meshes or establish 1,000-object throughput.

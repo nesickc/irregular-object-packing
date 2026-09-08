@@ -264,7 +264,14 @@ diagnostics/replay and real-STL measurement foundations pass the evidence gates
 recorded in STATUS. Tranche 2 is Verified under ADR-0016: current-pose/exact-derivative
 growth, bounded sampling/physical recovery and preserved container sampling pass
 the supplied ten-object gate in three independent runs under 300 seconds, with
-both physical gates and a generated regression corpus. Tranches 3-4 remain planned.
+both physical gates and a generated regression corpus. Tranche 3 is Verified under
+ADR-0017 for registered known-fit 100/300 growth, with three successes each,
+33.484/125.446-second medians and Studio acceptance. Thread control and retry reuse
+meet those targets; heavier supplied100 growth still reaches a physical-work limit.
+The [pryanik follow-up](PRYANIK_INVESTIGATION.md) now prioritizes constructive
+placement and sampling/local-solve robustness on actual meshes, with collision
+acceleration where measured. Tranche 4 retains the 1,000-object extension after
+that practical follow-up.
 Hosted CI is a parallel acceptance item. Historical milestone scope and verification remain unchanged.
 
 ## Milestone Change Policy

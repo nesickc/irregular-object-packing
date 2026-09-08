@@ -14,9 +14,11 @@ param(
     [ValidateRange(1, 300000)][int]$LocalTimeoutMilliseconds = 30000,
     [ValidateRange(1, 10000)][int]$LocalIterations = 1000,
     [ValidateRange(1, 10000000)][int]$Attempts = 1000000,
+    [ValidateRange(0, 256)][int]$SolverOpenmpThreads = 1,
     [string]$Label = 'real-stl',
     [switch]$DisableAdaptiveSampling,
     [switch]$DisableInitializationFallback,
+    [switch]$DisablePhysicalRetryReuse,
     [switch]$DetailedDiagnostics,
     [switch]$ContinueAfterFailure
 )
@@ -64,8 +66,13 @@ foreach ($count in $Counts) {
             '--local-iterations', [string]$LocalIterations, '--attempts', [string]$Attempts,
             '--label', $Label, '--output', $reportPath, '--run-output', $runOutput
         )
+        # Preserve old benchmark binary invocations unless the caller selects this new option.
+        if ($PSBoundParameters.ContainsKey('SolverOpenmpThreads')) {
+            $arguments += @('--solver-openmp-threads', [string]$SolverOpenmpThreads)
+        }
         if ($DisableAdaptiveSampling) { $arguments += '--no-adaptive-sampling' }
         if ($DisableInitializationFallback) { $arguments += '--no-initialization-fallback' }
+        if ($DisablePhysicalRetryReuse) { $arguments += '--no-physical-retry-reuse' }
         if ($DetailedDiagnostics) { $arguments += '--detailed-diagnostics' }
         & $benchmarkExecutable @arguments *> $logPath
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $reportPath -PathType Leaf)) {
@@ -115,6 +122,8 @@ $summaryPath = Join-Path $benchmarkOutput 'summary.json'
     density_policy = 'same supplied container at every count; use separately scaled container files for fixed-density studies'
     aggregation = 'independent processes; input hashes warm file caches; timing distributions include unsuccessful outcomes; stage CPU null when unavailable'
     requested_counts = $Counts
+    disable_physical_retry_reuse_argument = [bool]$DisablePhysicalRetryReuse
+    solver_openmp_threads_argument = $(if ($PSBoundParameters.ContainsKey('SolverOpenmpThreads')) { $SolverOpenmpThreads } else { $null })
     object = $benchmarkObject
     container = $benchmarkContainer
     executable = $benchmarkExecutable

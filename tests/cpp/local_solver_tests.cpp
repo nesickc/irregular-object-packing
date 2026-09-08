@@ -16,6 +16,7 @@
 #include <system_error>
 #include <vector>
 
+#include "../../src/optimization/solver_openmp_scope.hpp"
 #include "irop/optimization/local_solver.hpp"
 
 namespace {
@@ -387,6 +388,72 @@ TEST_CASE("near-target local result snaps to an independently feasible exact bar
     CHECK(result.accepted_transform->volume_scale == exact_feasible_barrier);
     REQUIRE(result.work.minimum_applied_constraint.has_value());
     CHECK(*result.work.minimum_applied_constraint >= 0.0);
+}
+
+TEST_CASE("local solve timing attribution preserves success and bounded failure paths")
+{
+    const LocalSolveFixture fixture = make_box_fixture();
+    irop::LocalSolveRequest request = make_scale_only_request();
+    request.use_exact_hessian = true;
+    irop::LocalSolveLimits limits;
+    irop::LocalSolveWorkspace workspace;
+    request.openmp_threads = 1;
+    bool dependency_expected = true;
+    irop::LocalSolveStatus expected_status = irop::LocalSolveStatus::success;
+
+    SECTION("successful dependency solve") {}
+    SECTION("iteration-limited dependency solve")
+    {
+        limits.max_iterations = 1;
+        expected_status = irop::LocalSolveStatus::iteration_limit;
+    }
+    SECTION("fixed point bypasses dependency and callback timing")
+    {
+        request.bounds.minimum_volume_scale_multiplier = 1.0;
+        request.bounds.maximum_volume_scale_multiplier = 1.0;
+        dependency_expected = false;
+    }
+    SECTION("invalid input never starts dependency or postchecks")
+    {
+        request.padding = -1.0;
+        dependency_expected = false;
+        expected_status = irop::LocalSolveStatus::invalid_input;
+    }
+
+    const auto result = irop::solve_local_transform(fixture.mesh, fixture.cat, request, workspace, limits);
+    INFO(result.diagnostic);
+    REQUIRE(result.status == expected_status);
+    CHECK(result.accepted_transform.has_value() == (expected_status == irop::LocalSolveStatus::success));
+    CHECK(result.work.threading.has_value() == dependency_expected);
+    if (result.work.threading) {
+        CHECK(result.work.threading->requested_openmp_threads == 1);
+        CHECK(result.work.threading->scoped_openmp_threads == 1);
+        CHECK_FALSE(result.work.threading_mixed);
+    }
+    const auto& timings = result.work.timings;
+    const std::array durations { timings.preparation,     timings.dependency_setup,    timings.dependency_solve,
+                                 timings.postcheck,       timings.constraint_callback, timings.jacobian_callback,
+                                 timings.hessian_callback };
+    for (const auto duration : durations) {
+        CHECK(duration >= std::chrono::nanoseconds::zero());
+    }
+    // These are accounting invariants, not machine-dependent speed thresholds.
+    const auto stages = timings.preparation + timings.dependency_setup + timings.dependency_solve + timings.postcheck;
+    CHECK(stages < result.work.elapsed_time + std::chrono::milliseconds(1));
+    const auto callbacks = timings.constraint_callback + timings.jacobian_callback + timings.hessian_callback;
+    CHECK(callbacks <= timings.dependency_solve);
+    if (dependency_expected) {
+        CHECK(result.work.objective_evaluations > 0);
+        CHECK(timings.dependency_solve > std::chrono::nanoseconds::zero());
+    }
+    else {
+        CHECK(timings.dependency_setup == std::chrono::nanoseconds::zero());
+        CHECK(timings.dependency_solve == std::chrono::nanoseconds::zero());
+        CHECK(callbacks == std::chrono::nanoseconds::zero());
+    }
+    if (expected_status == irop::LocalSolveStatus::invalid_input) {
+        CHECK(timings.postcheck == std::chrono::nanoseconds::zero());
+    }
 }
 
 TEST_CASE("Ipopt solves the Python box scale fixture")
@@ -792,6 +859,121 @@ TEST_CASE("analytic local derivatives outperform Python-style forward difference
     {
         return forward_difference_checksum(constraints, object_center, 0.05, step);
     };
+}
+
+TEST_CASE("solver OpenMP task scopes inherit and restore nested or exceptional exits", "[local-solve][threading]")
+{
+    const irop::detail::SolverOpenmpScope inherited(0);
+    CHECK(inherited.scoped_threads() == inherited.before_threads());
+    {
+        const irop::detail::SolverOpenmpScope outer(2);
+        CHECK(outer.before_threads() == inherited.scoped_threads());
+        CHECK(outer.scoped_threads() == 2);
+        {
+            const irop::detail::SolverOpenmpScope nested(1);
+            CHECK(nested.before_threads() == 2);
+            CHECK(nested.scoped_threads() == 1);
+        }
+        CHECK(irop::detail::SolverOpenmpScope(0).scoped_threads() == 2);
+        CHECK_THROWS_AS(irop::detail::SolverOpenmpScope(257), irop::Error);
+        CHECK(irop::detail::SolverOpenmpScope(0).scoped_threads() == 2);
+        try {
+            const irop::detail::SolverOpenmpScope exceptional(1);
+            throw std::runtime_error("test scope unwind");
+        }
+        catch (const std::runtime_error&) {
+        }
+        CHECK(irop::detail::SolverOpenmpScope(0).scoped_threads() == 2);
+    }
+    CHECK(irop::detail::SolverOpenmpScope(0).scoped_threads() == inherited.scoped_threads());
+}
+
+TEST_CASE("local solver restores caller task threads after bounded failure and rejects invalid requests",
+          "[local-solve][threading]")
+{
+    const irop::detail::SolverOpenmpScope caller(2);
+    const LocalSolveFixture fixture = make_box_fixture();
+    irop::LocalSolveRequest request = make_scale_only_request();
+    request.openmp_threads = 1;
+    irop::LocalSolveLimits limits;
+    limits.max_iterations = 1;
+    irop::LocalSolveWorkspace workspace;
+    const auto limited = irop::solve_local_transform(fixture.mesh, fixture.cat, request, workspace, limits);
+    REQUIRE(limited.status == irop::LocalSolveStatus::iteration_limit);
+    REQUIRE(limited.work.threading);
+    CHECK(limited.work.threading->before_openmp_threads == 2);
+    CHECK(limited.work.threading->scoped_openmp_threads == 1);
+    CHECK(irop::detail::SolverOpenmpScope(0).scoped_threads() == 2);
+
+    request.openmp_threads = 257;
+    const auto invalid = irop::solve_local_transform(fixture.mesh, fixture.cat, request, workspace);
+    CHECK(invalid.status == irop::LocalSolveStatus::invalid_input);
+    CHECK_FALSE(invalid.work.threading);
+    CHECK(invalid.work.constraints_prepared == 0);
+    CHECK(irop::detail::SolverOpenmpScope(0).scoped_threads() == 2);
+
+    request.openmp_threads = 0;
+    const auto inherited = irop::solve_local_transform(fixture.mesh, fixture.cat, request, workspace);
+    INFO(inherited.diagnostic);
+    REQUIRE(inherited.succeeded());
+    REQUIRE(inherited.work.threading);
+    CHECK(inherited.work.threading->requested_openmp_threads == 0);
+    CHECK(inherited.work.threading->before_openmp_threads == 2);
+    CHECK(inherited.work.threading->scoped_openmp_threads == 2);
+}
+
+class TestMklEnvironment final {
+public:
+    TestMklEnvironment(const wchar_t* name, const std::wstring& value) : name_(name)
+    {
+        const DWORD required = GetEnvironmentVariableW(name_, nullptr, 0);
+        if (required > 0) {
+            original_.resize(required);
+            const DWORD copied = GetEnvironmentVariableW(name_, original_.data(), required);
+            if (copied >= required) {
+                throw std::runtime_error("test environment changed while saving it");
+            }
+            original_.resize(copied);
+            present_ = true;
+        }
+        if (!SetEnvironmentVariableW(name_, value.c_str())) {
+            throw std::runtime_error("could not set scoped test environment");
+        }
+    }
+    ~TestMklEnvironment() { SetEnvironmentVariableW(name_, present_ ? original_.c_str() : nullptr); }
+    TestMklEnvironment(const TestMklEnvironment&) = delete;
+    TestMklEnvironment& operator=(const TestMklEnvironment&) = delete;
+
+private:
+    const wchar_t* name_;
+    std::wstring original_;
+    bool present_ = false;
+};
+
+TEST_CASE("solver threading metadata records bounded MKL overrides without claiming their effective team size",
+          "[local-solve][threading]")
+{
+    SECTION("printable overrides are recorded independently of the OpenMP task")
+    {
+        const TestMklEnvironment threads(L"MKL_NUM_THREADS", L"4");
+        const TestMklEnvironment domains(L"MKL_DOMAIN_NUM_THREADS", L"MKL_BLAS=3");
+        const irop::detail::SolverOpenmpScope scoped(1);
+        CHECK(scoped.scoped_threads() == 1);
+        CHECK(scoped.mkl_num_threads().present);
+        CHECK(scoped.mkl_num_threads().value == "4");
+        CHECK(scoped.mkl_domain_num_threads().present);
+        CHECK(scoped.mkl_domain_num_threads().value == "MKL_BLAS=3");
+    }
+    SECTION("overlong or non-ASCII overrides remain explicitly present and unavailable")
+    {
+        const TestMklEnvironment threads(L"MKL_NUM_THREADS", std::wstring(257, L'4'));
+        const TestMklEnvironment domains(L"MKL_DOMAIN_NUM_THREADS", L"\u0434");
+        const irop::detail::SolverOpenmpScope scoped(1);
+        CHECK(scoped.mkl_num_threads().present);
+        CHECK_FALSE(scoped.mkl_num_threads().value);
+        CHECK(scoped.mkl_domain_num_threads().present);
+        CHECK_FALSE(scoped.mkl_domain_num_threads().value);
+    }
 }
 
 }  // namespace

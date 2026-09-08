@@ -322,4 +322,34 @@ TEST_CASE("local snapshots retain Hessian policy and read historical omission as
     }
 }
 
+TEST_CASE("local snapshots retain scoped OpenMP requests and historical omission inherits",
+          "[diagnostics][local-solve][threading]")
+{
+    irop::test::TempDirectory directory;
+    const auto path = directory.path() / "thread-policy.json";
+    irop::LocalSolveSnapshot snapshot { scale_request(), {}, box_constraints() };
+    for (const std::uint32_t threads : { 0U, 1U, 256U }) {
+        snapshot.request.openmp_threads = threads;
+        irop::write_local_solve_snapshot(path, snapshot);
+        CHECK(irop::read_local_solve_snapshot(path).request.openmp_threads == threads);
+    }
+    nlohmann::json document;
+    {
+        std::ifstream input(path);
+        input >> document;
+    }
+    document["request"].erase("openmp_threads");
+    write_json(path, document);
+    CHECK(irop::read_local_solve_snapshot(path).request.openmp_threads == 0);
+    for (const nlohmann::json& malformed : { nlohmann::json(nullptr), nlohmann::json(true), nlohmann::json(-1),
+                                             nlohmann::json(257), nlohmann::json(1.5), nlohmann::json("1") }) {
+        CAPTURE(malformed);
+        document["request"]["openmp_threads"] = malformed;
+        write_json(path, document);
+        CHECK_THROWS_AS(irop::read_local_solve_snapshot(path), irop::Error);
+    }
+    snapshot.request.openmp_threads = 257;
+    CHECK_THROWS_AS(irop::write_local_solve_snapshot(path, snapshot), irop::Error);
+}
+
 }  // namespace
